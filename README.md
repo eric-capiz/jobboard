@@ -74,3 +74,9 @@ Pushing to `main` deploys automatically via the GitHub Actions workflow in `.git
 ## Tech
 
 Vite + React 18 + TypeScript (strict) + Tailwind CSS · dnd-kit (drag-and-drop) · SheetJS (import) · Framer Motion · hand-rolled SVG charts · localStorage persistence with versioned migrations.
+
+## Environment variables (Vercel)
+
+- `MONGODB_URI` — MongoDB Atlas connection string for cloud sync storage
+- `SYNC_KEY` — shared secret the API checks on every state read/write
+- `VITE_SYNC_KEY` — same value as `SYNC_KEY` (used by the web client)
