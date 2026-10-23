@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { industryStats, type IndustryStats } from '../data/industries';
 import { useStore } from '../store';
-import { Button, EmptyState } from './ui';
+import { Button, EmptyState, Input } from './ui';
 
 export const INDUSTRIES_PER_PAGE = 25;
 
@@ -18,17 +18,23 @@ function IndustryCard({ stats }: { stats: IndustryStats }) {
           </span>
         </p>
         <p className="text-sm text-zinc-400">
-          {stats.companyCount}
+          {stats.rosterCount}
           <span className="ml-1 text-xs text-zinc-500">
-            {stats.companyCount === 1 ? 'company' : 'companies'}
+            {stats.rosterCount === 1 ? 'company' : 'companies'} in sweep
           </span>
         </p>
       </div>
 
       <p className="mt-2 text-xs text-zinc-500">
-        {stats.avgMatch !== null ? (
+        {stats.boardCompanyCount > 0 ? (
           <>
-            Avg match <span className="font-semibold text-zinc-300">{stats.avgMatch}%</span>
+            {stats.boardCompanyCount} on the board
+            {stats.avgMatch !== null && (
+              <>
+                {' · '}Avg match{' '}
+                <span className="font-semibold text-zinc-300">{stats.avgMatch}%</span>
+              </>
+            )}
             {stats.bestMatch !== null && (
               <>
                 {' · '}Best <span className="font-semibold text-zinc-300">{stats.bestMatch}%</span>
@@ -36,7 +42,7 @@ function IndustryCard({ stats }: { stats: IndustryStats }) {
             )}
           </>
         ) : (
-          'No scored jobs yet'
+          'No jobs on the board yet'
         )}
       </p>
 
@@ -51,10 +57,10 @@ function IndustryCard({ stats }: { stats: IndustryStats }) {
         </p>
       )}
 
-      {stats.topCompanies.length > 0 && (
+      {stats.exampleCompanies.length > 0 && (
         <p className="mt-auto pt-3 text-xs leading-relaxed text-zinc-500">
-          <span className="text-zinc-600">Top: </span>
-          {stats.topCompanies.join(', ')}
+          <span className="text-zinc-600">{stats.jobCount > 0 ? 'Top: ' : 'Includes: '}</span>
+          {stats.exampleCompanies.join(', ')}
         </p>
       )}
     </div>
@@ -64,49 +70,76 @@ function IndustryCard({ stats }: { stats: IndustryStats }) {
 export function IndustriesView() {
   const { jobs, settings } = useStore();
   const [page, setPage] = useState(1);
+  const [query, setQuery] = useState('');
 
-  const stats = useMemo(() => industryStats(jobs, settings.stages), [jobs, settings.stages]);
+  const allStats = useMemo(() => industryStats(jobs, settings.stages), [jobs, settings.stages]);
+  const stats = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return allStats;
+    return allStats.filter((s) => s.name.toLowerCase().includes(q));
+  }, [allStats, query]);
+
   const pageCount = Math.max(1, Math.ceil(stats.length / INDUSTRIES_PER_PAGE));
 
-  // Keep the page in range if the board shrinks (deletes, stage moves don't
-  // change industries, but imports/deletes do).
+  useEffect(() => {
+    setPage(1);
+  }, [query]);
+
   useEffect(() => {
     if (page > pageCount) setPage(pageCount);
   }, [page, pageCount]);
 
-  if (jobs.length === 0) {
+  if (allStats.length === 0) {
     return (
       <EmptyState
         title="No industries yet"
-        description="Industries are grouped from the companies on your board. Once jobs land here, each industry gets a card with its job count, companies, and match stats."
+        description="Industries come from the sweep's company lists. Once they load, each industry gets a card with its companies and board stats."
       />
     );
   }
 
+  const totalCompanies = allStats.reduce((sum, s) => sum + s.rosterCount, 0);
   const start = (page - 1) * INDUSTRIES_PER_PAGE;
   const pageStats = stats.slice(start, start + INDUSTRIES_PER_PAGE);
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-end justify-between gap-2">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-zinc-100">Industries</h1>
           <p className="mt-0.5 text-sm text-zinc-500">
-            {stats.length} {stats.length === 1 ? 'industry' : 'industries'} across {jobs.length} jobs
+            {allStats.length} industries · {totalCompanies} companies in the sweep · {jobs.length}{' '}
+            jobs on the board
           </p>
         </div>
-        {pageCount > 1 && (
-          <p className="text-xs text-zinc-500">
-            Showing {start + 1}–{start + pageStats.length} of {stats.length}
-          </p>
-        )}
+        <div className="w-full sm:w-64">
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search industries…"
+            aria-label="Search industries"
+          />
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {pageStats.map((s) => (
-          <IndustryCard key={s.name} stats={s} />
-        ))}
-      </div>
+      {stats.length === 0 ? (
+        <p className="py-10 text-center text-sm text-zinc-500">
+          No industries match “{query}”.
+        </p>
+      ) : (
+        <>
+          {pageCount > 1 && (
+            <p className="text-xs text-zinc-500">
+              Showing {start + 1}–{start + pageStats.length} of {stats.length}
+            </p>
+          )}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {pageStats.map((s) => (
+              <IndustryCard key={s.name} stats={s} />
+            ))}
+          </div>
+        </>
+      )}
 
       {pageCount > 1 && (
         <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
