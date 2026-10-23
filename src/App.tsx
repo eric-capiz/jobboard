@@ -4,6 +4,7 @@ import { KanbanBoard } from './components/KanbanBoard';
 import { JobDrawer } from './components/JobDrawer';
 import { Dashboard } from './components/Dashboard';
 import { ResumesView } from './components/ResumesView';
+import { IndustriesView } from './components/IndustriesView';
 import { Settings } from './components/Settings';
 import { AddJobModal } from './components/AddJobModal';
 import { Button } from './components/ui';
@@ -11,7 +12,7 @@ import { Button } from './components/ui';
 // SheetJS is heavy — split it into its own chunk, loaded only when the import dialog opens.
 const Importer = lazy(() => import('./components/Importer').then((m) => ({ default: m.Importer })));
 
-type View = 'dashboard' | 'pipeline' | 'resumes' | 'settings';
+type View = 'dashboard' | 'pipeline' | 'industries' | 'resumes' | 'settings';
 
 const NAV: { id: View; label: string; icon: ReactNode }[] = [
   {
@@ -32,6 +33,16 @@ const NAV: { id: View; label: string; icon: ReactNode }[] = [
     icon: (
       <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6">
         <path d="M2 4h4v10H2zM7 4h4v6H7zM12 4h4v3h-4z" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
+    id: 'industries',
+    label: 'Industries',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6">
+        <path d="M2 16V8l4 2.4V8l4 2.4V4h6v12z" strokeLinejoin="round" />
+        <path d="M5.5 13.5h.01M9 13.5h.01M12.5 13.5h.01" strokeLinecap="round" strokeWidth="2" />
       </svg>
     ),
   },
@@ -143,6 +154,7 @@ export default function App() {
             >
               {view === 'dashboard' && <Dashboard />}
               {view === 'pipeline' && <KanbanBoard onAddJob={() => setAddOpen(true)} />}
+              {view === 'industries' && <IndustriesView />}
               {view === 'resumes' && <ResumesView />}
               {view === 'settings' && <Settings />}
             </motion.div>
@@ -151,7 +163,7 @@ export default function App() {
 
         {/* Mobile bottom nav */}
         <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-white/[0.07] bg-zinc-950/90 backdrop-blur-lg lg:hidden">
-          <div className="grid grid-cols-4">
+          <div className="grid grid-cols-5">
             {NAV.map((n) => (
               <button
                 key={n.id}
