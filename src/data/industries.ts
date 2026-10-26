@@ -1224,6 +1224,7 @@ export const SWEEP_ROSTER: Record<string, string[]> = {
  "Outdoors": [
   "Amer Sports (Salomon, Arc'teryx)",
   "Backcountry",
+  "CSC Generation",
   "Bass Pro Shops / Cabela's",
   "Columbia Sportswear",
   "Helen of Troy (Hydro Flask)",
