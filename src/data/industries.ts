@@ -1044,6 +1044,7 @@ export const SWEEP_ROSTER: Record<string, string[]> = {
   "Wpromote"
  ],
  "Field Service SaaS": [
+  "EverCommerce",
   "FieldEdge",
   "Housecall Pro",
   "Jobber",
