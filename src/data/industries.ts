@@ -888,6 +888,7 @@ export const SWEEP_ROSTER: Record<string, string[]> = {
   "Fidelity Investments",
   "Goldman Sachs",
   "Morgan Stanley",
+  "NBH Bank",
   "Vanguard"
  ],
  "Healthcare/Tech": [
