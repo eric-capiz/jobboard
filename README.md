@@ -80,3 +80,32 @@ Vite + React 18 + TypeScript (strict) + Tailwind CSS · dnd-kit (drag-and-drop) 
 - `MONGODB_URI` — MongoDB Atlas connection string for cloud sync storage
 - `SYNC_KEY` — shared secret the API checks on every state read/write
 - `VITE_SYNC_KEY` — same value as `SYNC_KEY` (used by the web client)
+
+## Finder (Find Companies + Find Jobs)
+
+The **Finder** view is how the board fills itself with real leads:
+
+- **Find Companies** loads the verified company seed (`api/companies-seed.ts` —
+  1,526 companies whose careers links were verified to land on real listings)
+  and stores only the ones not already in the database. Pressing it again
+  adds zero duplicates. New company sources plug in by extending the seed
+  file; the dedupe key is normalized name + website domain.
+- **Find Jobs** takes the resume you select, then searches those companies'
+  own careers boards in chunks via `POST /api/find-jobs` (cursor + limit,
+  same `x-sync-key` auth as `/api/state`). Each chunk reads the company's
+  own board — Greenhouse / Lever / Ashby public board endpoints, or the
+  board linked from the company's careers page — and filters for frontend
+  titles (or full-stack with frontend in the description) in remote-US
+  locations (TX-only remote flagged, not hidden). Matches are scored
+  against the selected resume's actual skills; gaps are flagged, never
+  padded. Every result links straight to the employer's application page.
+- Nothing is added to the pipeline until you press **Add to board** on a
+  lead, and nothing ever auto-applies. Leads under 60% show as Near misses.
+- Honest limits: companies on custom boards the finder can't read (Apple,
+  Google, Workday, and similar) are skipped, not guessed at — that coverage
+  needs per-company adapters, which is the next extension point. The
+  company database lives in the same state doc as jobs, so it scales to
+  tens of thousands of companies; a million-company database would need a
+  real database table instead of the state doc (Vercel function payload
+  limits), and the Finder is written so that move only touches the seed
+  source and the state shape, not the UI.

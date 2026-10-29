@@ -12,6 +12,7 @@ import {
   ActivityEvent,
   ActivityKind,
   AppSettings,
+  Company,
   DEFAULT_STAGES,
   ImportRow,
   Job,
@@ -21,6 +22,7 @@ import {
   StageId,
   canTransition,
   clampMatchScore,
+  companyDedupeKey,
   dedupeImportRows,
   deriveTailoredFileName,
   findStage,
@@ -44,12 +46,14 @@ export interface StoreState {
   jobs: Job[];
   masterResumes: MasterResume[];
   settings: AppSettings;
+  companies: Company[];
   selectedJobId: string | null;
   initialized: boolean;
 }
 
 export type Action =
   | { type: 'ADD_JOB'; job: Job }
+  | { type: 'ADD_COMPANIES'; companies: Company[] }
   | { type: 'IMPORT_JOBS'; rows: ImportRow[] }
   | { type: 'UPDATE_JOB'; id: string; patch: Partial<Job>; activityText?: string; activityKind?: ActivityKind }
   | { type: 'MOVE_JOB'; id: string; toStageId: StageId }
@@ -79,6 +83,19 @@ function reducer(state: StoreState, action: Action): StoreState {
       const job = action.job;
       const activity = logActivity(job, 'created', 'Job added');
       return { ...state, jobs: [touch({ ...job, activities: [] }, activity), ...state.jobs] };
+    }
+    case 'ADD_COMPANIES': {
+      // Dedupe against the DB and within the batch; new rows go first.
+      const seen = new Set(state.companies.map((c) => companyDedupeKey(c.name, c.website)));
+      const fresh: Company[] = [];
+      for (const c of action.companies) {
+        const key = companyDedupeKey(c.name, c.website);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        fresh.push(c);
+      }
+      if (fresh.length === 0) return state;
+      return { ...state, companies: [...fresh, ...state.companies] };
     }
     case 'IMPORT_JOBS': {
       const { unique } = dedupeImportRows(action.rows, state.jobs);
@@ -175,6 +192,7 @@ function reducer(state: StoreState, action: Action): StoreState {
         jobs: action.state.jobs,
         masterResumes: action.state.masterResumes,
         settings: action.state.settings,
+        companies: action.state.companies,
         selectedJobId: null,
         initialized: true,
       };
@@ -201,6 +219,7 @@ function initialState(): StoreState {
     jobs: [],
     masterResumes: [],
     settings: defaultSettings(),
+    companies: [],
     selectedJobId: null,
     initialized: false,
   };
@@ -248,6 +267,19 @@ function normalizeMasterResume(raw: unknown): MasterResume {
   };
 }
 
+function normalizeCompany(raw: unknown): Company {
+  const c = (typeof raw === 'object' && raw !== null ? raw : {}) as Partial<Company>;
+  return {
+    id: typeof c.id === 'string' ? c.id : uid(),
+    name: String(c.name ?? ''),
+    website: String(c.website ?? ''),
+    careersUrl: String(c.careersUrl ?? ''),
+    category: String(c.category ?? ''),
+    source: String(c.source ?? 'Seed'),
+    addedAt: String(c.addedAt ?? nowIso()),
+  };
+}
+
 function normalizeSettings(raw: unknown): AppSettings {
   const s = (typeof raw === 'object' && raw !== null ? raw : {}) as Partial<AppSettings>;
   return {
@@ -270,6 +302,7 @@ export function migrate(raw: unknown): PersistedState {
     jobs: [],
     masterResumes: [],
     settings: defaultSettings(),
+    companies: [],
   };
   if (typeof raw !== 'object' || raw === null) return base;
   const r = raw as Partial<PersistedState>;
@@ -278,6 +311,7 @@ export function migrate(raw: unknown): PersistedState {
     jobs: Array.isArray(r.jobs) ? r.jobs.map((j) => normalizeJob(j)) : [],
     masterResumes: Array.isArray(r.masterResumes) ? r.masterResumes.map((m) => normalizeMasterResume(m)) : [],
     settings: normalizeSettings(r.settings),
+    companies: Array.isArray(r.companies) ? r.companies.map((c) => normalizeCompany(c)) : [],
   };
 }
 
@@ -291,6 +325,7 @@ function loadPersisted(): StoreState | null {
       jobs: migrated.jobs,
       masterResumes: migrated.masterResumes,
       settings: migrated.settings,
+      companies: migrated.companies,
       selectedJobId: null,
       initialized: true,
     };
@@ -308,6 +343,7 @@ export type NewJobInput = Omit<Job, 'id' | 'createdAt' | 'updatedAt' | 'activiti
 interface StoreApi extends StoreState {
   dispatch: React.Dispatch<Action>;
   addJob: (input: NewJobInput) => void;
+  addCompanies: (input: Omit<Company, 'id' | 'addedAt'>[]) => void;
   moveJob: (id: string, toStageId: StageId) => boolean;
   updateJob: (id: string, patch: Partial<Job>, activityText?: string, activityKind?: ActivityKind) => void;
   deleteJob: (id: string) => void;
@@ -337,6 +373,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       jobs: state.jobs,
       masterResumes: state.masterResumes,
       settings: state.settings,
+      companies: state.companies,
       updatedAt: Date.now(),
     };
     try {
@@ -415,6 +452,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   );
   const selectJob = useCallback((id: string | null) => dispatch({ type: 'SELECT_JOB', id }), []);
 
+  const addCompanies = useCallback((input: Omit<Company, 'id' | 'addedAt'>[]) => {
+    const ts = nowIso();
+    const companies: Company[] = input.map((c) => ({ ...c, id: uid(), addedAt: ts }));
+    dispatch({ type: 'ADD_COMPANIES', companies });
+  }, []);
+
   const addMasterResume = useCallback((input: Omit<MasterResume, 'id' | 'uploadedAt'>) => {
     const resume: MasterResume = { ...input, id: uid(), uploadedAt: nowIso() };
     dispatch({ type: 'ADD_MASTER_RESUME', resume });
@@ -430,6 +473,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       jobs: state.jobs,
       masterResumes: state.masterResumes,
       settings: state.settings,
+      companies: state.companies,
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -464,6 +508,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       ...state,
       dispatch,
       addJob,
+      addCompanies,
       moveJob,
       updateJob,
       deleteJob,
@@ -479,6 +524,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [
       state,
       addJob,
+      addCompanies,
       moveJob,
       updateJob,
       deleteJob,

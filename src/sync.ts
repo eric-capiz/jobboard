@@ -9,6 +9,13 @@ export function isSyncEnabled(): boolean {
   return !!SYNC_KEY;
 }
 
+/** The sync key for authenticated API calls (Finder job search).
+ *  Already embedded in the client bundle via VITE_SYNC_KEY — same key the
+ *  app uses for state sync, no new secret. */
+export function getSyncKey(): string | undefined {
+  return SYNC_KEY;
+}
+
 export interface CloudState {
   state: unknown;
   updatedAt: string;

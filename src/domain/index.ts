@@ -93,11 +93,27 @@ export interface AppSettings {
   defaultMasterResumeId: string;
 }
 
+/** A company in the Finder's database. The Finder searches these companies'
+ *  careers pages for jobs. Companies arrive via Find Companies (seeded from
+ *  the verified company spreadsheet; later sources append their own rows). */
+export interface Company {
+  id: string;
+  name: string;
+  website: string;
+  /** Careers page URL, verified to land on real listings. '' when unknown. */
+  careersUrl: string;
+  category: string;
+  /** Where the row came from, e.g. 'Seed'. */
+  source: string;
+  addedAt: string; // ISO timestamp
+}
+
 export interface PersistedState {
   version: number;
   jobs: Job[];
   masterResumes: MasterResume[];
   settings: AppSettings;
+  companies: Company[];
 }
 
 /* ------------------------------------------------------------------ */
@@ -420,4 +436,42 @@ export function importRowToJob(
     createdAt: ts,
     updatedAt: ts,
   };
+}
+
+/* ------------------------------------------------------------------ */
+/* Companies (Finder database)                                         */
+/* ------------------------------------------------------------------ */
+
+/** Website domain, used for company dedupe (www. stripped). */
+export function companyDomain(website: string): string {
+  try {
+    const host = new URL(website).hostname.toLowerCase();
+    return host.startsWith('www.') ? host.slice(4) : host;
+  } catch {
+    return website.toLowerCase().trim();
+  }
+}
+
+/** Dedupe key for companies: normalized name + website domain. */
+export const companyDedupeKey = (name: string, website: string): string =>
+  `${normalizeKey(name)}|${companyDomain(website)}`;
+
+/** Split candidate company rows into new vs already-in-DB. */
+export function dedupeCompanies<T extends { name: string; website: string }>(
+  rows: T[],
+  existing: Company[],
+): { unique: T[]; skipped: number } {
+  const seen = new Set(existing.map((c) => companyDedupeKey(c.name, c.website)));
+  const unique: T[] = [];
+  let skipped = 0;
+  for (const row of rows) {
+    const key = companyDedupeKey(row.name, row.website);
+    if (seen.has(key)) {
+      skipped += 1;
+      continue;
+    }
+    seen.add(key);
+    unique.push(row);
+  }
+  return { unique, skipped };
 }
