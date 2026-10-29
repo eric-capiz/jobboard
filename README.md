@@ -85,19 +85,27 @@ Vite + React 18 + TypeScript (strict) + Tailwind CSS · dnd-kit (drag-and-drop) 
 
 The **Finder** view is how the board fills itself with real leads:
 
-- **Find Companies** loads the verified company seed (`api/companies-seed.ts` —
-  1,526 companies whose careers links were verified to land on real listings)
-  and stores only the ones not already in the database, at most 500 new ones
-  per click — press it again for the next batch. New company sources plug in
-  by extending the seed file; the dedupe key is normalized name + website
-  domain.
+- **Find Companies** returns up to 500 companies NOT already in the database
+  per click, with no total cap — press it again for the next 500, as many
+  times as you like. It serves the verified seed first (`api/companies-seed.ts` —
+  1,526 companies whose careers links were verified to land on real
+  listings), then live discovery from Wikidata (US companies with official
+  websites) via `POST /api/find-companies` (same `x-sync-key` auth as
+  `/api/state`). The server filters every batch against your own state doc
+  and the client persists the discovery offset, so a company is never
+  returned twice and a timed-out press loses nothing — press again and it
+  retries the same page. The dedupe key is normalized name (corporate
+  suffixes stripped) + website domain.
 - **Find Jobs** takes the resume you select, then searches the companies in
   your database — the client sends their names, and the API resolves those
-  names against its seed (never a client-supplied URL) — in chunks via
+  names against the state doc (websites and known careers pages) and the
+  seed as a fallback (never a client-supplied URL) — in chunks via
   `POST /api/find-jobs` (cursor + limit, same `x-sync-key` auth as
   `/api/state`). Each chunk reads the company's own board — Greenhouse /
   Lever / Ashby public board endpoints, or the board linked from the
-  company's careers page — and filters for frontend titles (or full-stack
+  company's careers page (for companies without a known careers page, the
+  finder looks for a board link on the company's own homepage, `/careers`,
+  and `/jobs` first) — and filters for frontend titles (or full-stack
   with frontend in the description) in remote-US locations (TX-only remote
   flagged, not hidden). Matches are scored against the selected resume's
   actual skills; gaps are flagged, never padded. Every result links straight

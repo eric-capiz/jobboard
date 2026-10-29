@@ -2,20 +2,21 @@
  *
  * Searches companies' OWN careers boards for live remote frontend postings
  * matched to the resume the user selected. It never touches aggregators,
- * never takes a URL from the client (companies come only from the bundled
- * seed file, which is the verified company database), and never writes
- * anything: leads are returned to the app, and only the user can add one
- * to the board.
+ * never takes a URL from the client (companies come from the names the
+ * client sends, resolved against the user's own state doc and the bundled
+ * seed as a fallback), and never writes anything: leads are returned to
+ * the app, and only the user can add one to the board.
  *
  * Chunked + idempotent: the client passes the names of the companies in
- * its database plus a cursor (index into that filtered pool) and a limit;
- * the function processes that slice and returns the next cursor. A
- * timed-out chunk is simply retried — no state is written server-side, so
- * a retry can never duplicate anything.
+ * its database plus a cursor (index into that name list) and a limit; the
+ * function processes that slice and returns the next cursor. A timed-out
+ * chunk is simply retried — no state is written server-side, so a retry
+ * can never duplicate anything.
  *
  * Auth mirrors /api/state: the x-sync-key header must match SYNC_KEY.
  */
 
+import { MongoClient } from 'mongodb';
 import { COMPANIES_SEED } from './companies-seed';
 
 // Vercel provides process.env at runtime; the project has no @types/node,
@@ -306,6 +307,42 @@ function screenPostings(company: string, postings: Posting[], resumeText: string
 }
 
 /* ------------------------------------------------------------------ */
+/* State doc (the user's own company database)                         */
+/* ------------------------------------------------------------------ */
+
+let mongoClient: MongoClient | null = null;
+
+interface StateDoc {
+  _id: string;
+  state?: { companies?: unknown };
+}
+
+async function getStateCompanies(): Promise<{ name: string; website: string; careersUrl: string }[]> {
+  const uri = process.env.MONGODB_URI;
+  if (!uri) return [];
+  if (!mongoClient) {
+    mongoClient = new MongoClient(uri);
+    await mongoClient.connect();
+  }
+  const doc = await mongoClient
+    .db('dealboard')
+    .collection<StateDoc>('app_state')
+    .findOne({ _id: 'jobboard' });
+  const list = doc?.state?.companies;
+  if (!Array.isArray(list)) return [];
+  return list
+    .map((c) => {
+      const o = (typeof c === 'object' && c !== null ? c : {}) as Record<string, unknown>;
+      return {
+        name: String(o.name ?? ''),
+        website: String(o.website ?? ''),
+        careersUrl: String(o.careersUrl ?? ''),
+      };
+    })
+    .filter((c) => c.name || c.website);
+}
+
+/* ------------------------------------------------------------------ */
 /* Handler                                                             */
 /* ------------------------------------------------------------------ */
 
@@ -325,9 +362,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const body = req.body ?? {};
   const resumeText = typeof body.resumeText === 'string' ? body.resumeText : '';
-  // The client sends the names of the companies in its database. The
-  // function resolves those names against the seed — it never accepts a
-  // URL from the client, so this endpoint can't be used as an open proxy.
+  // The client sends the NAMES of the companies in its database. The
+  // function resolves those names against the user's own state doc (for
+  // websites and known careers pages) and the bundled seed as a fallback.
+  // It never accepts a URL from the client, so this endpoint can't be
+  // used as an open proxy.
   const normName = (v: string): string =>
     v
       .toLowerCase()
@@ -335,70 +374,114 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .replace(/[^a-z0-9\s]/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
-  const wanted = Array.isArray(body.companies)
-    ? new Set(
-        (body.companies as unknown[])
-          .filter((c): c is string => typeof c === 'string')
-          .map((c) => normName(c)),
-      )
-    : null;
-  const pool = wanted ? COMPANIES_SEED.filter((s) => wanted.has(normName(s.n))) : COMPANIES_SEED;
+  const rawNames: string[] = Array.isArray(body.companies)
+    ? (body.companies as unknown[]).filter((c): c is string => typeof c === 'string')
+    : [];
+  const seenNameKeys = new Set<string>();
+  const uniqueNames = rawNames.filter((n) => {
+    const k = normName(n);
+    if (!k || seenNameKeys.has(k)) return false;
+    seenNameKeys.add(k);
+    return true;
+  });
   const cursorRaw = Number(body.cursor ?? 0);
   const limitRaw = Number(body.limit ?? 15);
   const cursor = Number.isFinite(cursorRaw) && cursorRaw >= 0 ? Math.floor(cursorRaw) : 0;
   const limit = Number.isFinite(limitRaw) ? Math.min(MAX_LIMIT, Math.max(1, Math.floor(limitRaw))) : 15;
 
+  // Resolve each name: state doc first (it carries websites and careers
+  // pages for everything Find Companies added), bundled seed as fallback.
+  const dbMap = new Map<string, { name: string; website: string; careersUrl: string }>();
+  try {
+    const stateCompanies = await getStateCompanies();
+    for (const c of stateCompanies) {
+      const k = normName(c.name);
+      if (!k) continue;
+      const prev = dbMap.get(k);
+      if (!prev || (!prev.careersUrl && c.careersUrl)) dbMap.set(k, c);
+    }
+  } catch {
+    // State read failed — the seed fallback below still covers seed companies.
+  }
+  const seedMap = new Map<string, (typeof COMPANIES_SEED)[number]>();
+  for (const s of COMPANIES_SEED) {
+    const k = normName(s.n);
+    if (k && !seedMap.has(k)) seedMap.set(k, s);
+  }
+
   const startedAt = Date.now();
-  const slice = pool.slice(cursor, cursor + limit);
+  const slice = uniqueNames.slice(cursor, cursor + limit);
   const leads: FinderLead[] = [];
   let postingsSeen = 0;
   let boardErrors = 0;
-  let processed = 0;
+  let noBoard = 0;
+
+  async function processName(name: string): Promise<FinderLead[]> {
+    const k = normName(name);
+    const db = dbMap.get(k);
+    const seed = seedMap.get(k);
+    const displayName = db?.name ?? seed?.n ?? name;
+    const careersUrl = db?.careersUrl || seed?.c || '';
+    const website = db?.website || seed?.w || '';
+    let board = careersUrl ? boardFromUrl(careersUrl) : null;
+    if (!board && website) {
+      // Discover the board from the company's own site: homepage first,
+      // then the usual careers paths. A board link found on the company's
+      // own pages is verified — a path that doesn't resolve to a board is
+      // simply skipped.
+      const base = website.replace(/\/$/, '');
+      for (const u of [website, `${base}/careers`, `${base}/jobs`]) {
+        try {
+          const html = await fetchText(u);
+          board = discoverBoard(html);
+          if (board) break;
+        } catch {
+          // Next candidate path.
+        }
+      }
+    }
+    if (!board) {
+      noBoard += 1;
+      return [];
+    }
+    const postings = await fetchBoard(board.board, board.slug);
+    postingsSeen += postings.length;
+    return screenPostings(displayName, postings, resumeText);
+  }
 
   // Small worker pool: 5 companies at a time, soft deadline so the
-  // function never blows the serverless time limit mid-chunk.
+  // function never blows the serverless time limit mid-chunk. The cursor
+  // only advances past the contiguous run of finished companies, so a
+  // company cut off by the deadline is retried — never skipped — and the
+  // client dedupes any lead returned twice.
   let next = 0;
+  const completed = new Set<number>();
   async function worker(): Promise<void> {
     while (next < slice.length) {
       if (Date.now() - startedAt > SOFT_DEADLINE_MS) return;
       const idx = next;
       next += 1;
-      const company = slice[idx];
-      if (!company || !company.c) {
-        processed += 1;
-        continue;
-      }
       try {
-        let board = boardFromUrl(company.c);
-        if (!board) {
-          const hub = await fetchText(company.c);
-          board = discoverBoard(hub);
-        }
-        if (!board) {
-          processed += 1;
-          continue;
-        }
-        const postings = await fetchBoard(board.board, board.slug);
-        postingsSeen += postings.length;
-        leads.push(...screenPostings(company.n, postings, resumeText));
+        const found = await processName(slice[idx]);
+        leads.push(...found);
       } catch {
         boardErrors += 1;
       }
-      processed += 1;
+      completed.add(idx);
     }
   }
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, slice.length) }, () => worker()));
 
-  // If the deadline cut the chunk short, the client resumes at the next
-  // unprocessed index — nothing is lost or double-counted.
-  const nextCursor = cursor + processed;
-  const done = nextCursor >= pool.length;
+  let prefix = 0;
+  while (completed.has(prefix)) prefix += 1;
+  const nextCursor = cursor + prefix;
+  const done = nextCursor >= uniqueNames.length;
   return res.status(200).json({
     leads,
-    checked: processed,
-    totalCompanies: pool.length,
+    checked: completed.size,
+    totalCompanies: uniqueNames.length,
     nextCursor: done ? null : nextCursor,
     done,
-    stats: { postingsSeen, boardErrors },
+    stats: { postingsSeen, boardErrors, noBoard },
   });
 }

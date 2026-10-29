@@ -9,11 +9,11 @@ const COMPANIES_PER_PAGE = 25;
 const JOBS_CHUNK = 15;
 
 interface CompanyResult {
-  seedTotal: number;
   added: number;
-  already: number;
-  remaining: number;
-  total: number;
+  seedRemaining: number;
+  nextOffset: number;
+  exhausted: boolean;
+  error?: string;
 }
 
 function ScoreBadge({ score }: { score: number }) {
@@ -31,6 +31,16 @@ export function FinderView() {
   /* ---------------- Companies ---------------- */
   const [findingCompanies, setFindingCompanies] = useState(false);
   const [companyResult, setCompanyResult] = useState<CompanyResult | null>(null);
+  // Wikidata discovery offset, persisted locally so presses keep walking
+  // the live result set. Losing it is harmless — the server also filters
+  // against the database, so no company is ever returned twice.
+  const [discoveryOffset, setDiscoveryOffset] = useState<number>(() => {
+    try {
+      return Number(localStorage.getItem('jobboard-finder-offset') ?? 0) || 0;
+    } catch {
+      return 0;
+    }
+  });
   const [companyQuery, setCompanyQuery] = useState('');
   const [companyPage, setCompanyPage] = useState(1);
 
@@ -57,27 +67,74 @@ export function FinderView() {
   async function handleFindCompanies() {
     setFindingCompanies(true);
     try {
-      // Seed loads on demand so the main bundle stays small.
-      const { COMPANIES_SEED } = await import('../../api/companies-seed');
-      const rows = COMPANIES_SEED.map((s) => ({
-        name: s.n,
-        website: s.w,
-        careersUrl: s.c,
-        category: s.g,
-        source: 'Seed',
+      const key = getSyncKey();
+      if (!key) {
+        setCompanyResult({
+          added: 0,
+          seedRemaining: 0,
+          nextOffset: discoveryOffset,
+          exhausted: false,
+          error: "Find Companies needs the app's sync key, which isn't set in this build.",
+        });
+        return;
+      }
+      const r = await fetch('/api/find-companies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-sync-key': key },
+        body: JSON.stringify({ limit: 500, offset: discoveryOffset }),
+      });
+      if (!r.ok) {
+        setCompanyResult({
+          added: 0,
+          seedRemaining: 0,
+          nextOffset: discoveryOffset,
+          exhausted: false,
+          error:
+            r.status === 401
+              ? 'Find Companies was not authorized. Check the app sync key and try again.'
+              : `Find Companies failed (HTTP ${r.status}). Nothing was lost — press again.`,
+        });
+        return;
+      }
+      const data = await r.json();
+      const rows = ((data.companies ?? []) as {
+        name: string;
+        website: string;
+        careersUrl: string;
+        category: string;
+        source: string;
+      }[]).map((c) => ({
+        name: c.name,
+        website: c.website,
+        careersUrl: c.careersUrl ?? '',
+        category: c.category ?? '',
+        source: c.source ?? 'Seed',
       }));
-      const { unique, skipped } = dedupeCompanies(rows, companies);
-      // At most 500 new companies per click — press again for the next batch.
-      const batch = unique.slice(0, 500);
-      addCompanies(batch);
+      const { unique } = dedupeCompanies(rows, companies);
+      addCompanies(unique);
+      const nextOffset = typeof data.nextOffset === 'number' ? data.nextOffset : discoveryOffset;
+      setDiscoveryOffset(nextOffset);
+      try {
+        localStorage.setItem('jobboard-finder-offset', String(nextOffset));
+      } catch {
+        // Storage blocked — offset resets next visit, but dedupe still prevents repeats.
+      }
       setCompanyResult({
-        seedTotal: rows.length,
-        added: batch.length,
-        already: skipped,
-        remaining: unique.length - batch.length,
-        total: companies.length + batch.length,
+        added: unique.length,
+        seedRemaining: typeof data.seedRemaining === 'number' ? data.seedRemaining : 0,
+        nextOffset,
+        exhausted: !!data.exhausted,
+        error: typeof data.error === 'string' ? data.error : undefined,
       });
       setCompanyPage(1);
+    } catch {
+      setCompanyResult({
+        added: 0,
+        seedRemaining: 0,
+        nextOffset: discoveryOffset,
+        exhausted: false,
+        error: 'Find Companies hit a network error. Nothing was lost — press again.',
+      });
     } finally {
       setFindingCompanies(false);
     }
@@ -257,13 +314,16 @@ export function FinderView() {
               {companies.length} {companies.length === 1 ? 'company' : 'companies'} in your database
               {companyResult && (
                 <>
-                  {' · '}Seed has {companyResult.seedTotal} verified companies ·{' '}
-                  {companyResult.added} added just now · {companyResult.already} already in your
-                  database
-                  {companyResult.remaining > 0 ? (
-                    <> · {companyResult.remaining} more to find</>
+                  {' · '}
+                  {companyResult.added} added just now
+                  {companyResult.error ? (
+                    <> · {companyResult.error}</>
+                  ) : companyResult.exhausted ? (
+                    <> · No more companies found from current sources</>
+                  ) : companyResult.seedRemaining > 0 ? (
+                    <> · {companyResult.seedRemaining} verified seed companies left</>
                   ) : (
-                    <> · Nothing left to find</>
+                    <> · Discovering from live sources — press again for 500 more</>
                   )}
                 </>
               )}
@@ -274,9 +334,10 @@ export function FinderView() {
           </Button>
         </div>
         <p className="text-sm text-zinc-400">
-          Find Companies pulls in verified companies — ones with a real careers page — and stores
-          only the ones not already in your database, at most 500 new ones per click. Press it
-          again for the next batch; it never duplicates.
+          Find Companies finds companies not already in your database — verified seed companies
+          first, then live discovery — at most 500 new ones per click. Press it again for the
+          next batch; it never duplicates, and it keeps finding new ones until every source is
+          exhausted.
         </p>
 
         {companies.length === 0 ? (
