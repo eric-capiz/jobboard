@@ -7,10 +7,11 @@
  * anything: leads are returned to the app, and only the user can add one
  * to the board.
  *
- * Chunked + idempotent: the client passes a cursor (index into the seed)
- * and a limit; the function processes that slice and returns the next
- * cursor. A timed-out chunk is simply retried — no state is written
- * server-side, so a retry can never duplicate anything.
+ * Chunked + idempotent: the client passes the names of the companies in
+ * its database plus a cursor (index into that filtered pool) and a limit;
+ * the function processes that slice and returns the next cursor. A
+ * timed-out chunk is simply retried — no state is written server-side, so
+ * a retry can never duplicate anything.
  *
  * Auth mirrors /api/state: the x-sync-key header must match SYNC_KEY.
  */
@@ -324,13 +325,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const body = req.body ?? {};
   const resumeText = typeof body.resumeText === 'string' ? body.resumeText : '';
+  // The client sends the names of the companies in its database. The
+  // function resolves those names against the seed — it never accepts a
+  // URL from the client, so this endpoint can't be used as an open proxy.
+  const normName = (v: string): string =>
+    v
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  const wanted = Array.isArray(body.companies)
+    ? new Set(
+        (body.companies as unknown[])
+          .filter((c): c is string => typeof c === 'string')
+          .map((c) => normName(c)),
+      )
+    : null;
+  const pool = wanted ? COMPANIES_SEED.filter((s) => wanted.has(normName(s.n))) : COMPANIES_SEED;
   const cursorRaw = Number(body.cursor ?? 0);
   const limitRaw = Number(body.limit ?? 15);
   const cursor = Number.isFinite(cursorRaw) && cursorRaw >= 0 ? Math.floor(cursorRaw) : 0;
   const limit = Number.isFinite(limitRaw) ? Math.min(MAX_LIMIT, Math.max(1, Math.floor(limitRaw))) : 15;
 
   const startedAt = Date.now();
-  const slice = COMPANIES_SEED.slice(cursor, cursor + limit);
+  const slice = pool.slice(cursor, cursor + limit);
   const leads: FinderLead[] = [];
   let postingsSeen = 0;
   let boardErrors = 0;
@@ -373,11 +392,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // If the deadline cut the chunk short, the client resumes at the next
   // unprocessed index — nothing is lost or double-counted.
   const nextCursor = cursor + processed;
-  const done = nextCursor >= COMPANIES_SEED.length;
+  const done = nextCursor >= pool.length;
   return res.status(200).json({
     leads,
     checked: processed,
-    totalCompanies: COMPANIES_SEED.length,
+    totalCompanies: pool.length,
     nextCursor: done ? null : nextCursor,
     done,
     stats: { postingsSeen, boardErrors },

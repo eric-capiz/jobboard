@@ -12,6 +12,7 @@ interface CompanyResult {
   seedTotal: number;
   added: number;
   already: number;
+  remaining: number;
   total: number;
 }
 
@@ -66,12 +67,15 @@ export function FinderView() {
         source: 'Seed',
       }));
       const { unique, skipped } = dedupeCompanies(rows, companies);
-      addCompanies(unique);
+      // At most 500 new companies per click — press again for the next batch.
+      const batch = unique.slice(0, 500);
+      addCompanies(batch);
       setCompanyResult({
         seedTotal: rows.length,
-        added: unique.length,
+        added: batch.length,
         already: skipped,
-        total: companies.length + unique.length,
+        remaining: unique.length - batch.length,
+        total: companies.length + batch.length,
       });
       setCompanyPage(1);
     } finally {
@@ -91,7 +95,21 @@ export function FinderView() {
   const [jobError, setJobError] = useState('');
   const [jobDone, setJobDone] = useState(false);
   const [addedKeys, setAddedKeys] = useState<Set<string>>(new Set());
+  const [runSummary, setRunSummary] = useState<{
+    found: number;
+    added: number;
+    already: number;
+    manual: number;
+    nearMiss: number;
+    stopped: boolean;
+  } | null>(null);
   const stopRef = useRef(false);
+  // Run-scoped bookkeeping (refs because the chunk loop outlives renders).
+  const allLeadsRef = useRef<FinderLead[]>([]);
+  const startKeysRef = useRef<Set<string>>(new Set());
+  const knownRef = useRef<Set<string>>(new Set());
+  const autoAddedRef = useRef<Set<string>>(new Set());
+  const manualRef = useRef<Set<string>>(new Set());
 
   const boardKeys = useMemo(
     () => new Set(jobs.map((j) => jobDedupeKey(j.title, j.company))),
@@ -106,7 +124,13 @@ export function FinderView() {
     setJobError('');
     setJobDone(false);
     setLeads([]);
+    setRunSummary(null);
     setProgress({ checked: 0, total: 0, errors: 0 });
+    allLeadsRef.current = [];
+    startKeysRef.current = new Set(boardKeys);
+    knownRef.current = new Set(boardKeys);
+    autoAddedRef.current = new Set();
+    manualRef.current = new Set();
     const key = getSyncKey();
     if (!key) {
       setJobError("Job search needs the app's sync key, which isn't set in this build.");
@@ -124,6 +148,9 @@ export function FinderView() {
           headers: { 'Content-Type': 'application/json', 'x-sync-key': key },
           body: JSON.stringify({
             resumeText: selectedResume.text,
+            // Search the companies in this database — the API resolves
+            // these names against its seed and never takes a URL from us.
+            companies: companies.map((c) => c.name),
             cursor,
             limit: JOBS_CHUNK,
           }),
@@ -132,7 +159,7 @@ export function FinderView() {
           setJobError(
             r.status === 401
               ? 'Job search was not authorized. Check the app sync key and try again.'
-              : `Job search failed (HTTP ${r.status}). You can resume — progress is kept.`,
+              : `Job search failed (HTTP ${r.status}). You can run it again — progress is kept.`,
           );
           break;
         }
@@ -141,11 +168,22 @@ export function FinderView() {
         errors += data.stats?.boardErrors ?? 0;
         setProgress({ checked, total: data.totalCompanies ?? 0, errors });
         if (Array.isArray(data.leads) && data.leads.length > 0) {
-          setLeads((prev) => {
-            const seen = new Set(prev.map((l) => l.applyUrl));
-            const fresh = (data.leads as FinderLead[]).filter((l) => l.applyUrl && !seen.has(l.applyUrl));
-            return [...prev, ...fresh];
-          });
+          const seen = new Set(allLeadsRef.current.map((l) => l.applyUrl));
+          const deduped = (data.leads as FinderLead[]).filter(
+            (l) => l.applyUrl && !seen.has(l.applyUrl),
+          );
+          allLeadsRef.current = [...allLeadsRef.current, ...deduped];
+          setLeads(allLeadsRef.current);
+          // 60% and up go straight to the Pipeline; under 60% stays here
+          // as a near miss for Eric to add by hand.
+          for (const lead of deduped) {
+            const k = jobDedupeKey(lead.title, lead.company);
+            if (lead.matchScore >= 60 && !knownRef.current.has(k)) {
+              addLeadToBoard(lead);
+              knownRef.current.add(k);
+              autoAddedRef.current.add(k);
+            }
+          }
         }
         if (data.done || data.nextCursor === null || data.nextCursor === undefined) {
           setJobDone(true);
@@ -155,12 +193,30 @@ export function FinderView() {
       }
     } catch {
       setJobError('Job search hit a network error. You can run it again — progress is kept.');
-    } finally {
-      setSearching(false);
     }
+    const found = allLeadsRef.current.length;
+    const added = autoAddedRef.current.size;
+    const already = allLeadsRef.current.filter((l) =>
+      startKeysRef.current.has(jobDedupeKey(l.title, l.company)),
+    ).length;
+    const manual = allLeadsRef.current.filter((l) => {
+      const k = jobDedupeKey(l.title, l.company);
+      return (
+        manualRef.current.has(k) && !startKeysRef.current.has(k) && !autoAddedRef.current.has(k)
+      );
+    }).length;
+    setRunSummary({
+      found,
+      added,
+      already,
+      manual,
+      nearMiss: Math.max(0, found - added - already - manual),
+      stopped: stopRef.current,
+    });
+    setSearching(false);
   }
 
-  function handleAddToBoard(lead: FinderLead) {
+  function addLeadToBoard(lead: FinderLead) {
     if (!selectedResume) return;
     addJob({
       title: lead.title,
@@ -180,7 +236,14 @@ export function FinderView() {
       stageId: 'new',
       notes: 'Found via Finder.',
     });
-    setAddedKeys((prev) => new Set(prev).add(jobDedupeKey(lead.title, lead.company)));
+  }
+
+  function handleAddToBoard(lead: FinderLead) {
+    const k = jobDedupeKey(lead.title, lead.company);
+    addLeadToBoard(lead);
+    setAddedKeys((prev) => new Set(prev).add(k));
+    manualRef.current.add(k);
+    knownRef.current.add(k);
   }
 
   return (
@@ -197,6 +260,11 @@ export function FinderView() {
                   {' · '}Seed has {companyResult.seedTotal} verified companies ·{' '}
                   {companyResult.added} added just now · {companyResult.already} already in your
                   database
+                  {companyResult.remaining > 0 ? (
+                    <> · {companyResult.remaining} more to find</>
+                  ) : (
+                    <> · Nothing left to find</>
+                  )}
                 </>
               )}
             </p>
@@ -207,7 +275,8 @@ export function FinderView() {
         </div>
         <p className="text-sm text-zinc-400">
           Find Companies pulls in verified companies — ones with a real careers page — and stores
-          only the ones not already in your database. Press it again any time; it never duplicates.
+          only the ones not already in your database, at most 500 new ones per click. Press it
+          again for the next batch; it never duplicates.
         </p>
 
         {companies.length === 0 ? (
@@ -310,8 +379,9 @@ export function FinderView() {
           <div>
             <h2 className="text-xl font-bold tracking-tight text-zinc-100">Find Jobs</h2>
             <p className="mt-0.5 text-sm text-zinc-500">
-              Searches your companies' careers pages for remote roles matching the resume you pick.
-              Every result links straight to the real application.
+              Searches the companies in your database for remote roles matching the resume you
+              pick. Matches at 60% and up go straight to your Pipeline; every result links to the
+              real application.
             </p>
           </div>
           <div className="flex gap-2">
@@ -328,7 +398,7 @@ export function FinderView() {
             <Button
               variant="primary"
               onClick={handleFindJobs}
-              disabled={!selectedResume || searching}
+              disabled={!selectedResume || searching || companies.length === 0}
             >
               {searching ? 'Searching…' : 'Find Jobs'}
             </Button>
@@ -346,6 +416,7 @@ export function FinderView() {
               label="Resume to match"
               value={selectedResume?.id ?? ''}
               onChange={(e) => setResumeId(e.target.value)}
+              disabled={searching}
             >
               {masterResumes.map((r) => (
                 <option key={r.id} value={r.id}>
@@ -367,6 +438,25 @@ export function FinderView() {
           </p>
         )}
         {jobError && <p className="text-sm text-red-400">{jobError}</p>}
+        {masterResumes.length > 0 && companies.length === 0 && (
+          <p className="text-sm text-amber-400">
+            Run Find Companies first — Find Jobs searches the companies in your database.
+          </p>
+        )}
+        {runSummary && !searching && (
+          <div className="rounded-2xl border border-white/10 bg-zinc-900/60 p-4">
+            <p className="text-sm text-zinc-100">
+              Found {runSummary.found} {runSummary.found === 1 ? 'job' : 'jobs'} · Added{' '}
+              {runSummary.added} to your Pipeline
+              {runSummary.already > 0 && <> · {runSummary.already} already on your board</>}
+              {runSummary.manual > 0 && <> · {runSummary.manual} added by hand</>}
+              {runSummary.nearMiss > 0 && (
+                <> · {runSummary.nearMiss} near-misses (under 60%) not added</>
+              )}
+              {runSummary.stopped && <> · Stopped early</>}
+            </p>
+          </div>
+        )}
 
         {sortedLeads.length > 0 && (
           <div className="space-y-3">
@@ -441,8 +531,9 @@ export function FinderView() {
         <p className="text-xs text-zinc-600">
           Method: the search reads each company's own careers board (Greenhouse, Lever, Ashby, or
           the board linked from its careers page) — never aggregators. Companies on custom boards
-          it can't read are skipped, not guessed at. Nothing is added to your pipeline until you
-          press Add to board, and nothing ever auto-applies.
+          it can't read are skipped, not guessed at. Jobs scoring 60% and up are added to your
+          Pipeline automatically; near misses stay here for you to add by hand. Nothing ever
+          auto-applies, and tailored resumes are still made only when you ask.
         </p>
       </section>
     </div>

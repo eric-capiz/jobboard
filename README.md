@@ -87,20 +87,27 @@ The **Finder** view is how the board fills itself with real leads:
 
 - **Find Companies** loads the verified company seed (`api/companies-seed.ts` —
   1,526 companies whose careers links were verified to land on real listings)
-  and stores only the ones not already in the database. Pressing it again
-  adds zero duplicates. New company sources plug in by extending the seed
-  file; the dedupe key is normalized name + website domain.
-- **Find Jobs** takes the resume you select, then searches those companies'
-  own careers boards in chunks via `POST /api/find-jobs` (cursor + limit,
-  same `x-sync-key` auth as `/api/state`). Each chunk reads the company's
-  own board — Greenhouse / Lever / Ashby public board endpoints, or the
-  board linked from the company's careers page — and filters for frontend
-  titles (or full-stack with frontend in the description) in remote-US
-  locations (TX-only remote flagged, not hidden). Matches are scored
-  against the selected resume's actual skills; gaps are flagged, never
-  padded. Every result links straight to the employer's application page.
-- Nothing is added to the pipeline until you press **Add to board** on a
-  lead, and nothing ever auto-applies. Leads under 60% show as Near misses.
+  and stores only the ones not already in the database, at most 500 new ones
+  per click — press it again for the next batch. New company sources plug in
+  by extending the seed file; the dedupe key is normalized name + website
+  domain.
+- **Find Jobs** takes the resume you select, then searches the companies in
+  your database — the client sends their names, and the API resolves those
+  names against its seed (never a client-supplied URL) — in chunks via
+  `POST /api/find-jobs` (cursor + limit, same `x-sync-key` auth as
+  `/api/state`). Each chunk reads the company's own board — Greenhouse /
+  Lever / Ashby public board endpoints, or the board linked from the
+  company's careers page — and filters for frontend titles (or full-stack
+  with frontend in the description) in remote-US locations (TX-only remote
+  flagged, not hidden). Matches are scored against the selected resume's
+  actual skills; gaps are flagged, never padded. Every result links straight
+  to the employer's application page.
+- When a run finishes it reports how many jobs it found, and jobs scoring
+  60% and up are added to the Pipeline automatically with all their details
+  (title, company, location, salary, apply link, description, score,
+  strengths, gaps, master resume). Leads under 60% show as Near misses and
+  are never auto-added — you can still add one by hand. Nothing ever
+  auto-applies, and tailored resumes are still made only when you ask.
 - Honest limits: companies on custom boards the finder can't read (Apple,
   Google, Workday, and similar) are skipped, not guessed at — that coverage
   needs per-company adapters, which is the next extension point. The
