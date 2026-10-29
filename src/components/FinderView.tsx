@@ -33,10 +33,12 @@ export function FinderView() {
   const [companyResult, setCompanyResult] = useState<CompanyResult | null>(null);
   // Wikidata discovery offset, persisted locally so presses keep walking
   // the live result set. Losing it is harmless — the server also filters
-  // against the database, so no company is ever returned twice.
+  // against the database, so no company is ever returned twice. The v2 key
+  // exists because the discovery query grew (headquarters path added), which
+  // changed the result order — old offsets would point at the wrong page.
   const [discoveryOffset, setDiscoveryOffset] = useState<number>(() => {
     try {
-      return Number(localStorage.getItem('jobboard-finder-offset') ?? 0) || 0;
+      return Number(localStorage.getItem('jobboard-finder-offset-v2') ?? 0) || 0;
     } catch {
       return 0;
     }
@@ -115,7 +117,7 @@ export function FinderView() {
       const nextOffset = typeof data.nextOffset === 'number' ? data.nextOffset : discoveryOffset;
       setDiscoveryOffset(nextOffset);
       try {
-        localStorage.setItem('jobboard-finder-offset', String(nextOffset));
+        localStorage.setItem('jobboard-finder-offset-v2', String(nextOffset));
       } catch {
         // Storage blocked — offset resets next visit, but dedupe still prevents repeats.
       }

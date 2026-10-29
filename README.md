@@ -90,7 +90,7 @@ The **Finder** view is how the board fills itself with real leads:
   times as you like. It serves the verified seed first (`api/companies-seed.ts` —
   1,526 companies whose careers links were verified to land on real
   listings), then live discovery from Wikidata (US companies with official
-  websites) via `POST /api/find-companies` (same `x-sync-key` auth as
+  websites, including ones headquartered in the US) via `POST /api/find-companies` (same `x-sync-key` auth as
   `/api/state`). The server filters every batch against your own state doc
   and the client persists the discovery offset, so a company is never
   returned twice and a timed-out press loses nothing — press again and it

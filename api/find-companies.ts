@@ -2,7 +2,8 @@
  *
  * Every press returns up to 500 companies NOT already in the user's
  * database, with no total cap: verified seed companies first, then live
- * discovery from Wikidata (US companies with official websites), paged by
+ * discovery from Wikidata (US companies with official websites, including
+ * ones headquartered in the US even when no country is recorded), paged by
  * OFFSET in a stable result order. The client persists the Wikidata offset
  * and sends it back each press, so presses walk the whole result set
  * exactly once — no repeats, nothing skipped. The function also reads the
@@ -141,7 +142,8 @@ async function fetchWikidataPage(
   const query =
     'SELECT ?company ?companyLabel ?website WHERE { ' +
     WDQS_TYPES +
-    ' . ?company wdt:P17 wd:Q30 . ?company wdt:P856 ?website . ' +
+    ' . { ?company wdt:P17 wd:Q30 . } UNION { ?company wdt:P159 ?hq . ?hq wdt:P17 wd:Q30 . } ' +
+    '. ?company wdt:P856 ?website . ' +
     'SERVICE wikibase:label { bd:serviceParam wikibase:language "en" . } } ' +
     `LIMIT ${limit} OFFSET ${offset}`;
   const url =
