@@ -31,6 +31,7 @@ export function FinderView() {
 
   /* ---------------- Companies (server collection) ---------------- */
   const [findingCompanies, setFindingCompanies] = useState(false);
+  const [findingCount, setFindingCount] = useState(0);
   const [companyResult, setCompanyResult] = useState<CompanyResult | null>(null);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [totalCompanies, setTotalCompanies] = useState(0);
@@ -86,60 +87,103 @@ export function FinderView() {
 
   async function handleFindCompanies() {
     setFindingCompanies(true);
+    setFindingCount(0);
+    // One press must find at least 500 new companies. A single server call
+    // cannot fit that many inside the ~60s function limit, so the press
+    // loops: each call inserts what it found and advances the server-side
+    // cursor, and the press keeps going until 500 new companies are in,
+    // the sources are exhausted, or a call fails. Companies found before
+    // a failure or exhaustion stay found — a press never loses progress.
+    const MIN_PER_PRESS = 500;
+    const MAX_CALLS_PER_PRESS = 30;
+    let accumulated = 0;
+    let total = totalCompanies;
+    let source: string | undefined;
+    let exhausted = false;
+    let error: string | undefined;
+    let note: string | undefined;
     try {
       const key = getSyncKey();
       if (!key) {
         setCompanyResult({
           added: 0,
-          total: totalCompanies,
+          total,
           exhausted: false,
           error: "Find Companies needs the app's sync key, which isn't set in this build.",
         });
         return;
       }
-      const r = await fetch('/api/find-companies', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-sync-key': key },
-        // No offset: the server holds the discovery cursor and inserts new
-        // companies into the collection during the press. The response
-        // carries no company rows — the list is refreshed from
-        // GET /api/companies below.
-        body: JSON.stringify({ limit: 2000 }),
-      });
-      if (!r.ok) {
-        setCompanyResult({
-          added: 0,
-          total: totalCompanies,
-          exhausted: false,
-          error:
+      for (
+        let call = 0;
+        call < MAX_CALLS_PER_PRESS && accumulated < MIN_PER_PRESS && !exhausted && !error;
+        call += 1
+      ) {
+        let r: Response;
+        try {
+          r = await fetch('/api/find-companies', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-sync-key': key },
+            // No offset: the server holds the discovery cursor and inserts
+            // new companies into the collection during the call. The
+            // response carries no company rows — the list is refreshed from
+            // GET /api/companies below.
+            body: JSON.stringify({ limit: MIN_PER_PRESS - accumulated }),
+          });
+        } catch {
+          error = 'Find Companies hit a network error. Nothing was lost — press again.';
+          break;
+        }
+        if (!r.ok) {
+          error =
             r.status === 401
               ? 'Find Companies was not authorized. Check the app sync key and try again.'
-              : `Find Companies failed (HTTP ${r.status}). Nothing was lost — press again.`,
-        });
-        return;
+              : `Find Companies failed (HTTP ${r.status}). Nothing was lost — press again.`;
+          break;
+        }
+        let data: {
+          added?: unknown;
+          total?: unknown;
+          source?: unknown;
+          exhausted?: unknown;
+          error?: unknown;
+          note?: unknown;
+        };
+        try {
+          data = await r.json();
+        } catch {
+          error = 'Find Companies got an unreadable response. Nothing was lost — press again.';
+          break;
+        }
+        const added = typeof data.added === 'number' ? data.added : 0;
+        accumulated += added;
+        setFindingCount(accumulated);
+        if (typeof data.total === 'number') total = data.total;
+        if (typeof data.source === 'string') source = data.source;
+        if (typeof data.error === 'string') error = data.error;
+        if (typeof data.note === 'string') note = data.note;
+        if (data.exhausted) exhausted = true;
       }
-      const data = await r.json();
-      const added = typeof data.added === 'number' ? data.added : 0;
-      setCompanyResult({
-        added,
-        total: typeof data.total === 'number' ? data.total : totalCompanies,
-        source: typeof data.source === 'string' ? data.source : undefined,
-        exhausted: !!data.exhausted,
-        error: typeof data.error === 'string' ? data.error : undefined,
-        note: typeof data.note === 'string' ? data.note : undefined,
-      });
-      if (added > 0) {
+      if (!exhausted && !error && accumulated < MIN_PER_PRESS) {
+        note = `Stopped after ${MAX_CALLS_PER_PRESS} calls with ${accumulated} found — press again to continue.`;
+      }
+      setCompanyResult({ added: accumulated, total, source, exhausted, error, note });
+      if (accumulated > 0) {
         // The new rows live in the collection now — reset to page 1 and reload.
         setCompanyPage(1);
         await loadCompanies(1, companyQuery);
       }
     } catch {
       setCompanyResult({
-        added: 0,
-        total: totalCompanies,
-        exhausted: false,
-        error: 'Find Companies hit a network error. Nothing was lost — press again.',
+        added: accumulated,
+        total,
+        exhausted,
+        error: error ?? 'Find Companies hit an unexpected error. Nothing was lost — press again.',
+        note,
       });
+      if (accumulated > 0) {
+        setCompanyPage(1);
+        await loadCompanies(1, companyQuery);
+      }
     } finally {
       setFindingCompanies(false);
     }
@@ -339,11 +383,11 @@ export function FinderView() {
             </p>
           </div>
           <Button variant="primary" onClick={handleFindCompanies} disabled={findingCompanies}>
-            {findingCompanies ? 'Finding companies…' : 'Find Companies'}
+            {findingCompanies ? `Finding companies… (${findingCount}/500)` : 'Find Companies'}
           </Button>
         </div>
         <p className="text-sm text-zinc-400">
-          Find Companies discovers companies not already in your database, live, up to 2,000
+          Find Companies discovers companies not already in your database, live, at least 500
           new ones per click. Press it again for the next batch; it never duplicates, and it
           keeps finding new ones until every source is exhausted.
         </p>
@@ -355,7 +399,7 @@ export function FinderView() {
             description="Press Find Companies to discover companies live. Then Find Jobs searches those companies' careers pages."
             action={
               <Button variant="primary" onClick={handleFindCompanies} disabled={findingCompanies}>
-                Find Companies
+                {findingCompanies ? `Finding companies… (${findingCount}/500)` : 'Find Companies'}
               </Button>
             }
           />
