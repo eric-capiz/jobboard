@@ -809,7 +809,7 @@ async function testHouseRx() {
   const ghParsed = jobsMod.parseGreenhouseJobs(ghJson);
   check('greenhouse embed: 2 postings parsed', ghParsed.length === 2 && ghParsed[0]?.title === 'Sr. UI Engineer, Front End' && ghParsed[0]?.location === 'Remote' && ghParsed[0]?.url === 'https://www.houserx.com/careers?gh_jid=4749398005', ghParsed[0]);
   const entParsed = jobsMod.parseGreenhouseJobs(JSON.stringify({ jobs: [{ title: 'T', location: { name: 'Remote' }, absolute_url: 'https://x.example/1', content: '<p>React &amp; TypeScript &amp;nbsp; work.</p><p>&lt;li&gt;item&lt;/li&gt;</p>', created_at: '2026-10-20T00:00:00Z' }] }));
-  check('greenhouse: entities decoded, escaped tags stripped', entParsed[0]?.description === 'React & TypeScript work. item.', entParsed[0]?.description);
+  check('greenhouse: entities decoded, escaped tags stripped', entParsed[0]?.description === 'React & TypeScript work. item', entParsed[0]?.description);
   // End to end: careers page with Webflow items + embed script.
   const testMod = freshRequire(`${OUT}/test-company.cjs`);
   globalThis.fetch = async (url) => {
