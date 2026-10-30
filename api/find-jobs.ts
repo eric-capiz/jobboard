@@ -290,6 +290,74 @@ export interface FinderLead {
   gaps: string[];
 }
 
+export interface CompanySearchInput {
+  name: string;
+  website: string;
+  careersUrl: string;
+}
+
+export interface CompanySearchResult {
+  leads: FinderLead[];
+  postingsSeen: number;
+  board: { board: Board; slug: string; foundOn: string } | null;
+  triedUrls: string[];
+}
+
+/** Search ONE company: detect its careers board (from its careers link,
+ *  or by fetching its careers page / homepage / careers / jobs paths),
+ *  read the board, and match postings to the resume. Shared by the full
+ *  Find Jobs sweep and by the single-company test — so a test predicts
+ *  exactly what the sweep would find for that company. Throws when the
+ *  board itself fails to load (the caller counts it as a board error). */
+export async function searchCompanyJobs(
+  company: CompanySearchInput,
+  resumeText: string,
+): Promise<CompanySearchResult> {
+  const careersUrl = company.careersUrl || '';
+  const website = company.website || '';
+  let board: { board: Board; slug: string } | null = careersUrl ? boardFromUrl(careersUrl) : null;
+  let foundOn = board ? 'careers link' : '';
+  const triedUrls: string[] = [];
+  if (!board) {
+    // Fetch the company's own pages and look for a board link: the
+    // careers page first (when one was given), then homepage, /careers,
+    // /jobs. A board link found on the company's own pages is verified —
+    // a path that doesn't resolve to a board is simply skipped.
+    const candidates: string[] = [];
+    if (careersUrl) candidates.push(careersUrl);
+    if (website) {
+      const base = website.replace(/\/$/, '');
+      for (const u of [website, `${base}/careers`, `${base}/jobs`]) {
+        if (!candidates.includes(u)) candidates.push(u);
+      }
+    }
+    for (const u of candidates) {
+      triedUrls.push(u);
+      try {
+        const html = await fetchText(u);
+        const found = discoverBoard(html);
+        if (found) {
+          board = found;
+          foundOn = u;
+          break;
+        }
+      } catch {
+        // Next candidate path.
+      }
+    }
+  }
+  if (!board) {
+    return { leads: [], postingsSeen: 0, board: null, triedUrls };
+  }
+  const postings = await fetchBoard(board.board, board.slug);
+  return {
+    leads: screenPostings(company.name, postings, resumeText),
+    postingsSeen: postings.length,
+    board: { ...board, foundOn },
+    triedUrls,
+  };
+}
+
 function screenPostings(company: string, postings: Posting[], resumeText: string): FinderLead[] {
   const resumeTerms = extractResumeTerms(resumeText);
   const resumeSet = new Set(resumeTerms);
@@ -380,33 +448,13 @@ export async function runFindJobs(
   let noBoard = 0;
 
   async function processCompany(company: CompanyDoc): Promise<FinderLead[]> {
-    const displayName = company.name;
-    const careersUrl = company.careersUrl || '';
-    const website = company.website || '';
-    let board = careersUrl ? boardFromUrl(careersUrl) : null;
-    if (!board && website) {
-      // Discover the board from the company's own site: homepage first,
-      // then the usual careers paths. A board link found on the company's
-      // own pages is verified — a path that doesn't resolve to a board is
-      // simply skipped.
-      const base = website.replace(/\/$/, '');
-      for (const u of [website, `${base}/careers`, `${base}/jobs`]) {
-        try {
-          const html = await fetchText(u);
-          board = discoverBoard(html);
-          if (board) break;
-        } catch {
-          // Next candidate path.
-        }
-      }
-    }
-    if (!board) {
-      noBoard += 1;
-      return [];
-    }
-    const postings = await fetchBoard(board.board, board.slug);
-    postingsSeen += postings.length;
-    return screenPostings(displayName, postings, resumeText);
+    const result = await searchCompanyJobs(
+      { name: company.name, website: company.website || '', careersUrl: company.careersUrl || '' },
+      resumeText,
+    );
+    postingsSeen += result.postingsSeen;
+    if (!result.board) noBoard += 1;
+    return result.leads;
   }
 
   // Small worker pool: 5 companies at a time, soft deadline so the

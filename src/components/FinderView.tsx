@@ -17,6 +17,14 @@ interface CompanyResult {
   note?: string;
 }
 
+interface TestResult {
+  company: string;
+  board: { board: string; slug: string; foundOn: string } | null;
+  triedUrls: string[];
+  postingsSeen: number;
+  leads: FinderLead[];
+}
+
 function ScoreBadge({ score }: { score: number }) {
   const tone = score >= 60 ? 'green' : 'amber';
   return (
@@ -355,6 +363,166 @@ export function FinderView() {
     knownRef.current.add(k);
   }
 
+  /* ---------------- Test a company ---------------- */
+  const [testName, setTestName] = useState('');
+  const [testWebsite, setTestWebsite] = useState('');
+  const [testCareersUrl, setTestCareersUrl] = useState('');
+  const [testFromDb, setTestFromDb] = useState(false);
+  const [testSearch, setTestSearch] = useState('');
+  const [testSearchResults, setTestSearchResults] = useState<Company[]>([]);
+  const [testSearchError, setTestSearchError] = useState('');
+  const [testing, setTesting] = useState(false);
+  const [testError, setTestError] = useState('');
+  const [testResult, setTestResult] = useState<TestResult | null>(null);
+  const [testSaving, setTestSaving] = useState(false);
+  const [testSaveMsg, setTestSaveMsg] = useState('');
+  const [testAddedKeys, setTestAddedKeys] = useState<Set<string>>(new Set());
+
+  async function handleTestSearch() {
+    const q = testSearch.trim();
+    if (!q) {
+      setTestSearchResults([]);
+      return;
+    }
+    try {
+      const key = getSyncKey();
+      const params = new URLSearchParams({ skip: '0', limit: '25', q });
+      const r = await fetch(`/api/companies?${params.toString()}`, {
+        headers: key ? { 'x-sync-key': key } : {},
+      });
+      if (!r.ok) {
+        setTestSearchError(
+          r.status === 401
+            ? 'Company search was not authorized. Check the app sync key.'
+            : `Company search failed (HTTP ${r.status}).`,
+        );
+        return;
+      }
+      const data = await r.json();
+      setTestSearchResults(Array.isArray(data.companies) ? (data.companies as Company[]) : []);
+      setTestSearchError('');
+    } catch {
+      setTestSearchError('Company search hit a network error.');
+    }
+  }
+
+  function handleTestPick(c: Company) {
+    setTestName(c.name);
+    setTestWebsite(c.website);
+    setTestCareersUrl(c.careersUrl);
+    setTestFromDb(true);
+    setTestSearchResults([]);
+    setTestSearch(c.name);
+    setTestResult(null);
+    setTestError('');
+    setTestSaveMsg('');
+  }
+
+  async function handleTestCompany() {
+    if (!selectedResume || testing) return;
+    const name = testName.trim();
+    const website = testWebsite.trim();
+    const careersUrl = testCareersUrl.trim();
+    if (!name || (!website && !careersUrl)) {
+      setTestError('Enter a company name and a website or careers link.');
+      return;
+    }
+    const key = getSyncKey();
+    if (!key) {
+      setTestError("Testing needs the app's sync key, which isn't set in this build.");
+      return;
+    }
+    setTesting(true);
+    setTestError('');
+    setTestResult(null);
+    try {
+      const r = await fetch('/api/test-company', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-sync-key': key },
+        body: JSON.stringify({
+          company: { name, website, careersUrl },
+          resumeText: selectedResume.text,
+        }),
+      });
+      if (!r.ok) {
+        setTestError(
+          r.status === 401
+            ? 'Test was not authorized. Check the app sync key and try again.'
+            : `Test failed (HTTP ${r.status}).`,
+        );
+        return;
+      }
+      const data = await r.json();
+      setTestResult({
+        company: typeof data.company === 'string' ? data.company : name,
+        board: data.board ?? null,
+        triedUrls: Array.isArray(data.triedUrls) ? data.triedUrls : [],
+        postingsSeen: typeof data.postingsSeen === 'number' ? data.postingsSeen : 0,
+        leads: Array.isArray(data.leads) ? (data.leads as FinderLead[]) : [],
+      });
+    } catch {
+      setTestError('Test hit a network error.');
+    } finally {
+      setTesting(false);
+    }
+  }
+
+  async function handleTestSave() {
+    const name = testName.trim();
+    const website = testWebsite.trim();
+    const careersUrl = testCareersUrl.trim();
+    if (!name) {
+      setTestSaveMsg('Enter a company name first.');
+      return;
+    }
+    const key = getSyncKey();
+    if (!key) {
+      setTestSaveMsg("Saving needs the app's sync key, which isn't set in this build.");
+      return;
+    }
+    setTestSaving(true);
+    setTestSaveMsg('');
+    try {
+      const r = await fetch('/api/companies/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-sync-key': key },
+        body: JSON.stringify({
+          companies: [{ name, website, careersUrl, category: 'General', source: 'Manual' }],
+        }),
+      });
+      if (!r.ok) {
+        setTestSaveMsg(
+          r.status === 401
+            ? 'Save was not authorized. Check the app sync key.'
+            : `Save failed (HTTP ${r.status}).`,
+        );
+        return;
+      }
+      const data = await r.json();
+      if (typeof data.inserted === 'number' && data.inserted > 0) {
+        setTestSaveMsg(`${name} is now in your database — future Find Jobs sweeps will include it.`);
+        setTestFromDb(true);
+        setCompanyPage(1);
+        await loadCompanies(1, companyQuery);
+      } else if (typeof data.skipped === 'number' && data.skipped > 0) {
+        setTestSaveMsg(`${name} is already in your database.`);
+        setTestFromDb(true);
+      } else {
+        setTestSaveMsg('Could not save this company — check the name and try again.');
+      }
+    } catch {
+      setTestSaveMsg('Save hit a network error.');
+    } finally {
+      setTestSaving(false);
+    }
+  }
+
+  function handleTestAddToBoard(lead: FinderLead) {
+    const k = jobDedupeKey(lead.title, lead.company);
+    addLeadToBoard(lead);
+    setTestAddedKeys((prev) => new Set(prev).add(k));
+  }
+
   const showEmptyState = totalCompanies === 0 && companyQuery.trim() === '';
 
   return (
@@ -651,6 +819,239 @@ export function FinderView() {
           it can't read are skipped, not guessed at. Jobs scoring 60% and up are added to your
           Pipeline automatically; near misses stay here for you to add by hand. Nothing ever
           auto-applies, and tailored resumes are still made only when you ask.
+        </p>
+      </section>
+
+      {/* ---------------- Test a company ---------------- */}
+      <section className="space-y-5 border-t border-white/10 pt-8">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-bold tracking-tight text-zinc-100">Test a company</h2>
+            <p className="mt-0.5 text-sm text-zinc-500">
+              Check one company — from your database or one you type in — against your resume.
+              See whether its careers page is detected and which roles match, before running a
+              full Find Jobs sweep. Testing never changes your database or your Pipeline.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <div className="w-full sm:w-72">
+            <Input
+              value={testSearch}
+              onChange={(e) => setTestSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void handleTestSearch();
+              }}
+              placeholder="Search your companies…"
+              aria-label="Search your companies"
+            />
+          </div>
+          <Button variant="secondary" onClick={() => void handleTestSearch()}>
+            Search
+          </Button>
+        </div>
+        {testSearchError && <p className="text-sm text-red-400">{testSearchError}</p>}
+        {testSearchResults.length > 0 && (
+          <div className="space-y-1">
+            {testSearchResults.map((c) => (
+              <div
+                key={c.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/10 bg-zinc-900/60 px-3 py-2"
+              >
+                <span className="min-w-0 text-sm text-zinc-100">
+                  {c.name}
+                  {c.website && <span className="text-zinc-500"> · {c.website}</span>}
+                </span>
+                <Button variant="secondary" size="sm" onClick={() => handleTestPick(c)}>
+                  Use this
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Input
+            label="Company name"
+            value={testName}
+            onChange={(e) => {
+              setTestName(e.target.value);
+              setTestFromDb(false);
+            }}
+            placeholder="Acme Corp"
+          />
+          <Input
+            label="Website"
+            value={testWebsite}
+            onChange={(e) => {
+              setTestWebsite(e.target.value);
+              setTestFromDb(false);
+            }}
+            placeholder="https://acme.example"
+          />
+          <Input
+            label="Careers link (optional)"
+            value={testCareersUrl}
+            onChange={(e) => {
+              setTestCareersUrl(e.target.value);
+              setTestFromDb(false);
+            }}
+            placeholder="https://boards.greenhouse.io/acme"
+            hint="Leave blank and the test will look for the board on the company's own pages."
+          />
+        </div>
+        {testFromDb && (
+          <p className="text-sm text-zinc-500">
+            From your database. Edit any field to test different details.
+          </p>
+        )}
+
+        {masterResumes.length === 0 ? (
+          <EmptyState
+            title="No resume to match against"
+            description="Upload a master resume in Resumes first — the test reads its skills and titles to find matching roles."
+          />
+        ) : (
+          <div className="w-full sm:w-72">
+            <Select
+              label="Resume to match"
+              value={selectedResume?.id ?? ''}
+              onChange={(e) => setResumeId(e.target.value)}
+              disabled={testing}
+            >
+              {masterResumes.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.label}
+                </option>
+              ))}
+            </Select>
+          </div>
+        )}
+
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="primary"
+            onClick={() => void handleTestCompany()}
+            disabled={
+              !selectedResume ||
+              testing ||
+              !testName.trim() ||
+              (!testWebsite.trim() && !testCareersUrl.trim())
+            }
+          >
+            {testing ? 'Testing…' : 'Test this company'}
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => void handleTestSave()}
+            disabled={testSaving || !testName.trim()}
+          >
+            {testSaving ? 'Saving…' : 'Add to my companies'}
+          </Button>
+        </div>
+        {testSaveMsg && <p className="text-sm text-zinc-400">{testSaveMsg}</p>}
+        {testError && <p className="text-sm text-red-400">{testError}</p>}
+
+        {testResult && (
+          <div className="space-y-3">
+            <div className="rounded-2xl border border-white/10 bg-zinc-900/60 p-4">
+              {testResult.board ? (
+                <p className="text-sm text-zinc-100">
+                  Board detected: {testResult.board.board} — found on{' '}
+                  {testResult.board.foundOn === 'careers link'
+                    ? 'the careers link you gave'
+                    : testResult.board.foundOn}
+                  . {testResult.postingsSeen} {testResult.postingsSeen === 1 ? 'posting' : 'postings'}{' '}
+                  checked.
+                </p>
+              ) : (
+                <p className="text-sm text-zinc-100">
+                  No readable careers board found.
+                  {testResult.triedUrls.length > 0 && (
+                    <> Tried: {testResult.triedUrls.join(', ')}.</>
+                  )}{' '}
+                  If you know the board link, paste it as the careers link and test again.
+                </p>
+              )}
+            </div>
+            {testResult.leads.length > 0 ? (
+              testResult.leads.map((lead) => {
+                const key = jobDedupeKey(lead.title, lead.company);
+                const onBoard = boardKeys.has(key) || testAddedKeys.has(key);
+                return (
+                  <div
+                    key={lead.applyUrl}
+                    className="rounded-2xl border border-white/10 bg-zinc-900/60 p-4"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h3 className="text-sm font-semibold leading-snug text-zinc-100">
+                          {lead.title}
+                        </h3>
+                        <p className="mt-0.5 text-sm text-zinc-400">
+                          {lead.company} · {lead.location}
+                          {lead.salaryText && ` · ${lead.salaryText}`}
+                        </p>
+                      </div>
+                      <ScoreBadge score={lead.matchScore} />
+                    </div>
+                    {lead.locationFlag && (
+                      <p className="mt-1 text-xs text-zinc-500">{lead.locationFlag}</p>
+                    )}
+                    {lead.description && (
+                      <p className="mt-2 text-sm leading-relaxed text-zinc-400">
+                        {lead.description.slice(0, 280)}
+                        {lead.description.length > 280 && '…'}
+                      </p>
+                    )}
+                    {(lead.strengths.length > 0 || lead.gaps.length > 0) && (
+                      <div className="mt-3 flex flex-wrap gap-1.5">
+                        {lead.strengths.map((s) => (
+                          <Badge key={`s-${s}`} tone="green">
+                            {s}
+                          </Badge>
+                        ))}
+                        {lead.gaps.map((g) => (
+                          <Badge key={`g-${g}`} tone="red">
+                            Gap: {g}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <a href={lead.applyUrl} target="_blank" rel="noreferrer">
+                        <Button variant="primary" size="sm">
+                          Apply →
+                        </Button>
+                      </a>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        disabled={onBoard}
+                        onClick={() => handleTestAddToBoard(lead)}
+                      >
+                        {onBoard ? 'On board ✓' : 'Add to board'}
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              testResult.board && (
+                <p className="py-4 text-center text-sm text-zinc-500">
+                  Board found with {testResult.postingsSeen}{' '}
+                  {testResult.postingsSeen === 1 ? 'posting' : 'postings'}, but none matched this
+                  resume.
+                </p>
+              )
+            )}
+          </div>
+        )}
+        <p className="text-xs text-zinc-600">
+          The test runs the exact same board detection and resume matching as a full Find Jobs
+          sweep, for this one company only — so if it finds the job here, the sweep would find it
+          too.
         </p>
       </section>
     </div>

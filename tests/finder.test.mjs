@@ -20,7 +20,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
 const OUT = '/tmp/finder-test-bundles';
 execSync(`mkdir -p ${OUT}`);
-for (const name of ['find-companies', 'find-jobs', 'finder-lib']) {
+for (const name of ['find-companies', 'find-jobs', 'finder-lib', 'test-company']) {
   execSync(
     `${ROOT}/node_modules/.bin/esbuild ${ROOT}/api/${name}.ts --bundle --platform=node --format=cjs --external:mongodb --outfile=${OUT}/${name}.cjs`,
     { stdio: 'pipe' },
@@ -527,6 +527,79 @@ async function testFindJobsNonFrontend() {
   check('find-jobs non-frontend: support lead scores 94', out.leads[0]?.matchScore === 94, out.leads[0]);
 }
 
+async function testTestCompany() {
+  // Single-company test: same board detection + resume matching as the
+  // full sweep, for one company, with no database writes.
+  const mod = freshRequire(`${OUT}/test-company.cjs`);
+  const handler = mod.default;
+  // Board via the careers link, with a matching + a non-matching posting.
+  globalThis.fetch = boardsFetchStub;
+  const res = mkRes();
+  await handler(
+    mkReq('POST', {
+      company: { name: 'TestCorp', website: 'https://testcorp.com', careersUrl: 'https://boards.greenhouse.io/testcorp' },
+      resumeText: 'React TypeScript JavaScript frontend developer with Storybook and design systems experience',
+    }, { 'x-sync-key': 'testkey' }),
+    res,
+  );
+  check('test-company: board found via careers link', res.body?.board?.board === 'greenhouse' && res.body?.board?.foundOn === 'careers link', res.body);
+  check('test-company: 1 matching lead, score 100', res.body?.leads?.length === 1 && res.body?.leads[0]?.matchScore === 100, res.body?.leads);
+  check('test-company: postings seen 2', res.body?.postingsSeen === 2, res.body);
+  // Board discovered from the homepage (careers link not given).
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u.includes('boards-api.greenhouse.io')) {
+      return {
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            jobs: [
+              {
+                title: 'Frontend Engineer',
+                location: { name: 'Remote US' },
+                absolute_url: 'https://job-boards.greenhouse.io/testcorp/jobs/1',
+                content: '<p>React TypeScript frontend developer.</p>',
+                created_at: '2026-10-20T00:00:00Z',
+              },
+            ],
+          }),
+      };
+    }
+    if (u === 'https://discover.example') {
+      return { ok: true, text: async () => '<html><body><a href="https://boards.greenhouse.io/testcorp">Careers</a></body></html>' };
+    }
+    return { ok: true, text: async () => '<html><body>No careers here.</body></html>' };
+  };
+  const res2 = mkRes();
+  await handler(
+    mkReq('POST', {
+      company: { name: 'Discover Co', website: 'https://discover.example', careersUrl: '' },
+      resumeText: 'React TypeScript frontend developer',
+    }, { 'x-sync-key': 'testkey' }),
+    res2,
+  );
+  check('test-company: board discovered on homepage', res2.body?.board?.board === 'greenhouse' && res2.body?.board?.foundOn === 'https://discover.example', res2.body);
+  check('test-company: discovery lead found', res2.body?.leads?.length === 1, res2.body?.leads);
+  // No board anywhere: null board + tried URLs listed.
+  globalThis.fetch = async () => ({ ok: true, text: async () => '<html><body>No careers here.</body></html>' });
+  const res3 = mkRes();
+  await handler(
+    mkReq('POST', {
+      company: { name: 'NoBoard Co', website: 'https://noboard.example', careersUrl: '' },
+      resumeText: 'React developer',
+    }, { 'x-sync-key': 'testkey' }),
+    res3,
+  );
+  check('test-company: no board, tried URLs listed', res3.body?.board === null && res3.body?.triedUrls?.length === 3, res3.body);
+  // Auth + validation.
+  const res4 = mkRes();
+  await handler(mkReq('POST', { company: { name: 'X', website: 'https://x.example', careersUrl: '' }, resumeText: 'React' }, { 'x-sync-key': 'wrong' }), res4);
+  check('test-company wrong key 401', res4.statusCode === 401, res4);
+  const res5 = mkRes();
+  await handler(mkReq('POST', { company: { name: '', website: '', careersUrl: '' }, resumeText: 'React' }, { 'x-sync-key': 'testkey' }), res5);
+  check('test-company missing details 400', res5.statusCode === 400, res5);
+}
+
 async function testCompaniesApi() {
   const lib = freshRequire(`${OUT}/finder-lib.cjs`);
   const col = new FakeCollection();
@@ -866,6 +939,7 @@ await testWikidataSocial();
 await testWebsiteUpgrade();
 await testFindJobs();
 await testFindJobsNonFrontend();
+await testTestCompany();
 await testCompaniesApi();
 
 console.log(`\n${passed} passed, ${failed} failed`);
