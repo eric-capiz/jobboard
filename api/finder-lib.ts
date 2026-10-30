@@ -238,24 +238,75 @@ export async function findExistingPairs(
 }
 
 /** Split candidate docs into new vs already-stored (composite key, or
- *  source-id match for sources that provide stable ids). */
+ *  source-id match for sources that provide stable ids). Skipped docs
+ *  are returned too, so callers can upgrade them (a stored social URL
+ *  gives way to a real website for the same company). */
 export function splitNew(
   docs: CompanyDoc[],
   existing: ExistingKeys,
-): { fresh: CompanyDoc[]; skipped: number } {
+): { fresh: CompanyDoc[]; skipped: number; skippedDocs: CompanyDoc[] } {
   const fresh: CompanyDoc[] = [];
+  const skippedDocs: CompanyDoc[] = [];
   let skipped = 0;
   for (const d of docs) {
     const key = `${d.nameKey}|${d.domain ?? ''}`;
     if (existing.pairs.has(key) || (d.sourceId && existing.sourceIds.has(d.sourceId))) {
       skipped += 1;
+      skippedDocs.push(d);
       continue;
     }
     existing.pairs.add(key);
     if (d.sourceId) existing.sourceIds.add(d.sourceId);
     fresh.push(d);
   }
-  return { fresh, skipped };
+  return { fresh, skipped, skippedDocs };
+}
+
+/** Social platforms whose profile URLs count as online presence but are
+ *  fallback links only — a real website always beats one of these. */
+export const SOCIAL_HOSTS = new Set([
+  'facebook.com',
+  'www.facebook.com',
+  'x.com',
+  'www.x.com',
+  'twitter.com',
+  'www.twitter.com',
+  'instagram.com',
+  'www.instagram.com',
+  'linkedin.com',
+  'www.linkedin.com',
+  'youtube.com',
+  'www.youtube.com',
+  'tiktok.com',
+  'www.tiktok.com',
+]);
+
+export function isSocialUrl(site: string | undefined): boolean {
+  if (!site) return false;
+  try {
+    return SOCIAL_HOSTS.has(new URL(site).hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
+/** Upgrade a stored row's link: when a company already in the collection
+ *  (matched by stable source id) only has a social profile URL, and a
+ *  later source provides its real website, replace the link. Never
+ *  downgrades a real website to a social URL, and never touches rows
+ *  without a matching source id. Returns 1 when an upgrade landed. */
+export async function upgradeWebsite(
+  col: Collection<CompanyDoc>,
+  doc: CompanyDoc,
+): Promise<number> {
+  if (!doc.sourceId || !doc.website || isSocialUrl(doc.website)) return 0;
+  const existing = await col.findOne({ sourceId: doc.sourceId } as never);
+  if (!existing || !isSocialUrl(existing.website)) return 0;
+  await col.updateOne(
+    { _id: (existing as CompanyDoc)._id } as never,
+    { $set: { website: doc.website, domain: doc.domain } } as never,
+  );
+  return 1;
 }
 
 /** Insert docs, tolerating duplicate-key errors (races / replays).

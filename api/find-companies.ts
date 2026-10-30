@@ -6,14 +6,20 @@
  * server-side cursor (stored in MongoDB, so lost client state cannot
  * repeat or skip anything):
  *
- *   1. Wikidata — US companies with official websites (country or
+ *   1. Wikidata social — US companies by social profile, one cheap
+ *      single-pattern query per (social property, entity type) pair
+ *      (Facebook, X, Instagram, LinkedIn, YouTube, TikTok x business,
+ *      company, public company, enterprise). Runs first so social-only
+ *      companies flow immediately; a later website row for the same
+ *      company upgrades its stored link to the real site.
+ *   2. Wikidata — US companies with official websites (country or
  *      headquarters in the US), one independent OFFSET cursor per
  *      entity type (business, company, public company, enterprise).
  *      Per-type cursors outlive the old combined query's deep-OFFSET
  *      slowdown by 2-4x. Rows carry their Wikidata QID as sourceId, so
  *      the same entity found through two types (or two pages that split
  *      its websites) dedupes to one row.
- *   2. SEC EDGAR — US public filers with websites, walked by a
+ *   3. SEC EDGAR — US public filers with websites, walked by a
  *      server-side index into the live ticker map (sorted by CIK, so
  *      the cursor stays stable as the map grows). Each entry's
  *      submissions JSON is fetched live; only rows with a website and a
@@ -58,9 +64,11 @@ import {
   getDb,
   getFinderCursor,
   insertCompanies,
+  isSocialUrl,
   saveFinderCursor,
   splitNew,
   toCompanyDoc,
+  upgradeWebsite,
   type CompanyDoc,
   type CompanyInput,
   type FinderCursor,
@@ -75,7 +83,10 @@ declare const process: { env: Record<string, string | undefined> };
 
 /** Bump whenever a source adapter changes its cursor-state shape — a
  *  stored cursor from an older shape is discarded, never misread.
- *  v1 = combined Wikidata query; v2 = per-type Wikidata + SEC EDGAR. */
+ *  v1 = combined Wikidata query; v2 = per-type Wikidata + SEC EDGAR.
+ *  Adding a NEW source (Wikidata social, below) does NOT bump the
+ *  version: it gets a fresh state key, while the existing sources keep
+ *  their saved cursors and resume exactly where they left off. */
 const SOURCES_VERSION = 2;
 
 const FUNCTION_BUDGET_MS = 55000;
@@ -100,7 +111,9 @@ interface SourceAdapter {
 }
 
 /** Prefer a root .com address when a company lists several websites
- *  (Apple lists a dozen regional variants — apple.com wins). */
+ *  (Apple lists a dozen regional variants — apple.com wins). Social
+ *  profile URLs are fallback presence only: they always lose to a real
+ *  website, whatever its TLD, so a company with both keeps its own site. */
 function websiteScore(site: string): number {
   try {
     const u = new URL(site);
@@ -108,6 +121,7 @@ function websiteScore(site: string): number {
     return (
       (path !== '/' && path !== '' ? 1 : 0) +
       (!u.hostname.endsWith('.com') ? 1 : 0) +
+      (isSocialUrl(site) ? 2 : 0) +
       site.length / 10000
     );
   } catch {
@@ -186,6 +200,104 @@ const wikidataAdapter: SourceAdapter = {
       })),
       nextState: { typeIndex: nextTypeIndex, offsets: nextOffsets },
       exhausted: nextTypeIndex >= WDQS_TYPE_IDS.length,
+    };
+  },
+};
+
+/* ------------------------------------------------------------------ */
+/* Wikidata social — US companies by social profile (no website needed) */
+/* ------------------------------------------------------------------ */
+
+// Online presence = website AND/OR social media of any kind. A company
+// with only social media (no website) still counts — and Wikidata
+// carries its social identifiers. Two query shapes were measured and
+// REJECTED: one query with OPTIONAL website/social joins times out on
+// WDQS (HTTP 504 past its 60s limit), and FILTER NOT EXISTS { website }
+// is equally slow. So social presence is its own adapter with one cheap
+// single-pattern query per (property, type) pair — the Facebook pattern
+// answers in ~17s live. Property IDs verified against Wikidata's own
+// API, never guessed. Social rows may duplicate website rows for the
+// same company (same QID); the collection dedupes by source id, and a
+// later website row upgrades a stored social link to the real site.
+const SOCIAL_PROPS: { key: string; prop: string; base: string }[] = [
+  { key: 'fb', prop: 'P2013', base: 'https://www.facebook.com/' },
+  { key: 'x', prop: 'P2002', base: 'https://x.com/' },
+  { key: 'ig', prop: 'P2003', base: 'https://www.instagram.com/' },
+  { key: 'li', prop: 'P4264', base: 'https://www.linkedin.com/company/' },
+  { key: 'yt', prop: 'P2397', base: 'https://www.youtube.com/channel/' },
+  { key: 'tt', prop: 'P7085', base: 'https://www.tiktok.com/@' },
+];
+// One cursor per (property, type) pair: 6 properties x 4 types = 24
+// combos, walked in order. Each combo pages by OFFSET exactly like the
+// website adapter's per-type cursors.
+const SOCIAL_COMBOS: { prop: (typeof SOCIAL_PROPS)[number]; type: string }[] = [];
+for (const prop of SOCIAL_PROPS) {
+  for (const type of WDQS_TYPE_IDS) SOCIAL_COMBOS.push({ prop, type });
+}
+
+const wikidataSocialAdapter: SourceAdapter = {
+  key: 'wikidata-social',
+  label: 'Wikidata social',
+  async fetchPage(state, budgetMs, fetchFn): Promise<SourcePage> {
+    const comboIndex =
+      typeof state.comboIndex === 'number' && state.comboIndex >= 0 ? state.comboIndex : 0;
+    const offsets: number[] = Array.isArray(state.offsets) ? state.offsets : [];
+    const offset = offsets[comboIndex] ?? 0;
+    const combo = SOCIAL_COMBOS[comboIndex];
+    if (!combo) return { companies: [], nextState: { comboIndex, offsets }, exhausted: true };
+    const query =
+      'SELECT ?company ?companyLabel ?website WHERE { ' +
+      `?company wdt:P31 wd:${combo.type} . ` +
+      '{ ?company wdt:P17 wd:Q30 . } UNION { ?company wdt:P159 ?hq . ?hq wdt:P17 wd:Q30 . } ' +
+      `?company wdt:${combo.prop.prop} ?sid . ` +
+      `BIND(IRI(CONCAT('${combo.prop.base}', ENCODE_FOR_URI(STR(?sid)))) AS ?website) ` +
+      'SERVICE wikibase:label { bd:serviceParam wikibase:language "en" . } } ' +
+      `LIMIT ${WDQS_PAGE_ROWS} OFFSET ${offset}`;
+    const r = await fetchFn(
+      'https://query.wikidata.org/sparql?' +
+        new URLSearchParams({ query, format: 'json' }).toString(),
+      {
+        headers: {
+          'User-Agent': 'JobBoardFinder/1.0 (job search research)',
+          Accept: 'application/sparql-results+json',
+        },
+        signal: AbortSignal.timeout(budgetMs),
+      },
+    );
+    if (!r.ok) throw new Error(`WDQS HTTP ${r.status}`);
+    const data = await r.json();
+    const bindings: {
+      company?: { value?: string };
+      companyLabel?: { value?: string };
+      website?: { value?: string };
+    }[] = data?.results?.bindings ?? [];
+    const byEnt = new Map<string, { name: string; website: string }>();
+    for (const b of bindings) {
+      const ent: string = b.company?.value?.split('/').pop() ?? '';
+      if (!ent) continue;
+      const name: string = b.companyLabel?.value ?? ent;
+      const site: string = b.website?.value ?? '';
+      if (!site) continue;
+      const cur = byEnt.get(ent);
+      if (!cur || websiteScore(site) < websiteScore(cur.website)) {
+        byEnt.set(ent, { name, website: site });
+      }
+    }
+    const nextOffsets = [...offsets];
+    nextOffsets[comboIndex] = offset + WDQS_PAGE_ROWS;
+    const comboExhausted = bindings.length < WDQS_PAGE_ROWS;
+    const nextComboIndex = comboExhausted ? comboIndex + 1 : comboIndex;
+    return {
+      companies: [...byEnt.entries()].map(([qid, c]) => ({
+        name: c.name,
+        website: c.website,
+        careersUrl: '',
+        category: 'General',
+        source: 'Wikidata',
+        sourceId: qid,
+      })),
+      nextState: { comboIndex: nextComboIndex, offsets: nextOffsets },
+      exhausted: nextComboIndex >= SOCIAL_COMBOS.length,
     };
   },
 };
@@ -329,7 +441,10 @@ const edgarAdapter: SourceAdapter = {
 };
 
 /** Live sources, in the order the button walks them. */
-const SOURCES: SourceAdapter[] = [wikidataAdapter, edgarAdapter];
+// Social runs first so social-only companies flow from the first press;
+// the website walk resumes from its saved cursor afterwards, and its
+// rows upgrade any stored social link to the real website (same QID).
+const SOURCES: SourceAdapter[] = [wikidataSocialAdapter, wikidataAdapter, edgarAdapter];
 
 export interface FindCompaniesDeps {
   companiesCol: Collection<CompanyDoc>;
@@ -426,11 +541,17 @@ export async function runFindCompanies(
       existing.pairs.add(`${d.nameKey}|${d.domain ?? ''}`);
       if (d.sourceId) existing.sourceIds.add(d.sourceId);
     }
-    const { fresh } = splitNew(docs, existing);
+    const { fresh, skippedDocs } = splitNew(docs, existing);
     const take = fresh.slice(0, limit - added);
     const rest = fresh.slice(limit - added);
     const inserted = await insertCompanies(deps.companiesCol, take);
     added += inserted;
+    // Upgrade pass: a skipped row (same QID already stored) whose link
+    // is a real website replaces a stored social profile URL. Upgrades
+    // are not new companies, so they never count toward `added`.
+    for (const d of skippedDocs) {
+      await upgradeWebsite(deps.companiesCol, d);
+    }
     advancedPastWork = true;
     cursor.pending = [
       ...cursor.pending,

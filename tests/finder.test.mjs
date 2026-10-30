@@ -355,7 +355,7 @@ async function testFindCompanies() {
   check('find-companies press 1 status 200', res.statusCode === 200, res);
   check('find-companies press 1 added 90', res.body?.added === 90, res.body);
   check('find-companies press 1 not exhausted (limit stopped it)', res.body?.exhausted === false, res.body);
-  check('find-companies press 1 source label', res.body?.source === 'Wikidata', res.body);
+  check('find-companies press 1 source label', res.body?.source === 'Wikidata social', res.body);
   // Press 2 (same module instance = same fake DB + cursor): page 2 gives
   // 3 new (2 dupes filtered), then the empty page exhausts the source.
   res = mkRes();
@@ -383,10 +383,12 @@ async function testFindCompanies() {
   check('find-companies core full walk added 93', out.added === 93, out);
   const cursorDoc = await metaCol.findOne({ _id: 'find-companies' });
   check(
-    'find-companies core cursor past all sources (per-type wikidata + empty edgar)',
-    cursorDoc?.sourceIndex === 2 &&
+    'find-companies core cursor past all sources (social + per-type wikidata + empty edgar)',
+    cursorDoc?.sourceIndex === 3 &&
+      cursorDoc?.state?.['wikidata-social']?.comboIndex === 24 &&
+      JSON.stringify(cursorDoc?.state?.['wikidata-social']?.offsets?.slice(0, 1)) === JSON.stringify([600]) &&
       cursorDoc?.state?.wikidata?.typeIndex === 4 &&
-      JSON.stringify(cursorDoc?.state?.wikidata?.offsets) === JSON.stringify([600, 300, 300, 300]),
+      JSON.stringify(cursorDoc?.state?.wikidata?.offsets) === JSON.stringify([300, 300, 300, 300]),
     cursorDoc,
   );
   const comp1 = (await companiesCol.find({ name: 'Company 1' }).toArray())[0];
@@ -425,10 +427,11 @@ async function testFindCompaniesDupeStretch() {
     { limit: 90 },
   );
   check('dupe-stretch setup press added 90', first.added === 90, first);
-  // Rewind type 0's offset to 0 (per-type cursor shape).
+  // Rewind the social adapter's first combo to 0 (the press starts at
+  // social now, so the re-press re-consumes page 1 through social).
   await metaCol.updateOne(
     { _id: 'find-companies' },
-    { $set: { 'state.wikidata.offsets': [0, 0, 0, 0], 'state.wikidata.typeIndex': 0 } },
+    { $set: { 'state.wikidata-social.offsets': [0], 'state.wikidata-social.comboIndex': 0 } },
     {},
   );
   globalThis.fetch = routeFetch(wdqsFetchFactory([wdqsBindingsPage1()]), {}, null);
@@ -439,12 +442,13 @@ async function testFindCompaniesDupeStretch() {
   check('dupe-stretch press: added 0 with note, no error', out.added === 0 && typeof out.note === 'string' && !out.error, out);
   const cursorDoc = await metaCol.findOne({ _id: 'find-companies' });
   // The re-press consumed page 1 (all dupes) and then empty follow-up
-  // pages through every type — the cursor advanced past all consumed
-  // work, so the button is never stuck.
+  // pages through every combo, type, and source — the cursor advanced
+  // past all consumed work, so the button is never stuck.
   check(
     'dupe-stretch press: cursor advanced past consumed pages',
-    JSON.stringify(cursorDoc?.state?.wikidata?.offsets) === JSON.stringify([600, 300, 300, 300]) &&
-      cursorDoc?.sourceIndex === 2,
+    JSON.stringify(cursorDoc?.state?.['wikidata-social']?.offsets?.slice(0, 1)) === JSON.stringify([600]) &&
+      JSON.stringify(cursorDoc?.state?.wikidata?.offsets) === JSON.stringify([300, 300, 300, 300]) &&
+      cursorDoc?.sourceIndex === 3,
     cursorDoc,
   );
 }
@@ -572,7 +576,7 @@ async function testEdgar() {
   // Pre-exhaust wikidata so the press starts at EDGAR.
   await metaCol.updateOne(
     { _id: 'find-companies' },
-    { $set: { version: 2, sourceIndex: 1, state: { wikidata: { typeIndex: 4, offsets: [0, 0, 0, 0] } } } },
+    { $set: { version: 2, sourceIndex: 2, state: { wikidata: { typeIndex: 4, offsets: [0, 0, 0, 0] } } } },
     { upsert: true },
   );
   // Ticker map deliberately out of CIK order (adapter must sort by CIK).
@@ -630,7 +634,13 @@ async function testFailureSkip() {
   };
   globalThis.fetch = async (url) => {
     const u = String(url);
-    if (u.includes('query.wikidata.org')) throw new Error('WDQS down');
+    if (u.includes('query.wikidata.org')) {
+      // Social queries (single social property, no P856) return empty so
+      // the walk reaches the website adapter; website queries (P856)
+      // fail, exercising the website adapter's failure-skip.
+      if (u.includes('P856')) throw new Error('WDQS down');
+      return { ok: true, json: async () => ({ results: { bindings: [] } }) };
+    }
     if (u.includes('company_tickers.json')) return { ok: true, json: async () => tickerMap };
     if (u.includes('/submissions/CIK')) {
       const cik = u.match(/CIK(\d+)\.json/)?.[1];
@@ -654,7 +664,7 @@ async function testFailureSkip() {
   const p3 = await runMod.runFindCompanies(deps, { limit: 2000 });
   check('failure-skip press 3: wikidata skipped, edgar adds 2', p3.added === 2 && typeof p3.note === 'string' && p3.note.includes('skipped'), p3);
   const cursorDoc = await metaCol.findOne({ _id: 'find-companies' });
-  check('failure-skip: cursor past wikidata and edgar', cursorDoc?.sourceIndex === 2, cursorDoc);
+  check('failure-skip: cursor past wikidata and edgar', cursorDoc?.sourceIndex === 3, cursorDoc);
 }
 
 async function testExactCounts() {
@@ -699,6 +709,107 @@ async function testExactCounts() {
   check('exact: total 300, still no repeats', (await companiesCol.countDocuments()) === 300, await companiesCol.countDocuments());
 }
 
+async function testSocialPresence() {
+  // Online presence = website AND/OR social media. The query binds
+  // ?website to the real website when one exists, else the first social
+  // profile URL — so the adapter must include social-only rows (with
+  // the social URL as their link) and still prefer a real website when
+  // both exist for one entity.
+  const runMod = freshRequire(`${OUT}/find-companies.cjs`);
+  const companiesCol = new FakeCollection();
+  const metaCol = new FakeCollection();
+  const bindings = [
+    // Social-only entity: no website, only a Facebook profile URL.
+    { company: { value: 'http://www.wikidata.org/entity/Q7001' }, companyLabel: { value: 'Social Only Co' }, website: { value: 'https://www.facebook.com/socialonlyco' } },
+    // Entity with both: social row + real website row — website must win.
+    { company: { value: 'http://www.wikidata.org/entity/Q7002' }, companyLabel: { value: 'Both Co' }, website: { value: 'https://www.facebook.com/bothco' } },
+    { company: { value: 'http://www.wikidata.org/entity/Q7002' }, companyLabel: { value: 'Both Co' }, website: { value: 'https://bothco.com' } },
+  ];
+  globalThis.fetch = routeFetch(wdqsFetchFactory([bindings]), {}, null);
+  const out = await runMod.runFindCompanies(
+    { companiesCol, metaCol, fetchFn: globalThis.fetch },
+    { limit: 2000 },
+  );
+  check('social: added 2 (social-only + both)', out.added === 2, out);
+  const social = (await companiesCol.find({ name: 'Social Only Co' }).toArray())[0];
+  check('social: social-only row keeps its profile URL', social?.website === 'https://www.facebook.com/socialonlyco', social);
+  const both = (await companiesCol.find({ name: 'Both Co' }).toArray())[0];
+  check('social: real website wins over social URL', both?.website === 'https://bothco.com', both);
+}
+
+async function testWikidataSocial() {
+  // Social runs first: a fresh press hits the social adapter, whose
+  // single-pattern queries bind the profile URL as the website.
+  const runMod = freshRequire(`${OUT}/find-companies.cjs`);
+  const companiesCol = new FakeCollection();
+  const metaCol = new FakeCollection();
+  const bindings = [
+    { company: { value: 'http://www.wikidata.org/entity/Q8001' }, companyLabel: { value: 'Fb Only Co' }, website: { value: 'https://www.facebook.com/fbonlyco' } },
+    { company: { value: 'http://www.wikidata.org/entity/Q8002' }, companyLabel: { value: 'Ig Only Co' }, website: { value: 'https://www.instagram.com/igonlyco' } },
+  ];
+  globalThis.fetch = routeFetch(wdqsFetchFactory([bindings]), {}, null);
+  const out = await runMod.runFindCompanies(
+    { companiesCol, metaCol, fetchFn: globalThis.fetch },
+    { limit: 2 },
+  );
+  check('wikidata-social: added 2 social-only rows', out.added === 2, out);
+  check('wikidata-social: source label', out.source === 'Wikidata social', out);
+  const fb = (await companiesCol.find({ name: 'Fb Only Co' }).toArray())[0];
+  check('wikidata-social: facebook URL stored', fb?.website === 'https://www.facebook.com/fbonlyco', fb);
+  const cursorDoc = await metaCol.findOne({ _id: 'find-companies' });
+  check('wikidata-social: combo cursor advanced', cursorDoc?.state?.['wikidata-social']?.comboIndex === 1, cursorDoc?.state?.['wikidata-social']);
+}
+
+async function testWebsiteUpgrade() {
+  // A stored social link upgrades to the real website when the website
+  // walk later finds the same company (same QID); a real website never
+  // downgrades to a social URL.
+  const runMod = freshRequire(`${OUT}/find-companies.cjs`);
+  // Upgrade: seed a social row, then run the website adapter past it.
+  const companiesCol = new FakeCollection();
+  const metaCol = new FakeCollection();
+  await companiesCol.insertMany([{
+    name: 'Up Co', nameKey: 'up co', website: 'https://www.facebook.com/upco',
+    domain: 'facebook.com', careersUrl: '', category: 'General',
+    source: 'Wikidata', sourceId: 'Q9001', addedAt: new Date().toISOString(),
+  }]);
+  await metaCol.updateOne(
+    { _id: 'find-companies' },
+    { $set: { version: 2, sourceIndex: 1, state: { wikidata: { typeIndex: 0, offsets: [0, 0, 0, 0] } } } },
+    { upsert: true },
+  );
+  const webBindings = [
+    { company: { value: 'http://www.wikidata.org/entity/Q9001' }, companyLabel: { value: 'Up Co' }, website: { value: 'https://upco.com' } },
+  ];
+  globalThis.fetch = routeFetch(wdqsFetchFactory([webBindings]), {}, null);
+  const out = await runMod.runFindCompanies(
+    { companiesCol, metaCol, fetchFn: globalThis.fetch },
+    { limit: 2000 },
+  );
+  check('upgrade: dupe website row adds 0', out.added === 0, out);
+  const up = (await companiesCol.find({ name: 'Up Co' }).toArray())[0];
+  check('upgrade: social link replaced by real website', up?.website === 'https://upco.com' && up?.domain === 'upco.com', up);
+  // No downgrade: seed a real-website row, then run a social page for it.
+  const companiesCol2 = new FakeCollection();
+  const metaCol2 = new FakeCollection();
+  await companiesCol2.insertMany([{
+    name: 'Real Co', nameKey: 'real co', website: 'https://realco.com',
+    domain: 'realco.com', careersUrl: '', category: 'General',
+    source: 'Wikidata', sourceId: 'Q9002', addedAt: new Date().toISOString(),
+  }]);
+  const socialBindings = [
+    { company: { value: 'http://www.wikidata.org/entity/Q9002' }, companyLabel: { value: 'Real Co' }, website: { value: 'https://www.facebook.com/realco' } },
+  ];
+  globalThis.fetch = routeFetch(wdqsFetchFactory([socialBindings]), {}, null);
+  const out2 = await runMod.runFindCompanies(
+    { companiesCol: companiesCol2, metaCol: metaCol2, fetchFn: globalThis.fetch },
+    { limit: 2000 },
+  );
+  check('upgrade: social dupe adds 0', out2.added === 0, out2);
+  const real = (await companiesCol2.find({ name: 'Real Co' }).toArray())[0];
+  check('upgrade: real website never downgrades', real?.website === 'https://realco.com', real);
+}
+
 await testFindCompanies();
 await testFindCompaniesTransientError();
 await testFindCompaniesDupeStretch();
@@ -706,6 +817,9 @@ await testWikidataPerType();
 await testEdgar();
 await testFailureSkip();
 await testExactCounts();
+await testSocialPresence();
+await testWikidataSocial();
+await testWebsiteUpgrade();
 await testFindJobs();
 await testCompaniesApi();
 
