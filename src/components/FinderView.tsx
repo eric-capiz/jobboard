@@ -814,10 +814,10 @@ export function FinderView() {
           </p>
         )}
         <p className="text-xs text-zinc-600">
-          Method: the search reads each company's own careers board (Greenhouse, Lever, Ashby, or
-          the board linked from its careers page) — never aggregators. Companies on custom boards
-          it can't read are skipped, not guessed at. Jobs scoring 60% and up are added to your
-          Pipeline automatically; near misses stay here for you to add by hand. Nothing ever
+          Method: the search reads each company's own careers board (Greenhouse, Lever, Ashby,
+          JazzHR, or the board linked from its careers page) — never aggregators. Companies on
+          boards it can't read are skipped, not guessed at. Jobs scoring 60% and up are added to
+          your Pipeline automatically; near misses stay here for you to add by hand. Nothing ever
           auto-applies, and tailored resumes are still made only when you ask.
         </p>
       </section>

@@ -600,6 +600,83 @@ async function testTestCompany() {
   check('test-company missing details 400', res5.statusCode === 400, res5);
 }
 
+async function testJazzhr() {
+  // JazzHR: the widget script carries the listings, so fetching the
+  // widget URL is enough — no browser needed. Covers the Goldschmitt
+  // case: a careers page with a JazzHR embed and no Greenhouse/Lever/
+  // Ashby board anywhere.
+  const jobsMod = freshRequire(`${OUT}/find-jobs.cjs`);
+  const widgetJs = `
+<div id="resumator-job-job_20261027144142_FGDHFERUIMWO9F2B" class="resumator-job resumator-jobs-text"><div class="resumator-job-title resumator-jobs-text">Frontend Developer</div><div class="resumator-job-info resumator-jobs-text"><span class="resumator-job-location resumator-job-heading resumator-jobs-text">Location: </span>Remote<span class="resumator-job-department resumator-job-heading resumator-jobs-text">Department: </span>Timeguard Solutions</div><div class="resumator-job-view-details resumator-jobs-text"><a class="resumator-job-link resumator-jobs-text" target="_blank" href="https://testco.applytojob.com/apply/MQD6Cg04z9/Frontend-Developer?source=Our Career Page Widget">+ View details</a></div></div>
+<div id="resumator-job-job_20261026090000_ABCDEFGH12345678" class="resumator-job resumator-jobs-text"><div class="resumator-job-title resumator-jobs-text">Loan Analyst</div><div class="resumator-job-info resumator-jobs-text"><span class="resumator-job-location resumator-job-heading resumator-jobs-text">Location: </span>Remote<span class="resumator-job-department resumator-job-heading resumator-jobs-text">Department: </span>Perkins Loan Servicing</div><div class="resumator-job-view-details resumator-jobs-text"><a class="resumator-job-link resumator-jobs-text" target="_blank" href="https://testco.applytojob.com/apply/BvPb4CUCsx/Loan-Analyst?source=Our Career Page Widget">+ View details</a></div></div>
+`;
+  const postings = jobsMod.parseJazzhrWidget(widgetJs);
+  check('jazzhr: parsed 2 postings', postings.length === 2, postings);
+  check('jazzhr: frontend posting fields', postings[0]?.title === 'Frontend Developer' && postings[0]?.location === 'Remote' && postings[0]?.url === 'https://testco.applytojob.com/apply/MQD6Cg04z9/Frontend-Developer' && postings[0]?.description === 'Timeguard Solutions' && postings[0]?.postedDate === '2026-10-27', postings[0]);
+  // End to end via the test-company handler: website only, board
+  // discovered on the /careers page's JazzHR embed.
+  const testMod = freshRequire(`${OUT}/test-company.cjs`);
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u === 'https://app.jazz.co/widgets/basic/create/testco') {
+      return { ok: true, text: async () => widgetJs };
+    }
+    if (u === 'https://testco.example/careers') {
+      return { ok: true, text: async () => '<html><body><script src="https://app.jazz.co/widgets/basic/create/testco"></script></body></html>' };
+    }
+    return { ok: true, text: async () => '<html><body>No careers here.</body></html>' };
+  };
+  const res = mkRes();
+  await testMod.default(
+    mkReq('POST', {
+      company: { name: 'TestCo', website: 'https://testco.example', careersUrl: '' },
+      resumeText: 'React TypeScript JavaScript frontend developer with Storybook and design systems experience',
+    }, { 'x-sync-key': 'testkey' }),
+    res,
+  );
+  check('jazzhr: board found on careers page', res.body?.board?.board === 'jazzhr' && res.body?.board?.foundOn === 'https://testco.example/careers', res.body);
+  check('jazzhr: frontend lead found, loan gated out', res.body?.leads?.length === 1 && res.body?.leads[0]?.title === 'Frontend Developer', res.body?.leads);
+  check('jazzhr: frontend lead scores 63', res.body?.leads[0]?.matchScore === 63, res.body?.leads[0]);
+  // Careers link given directly as the widget URL.
+  const res2 = mkRes();
+  await testMod.default(
+    mkReq('POST', {
+      company: { name: 'TestCo', website: '', careersUrl: 'https://app.jazz.co/widgets/basic/create/testco' },
+      resumeText: 'React TypeScript JavaScript frontend developer with Storybook and design systems experience',
+    }, { 'x-sync-key': 'testkey' }),
+    res2,
+  );
+  check('jazzhr: board found via careers link', res2.body?.board?.board === 'jazzhr' && res2.body?.board?.foundOn === 'careers link', res2.body);
+  check('jazzhr: careers-link lead found', res2.body?.leads?.length === 1, res2.body?.leads);
+  // Homepage nav link followed: the careers page lives at a
+  // non-standard path (/join-us) that guessing would never try, and
+  // the /careers and /jobs guesses are never reached.
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u === 'https://app.jazz.co/widgets/basic/create/testco') {
+      return { ok: true, text: async () => widgetJs };
+    }
+    if (u === 'https://navco.example/join-us') {
+      return { ok: true, text: async () => '<html><body><script src="https://app.jazz.co/widgets/basic/create/testco"></script></body></html>' };
+    }
+    if (u === 'https://navco.example') {
+      return { ok: true, text: async () => '<html><body><nav><a href="/join-us">Careers</a></nav></body></html>' };
+    }
+    return { ok: true, text: async () => '<html><body>No careers here.</body></html>' };
+  };
+  const res3 = mkRes();
+  await testMod.default(
+    mkReq('POST', {
+      company: { name: 'NavCo', website: 'https://navco.example', careersUrl: '' },
+      resumeText: 'React TypeScript JavaScript frontend developer with Storybook and design systems experience',
+    }, { 'x-sync-key': 'testkey' }),
+    res3,
+  );
+  check('nav: board found on the nav-linked page', res3.body?.board?.board === 'jazzhr' && res3.body?.board?.foundOn === 'https://navco.example/join-us', res3.body);
+  check('nav: guesses never tried', JSON.stringify(res3.body?.triedUrls) === JSON.stringify(['https://navco.example', 'https://navco.example/join-us']), res3.body?.triedUrls);
+  check('nav: frontend lead found', res3.body?.leads?.length === 1 && res3.body?.leads[0]?.title === 'Frontend Developer', res3.body?.leads);
+}
+
 async function testCompaniesApi() {
   const lib = freshRequire(`${OUT}/finder-lib.cjs`);
   const col = new FakeCollection();
@@ -940,6 +1017,7 @@ await testWebsiteUpgrade();
 await testFindJobs();
 await testFindJobsNonFrontend();
 await testTestCompany();
+await testJazzhr();
 await testCompaniesApi();
 
 console.log(`\n${passed} passed, ${failed} failed`);

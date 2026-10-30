@@ -84,7 +84,14 @@ function ashbySlug(url: string): string | null {
   return m ? m[1] : null;
 }
 
-type Board = 'greenhouse' | 'lever' | 'ashby';
+function jazzhrSlug(url: string): string | null {
+  const m = url.match(/app\.jazz\.co\/widgets\/basic\/create\/([a-z0-9\-_]+)/);
+  if (m) return m[1];
+  const a = url.match(/([a-z0-9\-_]+)\.applytojob\.com/);
+  return a ? a[1] : null;
+}
+
+type Board = 'greenhouse' | 'lever' | 'ashby' | 'jazzhr';
 
 function boardFromUrl(url: string): { board: Board; slug: string } | null {
   if (url.includes('greenhouse')) {
@@ -98,6 +105,10 @@ function boardFromUrl(url: string): { board: Board; slug: string } | null {
   if (url.includes('ashbyhq')) {
     const s = ashbySlug(url);
     return s ? { board: 'ashby', slug: s } : null;
+  }
+  if (url.includes('jazz.co') || url.includes('applytojob.com')) {
+    const s = jazzhrSlug(url);
+    return s ? { board: 'jazzhr', slug: s } : null;
   }
   return null;
 }
@@ -118,7 +129,46 @@ function discoverBoard(hubHtml: string): { board: Board; slug: string } | null {
     const s = ashbySlug(ab[0]);
     if (s) return { board: 'ashby', slug: s };
   }
+  const jz = hubHtml.match(/https?:\/\/app\.jazz\.co\/widgets\/basic\/create\/[a-z0-9\-_]+/);
+  if (jz) {
+    const s = jazzhrSlug(jz[0]);
+    if (s) return { board: 'jazzhr', slug: s };
+  }
+  const ap = hubHtml.match(/https?:\/\/[a-z0-9\-_]+\.applytojob\.com/);
+  if (ap) {
+    const s = jazzhrSlug(ap[0]);
+    if (s) return { board: 'jazzhr', slug: s };
+  }
   return null;
+}
+
+/** Parse a JazzHR basic widget script: each job is a resumator-job block
+ *  with a title div, a "Location: X" span, a "Department: Y" span, and a
+ *  + View details link to the apply page. The widget renders jobs
+ *  client-side, but the listings themselves are IN the script text, so
+ *  fetching the widget URL is enough — no browser needed. The job div id
+ *  carries its posting date (job_YYYYMMDDHHMMSS_...). */
+export function parseJazzhrWidget(js: string): Posting[] {
+  const postings: Posting[] = [];
+  const blocks = js.split('<div id="resumator-job-job_');
+  for (let i = 1; i < blocks.length; i++) {
+    const b = blocks[i];
+    const dateMatch = b.match(/^(\d{4})(\d{2})(\d{2})/);
+    const titleMatch = b.match(/resumator-job-title[^>]*>([^<]+)<\/div>/);
+    const locMatch = b.match(/resumator-job-location[^>]*>Location:\s*<\/span>\s*([^<]+)/);
+    const deptMatch = b.match(/resumator-job-department[^>]*>Department:\s*<\/span>\s*([^<]+)/);
+    const linkMatch = b.match(/resumator-job-link[^>]*href="([^"]+)"/);
+    const title = (titleMatch?.[1] ?? '').trim();
+    if (!title || !linkMatch) continue;
+    postings.push({
+      title,
+      location: (locMatch?.[1] ?? '').trim(),
+      url: linkMatch[1].split('?')[0],
+      description: (deptMatch?.[1] ?? '').trim(),
+      postedDate: dateMatch ? `${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}` : '',
+    });
+  }
+  return postings;
 }
 
 function toDate(raw: unknown): string {
@@ -156,20 +206,27 @@ async function fetchBoard(board: Board, slug: string): Promise<Posting[]> {
       postedDate: toDate(j.createdAt),
     }));
   }
-  const data = JSON.parse(
-    await fetchText('https://api.ashbyhq.com/posting-api/job-board/' + slug, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: '{}',
-    }),
-  );
-  return (data.jobs ?? []).map((j: any) => ({
-    title: j.title ?? '',
-    location: typeof j.location === 'string' ? j.location : (j.location?.name ?? ''),
-    url: j.jobUrl ?? '',
-    description: stripTags(j.description ?? ''),
-    postedDate: toDate(j.publishedAt ?? j.createdAt),
-  }));
+  if (board === 'ashby') {
+    const data = JSON.parse(
+      await fetchText('https://api.ashbyhq.com/posting-api/job-board/' + slug, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      }),
+    );
+    return (data.jobs ?? []).map((j: any) => ({
+      title: j.title ?? '',
+      location: typeof j.location === 'string' ? j.location : (j.location?.name ?? ''),
+      url: j.jobUrl ?? '',
+      description: stripTags(j.description ?? ''),
+      postedDate: toDate(j.publishedAt ?? j.createdAt),
+    }));
+  }
+  if (board === 'jazzhr') {
+    const js = await fetchText(`https://app.jazz.co/widgets/basic/create/${slug}`);
+    return parseJazzhrWidget(js);
+  }
+  return [];
 }
 
 /* ------------------------------------------------------------------ */
@@ -309,6 +366,31 @@ export interface CompanySearchResult {
  *  Find Jobs sweep and by the single-company test — so a test predicts
  *  exactly what the sweep would find for that company. Throws when the
  *  board itself fails to load (the caller counts it as a board error). */
+/** Links on a page that look like a careers page: the href mentions
+ *  careers/jobs, or the link text does (nav "Careers", "Open
+ *  positions", "Join our team"). Relative links resolve against the
+ *  page URL. Capped at 3 so a big nav can't turn into a crawl. */
+function careersLinksOnPage(html: string, pageUrl: string): string[] {
+  const out: string[] = [];
+  const anchorRe = /<a[^>]*href=["']([^"']+)["'][^>]*>([\s\S]{0,200}?)<\/a>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = anchorRe.exec(html)) !== null) {
+    const href = m[1].trim();
+    if (!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:') || href.startsWith('javascript:')) continue;
+    const text = stripTags(m[2]).trim();
+    const hrefHits = /career|job/i.test(href);
+    const textHits = /career|job|open positions|join (us|our|the) team|work with us/i.test(text);
+    if (!hrefHits && !textHits) continue;
+    try {
+      const abs = new URL(href, pageUrl).href;
+      if (!out.includes(abs)) out.push(abs);
+    } catch {
+      // Unparseable href — skip.
+    }
+  }
+  return out.slice(0, 3);
+}
+
 export async function searchCompanyJobs(
   company: CompanySearchInput,
   resumeText: string,
@@ -320,9 +402,12 @@ export async function searchCompanyJobs(
   const triedUrls: string[] = [];
   if (!board) {
     // Fetch the company's own pages and look for a board link: the
-    // careers page first (when one was given), then homepage, /careers,
-    // /jobs. A board link found on the company's own pages is verified —
-    // a path that doesn't resolve to a board is simply skipped.
+    // careers page first (when one was given), then the homepage. A
+    // page with no board may still LINK to the careers page — the
+    // homepage nav "Careers" is the classic case — so those links are
+    // followed next, before the guessed /careers and /jobs paths. A
+    // board link found on the company's own pages is verified; a path
+    // that doesn't resolve to a board is simply skipped.
     const candidates: string[] = [];
     if (careersUrl) candidates.push(careersUrl);
     if (website) {
@@ -331,7 +416,8 @@ export async function searchCompanyJobs(
         if (!candidates.includes(u)) candidates.push(u);
       }
     }
-    for (const u of candidates) {
+    for (let i = 0; i < candidates.length; i++) {
+      const u = candidates[i];
       triedUrls.push(u);
       try {
         const html = await fetchText(u);
@@ -340,6 +426,13 @@ export async function searchCompanyJobs(
           board = found;
           foundOn = u;
           break;
+        }
+        let at = i + 1;
+        for (const link of careersLinksOnPage(html, u)) {
+          if (candidates.length < 8 && !candidates.includes(link) && !triedUrls.includes(link)) {
+            candidates.splice(at, 0, link);
+            at++;
+          }
         }
       } catch {
         // Next candidate path.
