@@ -31,8 +31,12 @@ interface VercelResponse {
 }
 
 const WDQS_TIMEOUT_MS = 45000;
-const SOFT_DEADLINE_MS = 45000;
-const WDQS_PAGE_ROWS = 750;
+// Hard budget for the whole press: the function must answer before the
+// platform kills it (~60s), so no single page fetch may run past the
+// remaining budget. Smaller pages keep each fetch fast enough that a
+// press returns companies instead of timing out on the first page.
+const FUNCTION_BUDGET_MS = 55000;
+const WDQS_PAGE_ROWS = 300;
 const MAX_PAGES_PER_PRESS = 4;
 
 export interface FoundCompany {
@@ -137,6 +141,7 @@ const WDQS_TYPES =
 async function fetchWikidataPage(
   offset: number,
   limit: number,
+  timeoutMs: number,
 ): Promise<{ companies: { name: string; website: string }[]; rows: number }> {
   const query =
     'SELECT ?company ?companyLabel ?website WHERE { ' +
@@ -150,7 +155,7 @@ async function fetchWikidataPage(
     new URLSearchParams({ query, format: 'json' }).toString();
   const r = await fetch(url, {
     headers: { 'User-Agent': 'JobBoardFinder/1.0 (job search research)' },
-    signal: AbortSignal.timeout(WDQS_TIMEOUT_MS),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   if (!r.ok) throw new Error(`WDQS HTTP ${r.status}`);
   const data = await r.json();
@@ -207,23 +212,22 @@ async function handlerInner(req: VercelRequest, res: VercelResponse) {
 
   const batch: FoundCompany[] = [];
 
-  // Live discovery from Wikidata until the batch is full, the soft
-  // deadline hits, or the result set runs out. The offset only advances
-  // past pages that returned successfully, so a timeout loses nothing —
-  // the next press retries the same page.
+  // Live discovery from Wikidata until the batch is full, the budget
+  // runs out, or the result set runs out. The offset only advances past
+  // pages that returned successfully, so a timeout loses nothing — the
+  // next press retries the same page. A partial batch is still a success:
+  // it is returned immediately rather than timing the whole press out.
   const startedAt = Date.now();
   let cursor = offset;
   let wikidataExhausted = false;
   let wdqsError = false;
   let pages = 0;
-  while (
-    batch.length < limit &&
-    Date.now() - startedAt < SOFT_DEADLINE_MS &&
-    pages < MAX_PAGES_PER_PRESS
-  ) {
+  while (batch.length < limit && pages < MAX_PAGES_PER_PRESS) {
+    const remaining = FUNCTION_BUDGET_MS - (Date.now() - startedAt);
+    if (remaining < 10000) break;
     let page: { companies: { name: string; website: string }[]; rows: number };
     try {
-      page = await fetchWikidataPage(cursor, WDQS_PAGE_ROWS);
+      page = await fetchWikidataPage(cursor, WDQS_PAGE_ROWS, Math.min(WDQS_TIMEOUT_MS, remaining));
     } catch {
       wdqsError = true;
       break;
