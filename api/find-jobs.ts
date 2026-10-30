@@ -81,6 +81,38 @@ function isBoardUrl(url: string): boolean {
   return /greenhouse\.io|lever\.co|ashbyhq\.com|jazz\.co|applytojob\.com/i.test(url);
 }
 
+/** The Greenhouse job board embed script on a business careers page
+ *  (boards.greenhouse.io/embed/job_board/js?for=<slug>): the page loads
+ *  this script to display its own jobs, so the embed's data is the
+ *  page's own display — same rule as the JazzHR widget and the iSolved
+ *  iframe. Only an embed found on the business page itself is read. */
+function greenhouseEmbedSlug(pageHtml: string): string | null {
+  const m = pageHtml.match(/boards\.greenhouse\.io\/embed\/job_board\/js\?for=([a-z0-9\-_]+)/);
+  return m ? m[1] : null;
+}
+
+/** Parse a Greenhouse board's jobs JSON (the embed's own data source)
+ *  into postings. Apply URLs come through as given — for embedded
+ *  boards they usually point back at the business site itself. */
+export function parseGreenhouseJobs(jsonText: string): Posting[] {
+  let data: any;
+  try {
+    data = JSON.parse(jsonText);
+  } catch {
+    return [];
+  }
+  return (data.jobs ?? []).map((j: any) => {
+    const d = new Date(j.created_at ?? '');
+    return {
+      title: j.title ?? '',
+      location: j.location?.name ?? '',
+      url: j.absolute_url ?? '',
+      description: stripTags(j.content ?? ''),
+      postedDate: Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10),
+    };
+  });
+}
+
 /** The job-list iframe embedded IN a business careers page: some
  *  companies display their own page's job list through an iSolved Hire
  *  iframe. Like the JazzHR widget, the iframe is part of the page — the
@@ -341,8 +373,13 @@ export function parseCareersPage(html: string, pageUrl: string): Posting[] {
   const postings: Posting[] = [];
   const seen = new Set<string>();
   const push = (title: string, location: string, url: string | null) => {
-    if (!titleOk(title) || !url || seen.has(url)) return;
-    seen.add(url);
+    if (!titleOk(title) || !url) return;
+    // Keyed by title AND url: some pages (Webflow lists) give every
+    // role the same generic detail link, and keying by url alone would
+    // collapse distinct roles into one.
+    const key = `${title}\n${url}`;
+    if (seen.has(key)) return;
+    seen.add(key);
     postings.push({ title, location, url, description: '', postedDate: '' });
   };
   // Strategy A: job blocks.
@@ -403,15 +440,16 @@ export function parseCareersPage(html: string, pageUrl: string): Posting[] {
 
 /** Search ONE company — business site ONLY, no exceptions. Jobs come
  *  from the company's own pages and nowhere else: listings parsed
- *  straight off its careers page, or the job-list widget embedded in
- *  that page (the widget is part of the page's own display). A board
- *  link is never fetched as a source — not a link the user pasted, not
- *  a link found on the company's pages. The ONLY board contact allowed
- *  is the apply link on a listing found on the business page: if
- *  applying takes the user to a board, that's fine, but the job itself
- *  was found on the company's site. Shared by the full Find Jobs sweep
- *  and by the single-company test — so a test predicts exactly what
- *  the sweep would find for that company. */
+ *  straight off a page, or the job displays embedded in that page (a
+ *  widget, an iframe, a job board embed script — all part of the
+ *  page's own display). A board link is never fetched as a source —
+ *  not a link the user pasted, not a link found on the company's
+ *  pages. The ONLY board contact allowed is the apply link on a
+ *  listing found on the business page: if applying takes the user to
+ *  a board, that's fine, but the job itself was found on the company's
+ *  site. Shared by the full Find Jobs sweep and by the single-company
+ *  test — so a test predicts exactly what the sweep would find for
+ *  that company. */
 /** Links on a page that look like a careers page: the href mentions
  *  careers/jobs, or the link text does (nav "Careers", "Open
  *  positions", "Join our team"). Relative links resolve against the
@@ -466,8 +504,59 @@ export async function searchCompanyJobs(
     } catch {
       continue;
     }
-    // Jobs listed on the page itself.
-    const pagePostings = parseCareersPage(html, u);
+    // Every way this page itself displays jobs, unioned: listings in
+    // the page's own HTML, plus its embedded widget, iframe, or job
+    // board embed. A page can carry more than one (House Rx lists a
+    // few Webflow roles AND embeds its Greenhouse board), and taking
+    // only the first source would hide the rest. All of these are the
+    // page's own display — no board is ever visited as a separate
+    // source, and a board link found on the page is never followed.
+    const pagePostings: Posting[] = [];
+    const seenKeys = new Set<string>();
+    const addPostings = (ps: Posting[]) => {
+      for (const p of ps) {
+        const k = `${p.title}\n${p.url}`;
+        if (!seenKeys.has(k)) {
+          seenKeys.add(k);
+          pagePostings.push(p);
+        }
+      }
+    };
+    addPostings(parseCareersPage(html, u));
+    const widgetSlug = jazzhrWidgetSlug(html);
+    if (widgetSlug) {
+      try {
+        addPostings(
+          parseJazzhrWidget(
+            await fetchText(`https://app.jazz.co/widgets/basic/create/${widgetSlug}`),
+          ),
+        );
+      } catch {
+        // Widget unreadable — the page's other sources still count.
+      }
+    }
+    const iframeUrl = isolvedIframeUrl(html);
+    if (iframeUrl) {
+      try {
+        addPostings(parseIsolvedIframe(await fetchText(iframeUrl), iframeUrl));
+      } catch {
+        // Iframe unreadable — the page's other sources still count.
+      }
+    }
+    const ghSlug = greenhouseEmbedSlug(html);
+    if (ghSlug) {
+      try {
+        addPostings(
+          parseGreenhouseJobs(
+            await fetchText(
+              `https://boards-api.greenhouse.io/v1/boards/${ghSlug}/jobs?content=true`,
+            ),
+          ),
+        );
+      } catch {
+        // Embed unreadable — the page's other sources still count.
+      }
+    }
     if (pagePostings.length > 0) {
       return {
         leads: screenPostings(company.name, pagePostings, resumeText),
@@ -475,45 +564,6 @@ export async function searchCompanyJobs(
         sourcePage: u,
         triedUrls,
       };
-    }
-    // Jobs displayed on the page through its embedded widget — the
-    // widget is part of this page, so these jobs are still the page's
-    // own listings. Their apply links may point at the board.
-    const widgetSlug = jazzhrWidgetSlug(html);
-    if (widgetSlug) {
-      try {
-        const widgetPostings = parseJazzhrWidget(
-          await fetchText(`https://app.jazz.co/widgets/basic/create/${widgetSlug}`),
-        );
-        if (widgetPostings.length > 0) {
-          return {
-            leads: screenPostings(company.name, widgetPostings, resumeText),
-            postingsSeen: widgetPostings.length,
-            sourcePage: u,
-            triedUrls,
-          };
-        }
-      } catch {
-        // Widget unreadable — keep looking at the company's own pages.
-      }
-    }
-    // Jobs displayed on the page through an embedded iframe — same
-    // rule as the widget: the iframe is part of this page.
-    const iframeUrl = isolvedIframeUrl(html);
-    if (iframeUrl) {
-      try {
-        const iframePostings = parseIsolvedIframe(await fetchText(iframeUrl), iframeUrl);
-        if (iframePostings.length > 0) {
-          return {
-            leads: screenPostings(company.name, iframePostings, resumeText),
-            postingsSeen: iframePostings.length,
-            sourcePage: u,
-            triedUrls,
-          };
-        }
-      } catch {
-        // Iframe unreadable — keep looking at the company's own pages.
-      }
     }
     let at = i + 1;
     for (const link of careersLinksOnPage(html, u)) {

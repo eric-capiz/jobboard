@@ -750,7 +750,7 @@ export function FinderView() {
               const onBoard = boardKeys.has(key) || addedKeys.has(key);
               return (
                 <div
-                  key={lead.applyUrl}
+                  key={`${lead.applyUrl}|${lead.title}`}
                   className="rounded-2xl border border-white/10 bg-zinc-900/60 p-4"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -980,7 +980,7 @@ export function FinderView() {
                 const onBoard = boardKeys.has(key) || testAddedKeys.has(key);
                 return (
                   <div
-                    key={lead.applyUrl}
+                    key={`${lead.applyUrl}|${lead.title}`}
                     className="rounded-2xl border border-white/10 bg-zinc-900/60 p-4"
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">

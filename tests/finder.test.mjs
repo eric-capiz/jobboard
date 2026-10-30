@@ -788,6 +788,51 @@ async function testHalvik() {
   check('halvik: front end developer found at 63', res.body?.leads?.length === 1 && res.body?.leads[0]?.title === 'Front End Developer (Remote)' && res.body?.leads[0]?.matchScore === 63, res.body?.leads);
 }
 
+async function testHouseRx() {
+  // House Rx pattern: the business page lists a few Webflow roles (all
+  // sharing one generic detail link, no locations) AND embeds its
+  // Greenhouse board — the Sr. UI Engineer role lives ONLY in the
+  // embed. The page's sources union: raw + embed, never just the first.
+  const jobsMod = freshRequire(`${OUT}/find-jobs.cjs`);
+  const webflowHtml = `<html><body>
+<div role="listitem" class="inner-jobs_item w-dyn-item"><a href="/career-details" target="_blank"><div>Pharmacy Technician / Care Coordinator</div></a></div>
+<div role="listitem" class="inner-jobs_item w-dyn-item"><a href="/career-details" target="_blank"><div>Engineering Team Lead</div></a></div>
+</body></html>`;
+  const webflowParsed = jobsMod.parseCareersPage(webflowHtml, 'https://houserx.example/careers');
+  check('webflow: same-URL roles do not collapse', webflowParsed.length === 2, webflowParsed);
+  const ghJson = JSON.stringify({
+    jobs: [
+      { title: 'Sr. UI Engineer, Front End', location: { name: 'Remote' }, absolute_url: 'https://www.houserx.com/careers?gh_jid=4749398005', content: '<p>React TypeScript frontend developer with Storybook experience.</p>', created_at: '2026-10-20T00:00:00Z' },
+      { title: 'Care Coordinator', location: { name: 'Cincinnati, OH' }, absolute_url: 'https://www.houserx.com/careers?gh_jid=4743625005', content: '<p>Pharmacy care.</p>', created_at: '2026-10-20T00:00:00Z' },
+    ],
+  });
+  const ghParsed = jobsMod.parseGreenhouseJobs(ghJson);
+  check('greenhouse embed: 2 postings parsed', ghParsed.length === 2 && ghParsed[0]?.title === 'Sr. UI Engineer, Front End' && ghParsed[0]?.location === 'Remote' && ghParsed[0]?.url === 'https://www.houserx.com/careers?gh_jid=4749398005', ghParsed[0]);
+  // End to end: careers page with Webflow items + embed script.
+  const testMod = freshRequire(`${OUT}/test-company.cjs`);
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u.includes('boards-api.greenhouse.io')) {
+      return { ok: true, text: async () => ghJson };
+    }
+    if (u === 'https://houserx.example/careers') {
+      return { ok: true, text: async () => `<html><body>${webflowHtml}<script src="https://boards.greenhouse.io/embed/job_board/js?for=houserx"></script></body></html>` };
+    }
+    return { ok: true, text: async () => '<html><body>No careers here.</body></html>' };
+  };
+  const res = mkRes();
+  await testMod.default(
+    mkReq('POST', {
+      company: { name: 'House Rx', website: 'https://houserx.example', careersUrl: '' },
+      resumeText: 'React TypeScript JavaScript frontend developer with Storybook and design systems experience',
+    }, { 'x-sync-key': 'testkey' }),
+    res,
+  );
+  check('houserx: source is the careers page', res.body?.sourcePage === 'https://houserx.example/careers', res.body);
+  check('houserx: union postings seen 4', res.body?.postingsSeen === 4, res.body);
+  check('houserx: sr ui engineer found at 81', res.body?.leads?.length === 1 && res.body?.leads[0]?.title === 'Sr. UI Engineer, Front End' && res.body?.leads[0]?.matchScore === 81, res.body?.leads);
+}
+
 async function testCompaniesApi() {
   const lib = freshRequire(`${OUT}/finder-lib.cjs`);
   const col = new FakeCollection();
@@ -1131,6 +1176,7 @@ await testTestCompany();
 await testJazzhr();
 await testBusinessSiteFirst();
 await testHalvik();
+await testHouseRx();
 await testCompaniesApi();
 
 console.log(`\n${passed} passed, ${failed} failed`);
