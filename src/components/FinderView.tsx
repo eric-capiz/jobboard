@@ -788,6 +788,18 @@ export function FinderView() {
                       ))}
                     </div>
                   )}
+                  {lead.reasons.length > 0 && (
+                    <div className="mt-3 space-y-1">
+                      <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                        Fit notes
+                      </p>
+                      {lead.reasons.map((r) => (
+                        <p key={r} className="text-sm text-amber-200/90">
+                          • {r}
+                        </p>
+                      ))}
+                    </div>
+                  )}
                   <div className="mt-3 flex flex-wrap gap-2">
                     <a href={lead.applyUrl} target="_blank" rel="noreferrer">
                       <Button variant="primary" size="sm">
@@ -1015,6 +1027,18 @@ export function FinderView() {
                           <Badge key={`g-${g}`} tone="red">
                             Gap: {g}
                           </Badge>
+                        ))}
+                      </div>
+                    )}
+                    {lead.reasons.length > 0 && (
+                      <div className="mt-3 space-y-1">
+                        <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                          Fit notes
+                        </p>
+                        {lead.reasons.map((r) => (
+                          <p key={r} className="text-sm text-amber-200/90">
+                            • {r}
+                          </p>
                         ))}
                       </div>
                     )}

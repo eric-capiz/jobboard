@@ -859,6 +859,47 @@ async function testHouseRx() {
   check('score caps at 100', resCap.body?.leads?.length === 1 && resCap.body?.leads[0]?.matchScore === 100, resCap.body?.leads);
 }
 
+async function testFitReasons() {
+  // A related job that doesn't fit must say why: years bar above
+  // what the resume shows, and explicit skill requirements missing
+  // from the resume. A fitting job gets no reasons.
+  const testMod = freshRequire(`${OUT}/test-company.cjs`);
+  const ghJson = JSON.stringify({
+    jobs: [
+      { title: 'Senior Frontend Engineer', location: { name: 'Remote' }, absolute_url: 'https://fit.example/careers?gh_jid=1', content: '<p>8+ years of experience building web apps. Experience with Angular and Vue required. Must have AWS experience.</p>', created_at: '2026-10-20T00:00:00Z' },
+      { title: 'Frontend Developer', location: { name: 'Remote' }, absolute_url: 'https://fit.example/careers?gh_jid=2', content: '<p>React TypeScript experience. 2 years of experience.</p>', created_at: '2026-10-20T00:00:00Z' },
+    ],
+  });
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u.includes('boards-api.greenhouse.io')) {
+      return { ok: true, text: async () => ghJson };
+    }
+    if (u === 'https://fit.example/careers') {
+      return { ok: true, text: async () => '<html><body><script src="https://boards.greenhouse.io/embed/job_board/js?for=fit"></script></body></html>' };
+    }
+    return { ok: true, text: async () => '<html><body>No careers here.</body></html>' };
+  };
+  const company = { name: 'Fit Co', website: 'https://fit.example', careersUrl: '' };
+  const resA = mkRes();
+  await testMod.default(
+    mkReq('POST', { company, resumeText: 'React TypeScript frontend developer with 3 years of experience' }, { 'x-sync-key': 'testkey' }),
+    resA,
+  );
+  const senior = resA.body?.leads?.find((l) => l.title === 'Senior Frontend Engineer');
+  const junior = resA.body?.leads?.find((l) => l.title === 'Frontend Developer');
+  check('fit: years reason vs resume', senior?.reasons?.some((r) => r.includes('Asks 8+ years') && r.includes('shows 3')), senior?.reasons);
+  check('fit: skill reasons named', ['Angular', 'Vue', 'AWS'].every((s) => senior?.reasons?.some((r) => r.includes(s))), senior?.reasons);
+  check('fit: fitting job has no reasons', Array.isArray(junior?.reasons) && junior.reasons.length === 0, junior?.reasons);
+  const resC = mkRes();
+  await testMod.default(
+    mkReq('POST', { company, resumeText: 'React TypeScript frontend developer' }, { 'x-sync-key': 'testkey' }),
+    resC,
+  );
+  const seniorC = resC.body?.leads?.find((l) => l.title === 'Senior Frontend Engineer');
+  check('fit: no years figure stated honestly', seniorC?.reasons?.[0]?.includes("doesn't state a years figure"), seniorC?.reasons);
+}
+
 async function testCompaniesApi() {
   const lib = freshRequire(`${OUT}/finder-lib.cjs`);
   const col = new FakeCollection();
@@ -1203,6 +1244,7 @@ await testJazzhr();
 await testBusinessSiteFirst();
 await testHalvik();
 await testHouseRx();
+await testFitReasons();
 await testCompaniesApi();
 
 console.log(`\n${passed} passed, ${failed} failed`);

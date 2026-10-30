@@ -308,6 +308,10 @@ export interface FinderLead {
   matchScore: number;
   strengths: string[];
   gaps: string[];
+  /** Why this job may not fit, in plain words: years asked vs shown,
+   *  and explicit skill requirements the resume doesn't show. Empty
+   *  when nothing specific mismatches. */
+  reasons: string[];
 }
 
 export interface CompanySearchInput {
@@ -576,9 +580,51 @@ export async function searchCompanyJobs(
   return { leads: [], postingsSeen: 0, sourcePage: null, triedUrls };
 }
 
+/** The highest years-of-experience figure a text states, or null.
+ *  Only counts years tied to experience/requirements ("8+ years of
+ *  experience", "minimum 5 years", "10 years in React") — not stray
+ *  mentions like "founded 5 years ago". */
+function extractYears(text: string): number | null {
+  let max: number | null = null;
+  const take = (n: number) => {
+    if (n >= 1 && n <= 50 && (max === null || n > max)) max = n;
+  };
+  for (const m of text.matchAll(/(\d+)\+?\s*(?:years?|yrs?)(?:\s+of)?\s+experience/gi)) take(+m[1]);
+  for (const m of text.matchAll(/(?:experience|required|minimum|at least)[^.\n]{0,50}?(\d+)\+?\s*(?:years?|yrs?)\b/gi)) take(+m[1]);
+  for (const m of text.matchAll(/(\d+)\+?\s*(?:years?|yrs?)\s+(?:in|of|with)\b/gi)) take(+m[1]);
+  return max;
+}
+
+/** Explicit skill requirements a posting states ("experience with
+ *  Angular", "must have AWS") that the resume doesn't show. Parsed
+ *  from requirement phrases, not a fixed skill list — so it works for
+ *  any field, not just frontend. Capped at 3. */
+function extractRequiredSkills(description: string, resumeSet: Set<string>): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const triggers =
+    /(?:experience with|experience in|experience using|proficiency in|proficiency with|knowledge of|skilled in|expertise in|familiarity with|must have)\s+([A-Za-z][A-Za-z0-9+#./&\- ]{1,60}?)(?:,|;|\.|$)/gi;
+  let m: RegExpExecArray | null;
+  while ((m = triggers.exec(description)) !== null && out.length < 3) {
+    for (const raw of m[1].split(/\s+and\s+|\s+or\s+|,/)) {
+      let piece = raw.trim().replace(/\s+(experience|required|preferred|skills?)$/i, '').trim();
+      if (!piece || piece.split(/\s+/).length > 3) continue;
+      const key = piece.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      // Shown only if none of its words appear in the resume.
+      if (tokenize(piece).every((t) => resumeSet.has(t))) continue;
+      out.push(piece);
+      if (out.length >= 3) break;
+    }
+  }
+  return out;
+}
+
 function screenPostings(company: string, postings: Posting[], resumeText: string): FinderLead[] {
   const resumeTerms = extractResumeTerms(resumeText);
   const resumeSet = new Set(resumeTerms);
+  const resumeYears = extractYears(resumeText);
   const leads: FinderLead[] = [];
   for (const p of postings) {
     if (!titleVerdict(p.title, resumeTerms)) continue;
@@ -606,6 +652,21 @@ function screenPostings(company: string, postings: Posting[], resumeText: string
       .slice(0, 5)
       .map(([t]) => t);
     if (/staff|principal/.test(p.title.toLowerCase())) gaps.unshift('Staff/principal-level ask');
+    // Why this job may not fit, in plain words — the years bar vs
+    // what the resume shows, then explicit skill requirements missing
+    // from the resume. A related job with a low score should say why.
+    const reasons: string[] = [];
+    const postingYears = extractYears(`${p.title} ${p.description}`);
+    if (postingYears !== null && (resumeYears === null || postingYears > resumeYears)) {
+      reasons.push(
+        resumeYears === null
+          ? `Asks ${postingYears}+ years of experience — your resume doesn't state a years figure`
+          : `Asks ${postingYears}+ years of experience, your resume shows ${resumeYears}`,
+      );
+    }
+    for (const skill of extractRequiredSkills(p.description, resumeSet)) {
+      reasons.push(`Requires ${skill} — not shown in your resume`);
+    }
     leads.push({
       company,
       title: p.title,
@@ -618,6 +679,7 @@ function screenPostings(company: string, postings: Posting[], resumeText: string
       matchScore,
       strengths: matched.slice(0, 6).map((t) => t.charAt(0).toUpperCase() + t.slice(1)),
       gaps,
+      reasons,
     });
   }
   return leads;
