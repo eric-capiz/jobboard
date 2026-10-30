@@ -17,7 +17,7 @@
  */
 
 import { MongoClient } from 'mongodb';
-import { COMPANIES_SEED } from './companies-seed';
+import { COMPANIES_SEED } from './companies-seed.js';
 
 // Vercel provides process.env at runtime; the project has no @types/node,
 // so declare just the shape this file uses (same approach as api/state.ts,
@@ -352,7 +352,7 @@ function authorized(req: VercelRequest): boolean {
   return !!expected && key === expected;
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+async function handlerInner(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'method not allowed' });
   }
@@ -484,4 +484,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     done,
     stats: { postingsSeen, boardErrors, noBoard },
   });
+}
+
+// Top-level guard so an unexpected error surfaces as a JSON 500 with a
+// message (like /api/state) instead of an opaque invocation failure.
+export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
+  try {
+    await handlerInner(req, res);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'failed';
+    res.status(500).json({ error: msg });
+  }
 }
