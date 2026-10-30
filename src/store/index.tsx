@@ -22,7 +22,6 @@ import {
   StageId,
   canTransition,
   clampMatchScore,
-  companyDedupeKey,
   dedupeImportRows,
   deriveTailoredFileName,
   findStage,
@@ -33,7 +32,7 @@ import {
   todayLocal,
   uid,
 } from '../domain';
-import { fetchCloudState, pushCloudStateDebounced } from '../sync';
+import { fetchCloudState, getSyncKey, pushCloudStateDebounced } from '../sync';
 
 export const STORAGE_KEY = 'jobboard-state-v1';
 export const CURRENT_VERSION = 1;
@@ -46,14 +45,12 @@ export interface StoreState {
   jobs: Job[];
   masterResumes: MasterResume[];
   settings: AppSettings;
-  companies: Company[];
   selectedJobId: string | null;
   initialized: boolean;
 }
 
 export type Action =
   | { type: 'ADD_JOB'; job: Job }
-  | { type: 'ADD_COMPANIES'; companies: Company[] }
   | { type: 'IMPORT_JOBS'; rows: ImportRow[] }
   | { type: 'UPDATE_JOB'; id: string; patch: Partial<Job>; activityText?: string; activityKind?: ActivityKind }
   | { type: 'MOVE_JOB'; id: string; toStageId: StageId }
@@ -83,19 +80,6 @@ function reducer(state: StoreState, action: Action): StoreState {
       const job = action.job;
       const activity = logActivity(job, 'created', 'Job added');
       return { ...state, jobs: [touch({ ...job, activities: [] }, activity), ...state.jobs] };
-    }
-    case 'ADD_COMPANIES': {
-      // Dedupe against the DB and within the batch; new rows go first.
-      const seen = new Set(state.companies.map((c) => companyDedupeKey(c.name, c.website)));
-      const fresh: Company[] = [];
-      for (const c of action.companies) {
-        const key = companyDedupeKey(c.name, c.website);
-        if (seen.has(key)) continue;
-        seen.add(key);
-        fresh.push(c);
-      }
-      if (fresh.length === 0) return state;
-      return { ...state, companies: [...fresh, ...state.companies] };
     }
     case 'IMPORT_JOBS': {
       const { unique } = dedupeImportRows(action.rows, state.jobs);
@@ -188,11 +172,13 @@ function reducer(state: StoreState, action: Action): StoreState {
     case 'RESET_ALL':
       return { ...initialState(), initialized: true };
     case 'REPLACE_ALL':
+      // Companies are NOT part of client state anymore: they live in the
+      // server-side companies collection. Any companies field on the
+      // incoming payload is deliberately ignored here.
       return {
         jobs: action.state.jobs,
         masterResumes: action.state.masterResumes,
         settings: action.state.settings,
-        companies: action.state.companies,
         selectedJobId: null,
         initialized: true,
       };
@@ -219,7 +205,6 @@ function initialState(): StoreState {
     jobs: [],
     masterResumes: [],
     settings: defaultSettings(),
-    companies: [],
     selectedJobId: null,
     initialized: false,
   };
@@ -267,19 +252,6 @@ function normalizeMasterResume(raw: unknown): MasterResume {
   };
 }
 
-function normalizeCompany(raw: unknown): Company {
-  const c = (typeof raw === 'object' && raw !== null ? raw : {}) as Partial<Company>;
-  return {
-    id: typeof c.id === 'string' ? c.id : uid(),
-    name: String(c.name ?? ''),
-    website: String(c.website ?? ''),
-    careersUrl: String(c.careersUrl ?? ''),
-    category: String(c.category ?? ''),
-    source: String(c.source ?? 'Seed'),
-    addedAt: String(c.addedAt ?? nowIso()),
-  };
-}
-
 function normalizeSettings(raw: unknown): AppSettings {
   const s = (typeof raw === 'object' && raw !== null ? raw : {}) as Partial<AppSettings>;
   return {
@@ -295,7 +267,13 @@ function normalizeSettings(raw: unknown): AppSettings {
   };
 }
 
-/** Migrate any stored payload up to CURRENT_VERSION. Pure & testable. */
+/** Migrate any stored payload up to CURRENT_VERSION. Pure & testable.
+ *  A legacy payload's companies field is deliberately IGNORED here — it is
+ *  never put in the store. Legacy companies reach the server-side collection
+ *  via runCompanyMigrationOnce (local payload) and POST /api/companies/migrate
+ *  (cloud state doc), which run before any reconciliation dispatch. The
+ *  companies: [] below only satisfies the PersistedState backup shape; the
+ *  store itself carries no companies. */
 export function migrate(raw: unknown): PersistedState {
   const base: PersistedState = {
     version: CURRENT_VERSION,
@@ -311,7 +289,7 @@ export function migrate(raw: unknown): PersistedState {
     jobs: Array.isArray(r.jobs) ? r.jobs.map((j) => normalizeJob(j)) : [],
     masterResumes: Array.isArray(r.masterResumes) ? r.masterResumes.map((m) => normalizeMasterResume(m)) : [],
     settings: normalizeSettings(r.settings),
-    companies: Array.isArray(r.companies) ? r.companies.map((c) => normalizeCompany(c)) : [],
+    companies: [],
   };
 }
 
@@ -325,12 +303,135 @@ function loadPersisted(): StoreState | null {
       jobs: migrated.jobs,
       masterResumes: migrated.masterResumes,
       settings: migrated.settings,
-      companies: migrated.companies,
       selectedJobId: null,
       initialized: true,
     };
   } catch {
     return null;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Server-side companies collection helpers                            */
+/* ------------------------------------------------------------------ */
+
+const COMPANIES_MIGRATED_FLAG = 'jobboard-companies-migrated-v1';
+const COMPANIES_IMPORT_CHUNK = 5000;
+
+interface CompanyImportRow {
+  name: string;
+  website: string;
+  careersUrl?: string;
+  category?: string;
+  source?: string;
+  addedAt?: string;
+}
+
+function toImportRow(raw: unknown): CompanyImportRow | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const c = raw as Partial<Company>;
+  const name = String(c.name ?? '').trim();
+  const website = String(c.website ?? '').trim();
+  if (!name || !website) return null;
+  return {
+    name,
+    website,
+    careersUrl: String(c.careersUrl ?? '') || undefined,
+    category: String(c.category ?? '') || undefined,
+    source: String(c.source ?? '') || undefined,
+    addedAt: String(c.addedAt ?? '') || undefined,
+  };
+}
+
+/** POST rows to /api/companies/import, chunked at 5000. Failures are
+ *  swallowed: the import endpoint dedupes server-side, and the migrate
+ *  endpoint is the authoritative path for cloud data. */
+async function importCompaniesToCollection(rawRows: unknown[]): Promise<void> {
+  const key = getSyncKey();
+  if (!key) return;
+  const rows = rawRows
+    .map((r) => toImportRow(r))
+    .filter((r): r is CompanyImportRow => r !== null);
+  for (let i = 0; i < rows.length; i += COMPANIES_IMPORT_CHUNK) {
+    try {
+      await fetch('/api/companies/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-sync-key': key },
+        body: JSON.stringify({ companies: rows.slice(i, i + COMPANIES_IMPORT_CHUNK) }),
+      });
+    } catch {
+      // Ignored per contract — never fail a restore/migration over this.
+    }
+  }
+}
+
+/** Fetch every company from the collection, paged at limit 100, for a
+ *  backup snapshot. On ANY failure returns [] so the caller exports
+ *  without companies rather than failing the whole export. */
+async function fetchAllCompaniesForBackup(): Promise<Company[]> {
+  const key = getSyncKey();
+  if (!key) return [];
+  const all: Company[] = [];
+  try {
+    for (;;) {
+      const params = new URLSearchParams({ skip: String(all.length), limit: '100', q: '' });
+      const r = await fetch(`/api/companies?${params.toString()}`, {
+        headers: { 'x-sync-key': key },
+      });
+      if (!r.ok) return [];
+      const data = await r.json();
+      const rows = Array.isArray(data.companies) ? (data.companies as Company[]) : [];
+      all.push(...rows);
+      const total = typeof data.total === 'number' ? data.total : all.length;
+      if (rows.length === 0 || all.length >= total) break;
+    }
+  } catch {
+    return [];
+  }
+  return all;
+}
+
+/** One-time legacy migration, run before cloud reconciliation (see the
+ *  StoreProvider effect below). (a) Any companies in the locally stored
+ *  payload are imported to the collection; (b) POST /api/companies/migrate
+ *  moves any companies still in the cloud state doc into the collection and
+ *  clears them there. Guarded by a localStorage flag so it runs once per
+ *  browser; a network throw leaves the flag unset so the next visit retries,
+ *  and re-running is harmless (the server dedupes / the migrate call is
+ *  idempotent). No sync key means no migration attempt and no flag. */
+async function runCompanyMigrationOnce(): Promise<void> {
+  try {
+    if (localStorage.getItem(COMPANIES_MIGRATED_FLAG)) return;
+  } catch {
+    return;
+  }
+  const key = getSyncKey();
+  if (!key) return;
+  try {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as { companies?: unknown };
+        if (Array.isArray(parsed.companies)) {
+          await importCompaniesToCollection(parsed.companies);
+        }
+      }
+    } catch {
+      // Local import failures are ignored — the migrate endpoint below is
+      // the authoritative path for cloud data.
+    }
+    await fetch('/api/companies/migrate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-sync-key': key },
+      body: JSON.stringify({}),
+    });
+    try {
+      localStorage.setItem(COMPANIES_MIGRATED_FLAG, '1');
+    } catch {
+      // Storage blocked — migration re-runs next visit; it is idempotent.
+    }
+  } catch {
+    // Network throw: flag stays unset so the next visit retries.
   }
 }
 
@@ -343,7 +444,6 @@ export type NewJobInput = Omit<Job, 'id' | 'createdAt' | 'updatedAt' | 'activiti
 interface StoreApi extends StoreState {
   dispatch: React.Dispatch<Action>;
   addJob: (input: NewJobInput) => void;
-  addCompanies: (input: Omit<Company, 'id' | 'addedAt'>[]) => void;
   moveJob: (id: string, toStageId: StageId) => boolean;
   updateJob: (id: string, patch: Partial<Job>, activityText?: string, activityKind?: ActivityKind) => void;
   deleteJob: (id: string) => void;
@@ -373,7 +473,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       jobs: state.jobs,
       masterResumes: state.masterResumes,
       settings: state.settings,
-      companies: state.companies,
       updatedAt: Date.now(),
     };
     try {
@@ -387,8 +486,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // Cloud reconciliation on load: newest wins (cloud vs local).
   // When cloud sync is on and the cloud is empty, the cloud is still the
   // source of truth — there is no seed data to protect.
+  // The legacy companies migration runs FIRST, before any REPLACE_ALL
+  // dispatch and before cloudReady lets the persist effect push state:
+  // that way a legacy state doc's companies reach the collection exactly
+  // once, instead of being overwritten by a companies-free push.
   useEffect(() => {
     (async () => {
+      await runCompanyMigrationOnce();
       const cloud = await fetchCloudState();
       if (cloud && cloud.state) {
         let localUpdatedAt = 0;
@@ -452,12 +556,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   );
   const selectJob = useCallback((id: string | null) => dispatch({ type: 'SELECT_JOB', id }), []);
 
-  const addCompanies = useCallback((input: Omit<Company, 'id' | 'addedAt'>[]) => {
-    const ts = nowIso();
-    const companies: Company[] = input.map((c) => ({ ...c, id: uid(), addedAt: ts }));
-    dispatch({ type: 'ADD_COMPANIES', companies });
-  }, []);
-
   const addMasterResume = useCallback((input: Omit<MasterResume, 'id' | 'uploadedAt'>) => {
     const resume: MasterResume = { ...input, id: uid(), uploadedAt: nowIso() };
     dispatch({ type: 'ADD_MASTER_RESUME', resume });
@@ -467,29 +565,45 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'UPDATE_SETTINGS', patch: { defaultMasterResumeId: id } });
   }, []);
 
+  // Backup snapshots still include companies, fetched paged from the
+  // collection — the store no longer holds them. If the fetch fails, the
+  // export goes out without companies rather than failing outright.
   const exportBackup = useCallback(() => {
-    const payload: PersistedState = {
-      version: CURRENT_VERSION,
-      jobs: state.jobs,
-      masterResumes: state.masterResumes,
-      settings: state.settings,
-      companies: state.companies,
-    };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `jobboard-backup-${todayLocal()}.json`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    void (async () => {
+      const companies = await fetchAllCompaniesForBackup();
+      const payload: PersistedState = {
+        version: CURRENT_VERSION,
+        jobs: state.jobs,
+        masterResumes: state.masterResumes,
+        settings: state.settings,
+        companies,
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `jobboard-backup-${todayLocal()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    })();
   }, [state]);
 
   const importBackup = useCallback(async (file: File): Promise<{ ok: boolean; error?: string }> => {
     try {
       const text = await file.text();
       const parsed: unknown = JSON.parse(text);
+      // Backup companies belong in the collection, not the store: import
+      // them first (failures ignored), then restore the rest. The migrated
+      // state dispatched below carries no companies (see REPLACE_ALL).
+      if (
+        typeof parsed === 'object' &&
+        parsed !== null &&
+        Array.isArray((parsed as { companies?: unknown }).companies)
+      ) {
+        await importCompaniesToCollection((parsed as { companies: unknown[] }).companies);
+      }
       const migrated = migrate(parsed);
       dispatch({ type: 'REPLACE_ALL', state: migrated });
       return { ok: true };
@@ -508,7 +622,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       ...state,
       dispatch,
       addJob,
-      addCompanies,
       moveJob,
       updateJob,
       deleteJob,
@@ -524,7 +637,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [
       state,
       addJob,
-      addCompanies,
       moveJob,
       updateJob,
       deleteJob,

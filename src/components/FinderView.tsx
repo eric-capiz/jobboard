@@ -1,5 +1,5 @@
-import { useMemo, useRef, useState } from 'react';
-import { dedupeCompanies, deriveTailoredFileName, jobDedupeKey } from '../domain';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { deriveTailoredFileName, jobDedupeKey, type Company } from '../domain';
 import { useStore } from '../store';
 import { getSyncKey } from '../sync';
 import { Badge, Button, EmptyState, Input, Select } from './ui';
@@ -10,9 +10,11 @@ const JOBS_CHUNK = 15;
 
 interface CompanyResult {
   added: number;
-  nextOffset: number;
+  total: number;
+  source?: string;
   exhausted: boolean;
   error?: string;
+  note?: string;
 }
 
 function ScoreBadge({ score }: { score: number }) {
@@ -25,45 +27,62 @@ function ScoreBadge({ score }: { score: number }) {
 }
 
 export function FinderView() {
-  const { companies, jobs, masterResumes, settings, addCompanies, addJob } = useStore();
+  const { jobs, masterResumes, settings, addJob } = useStore();
 
-  /* ---------------- Companies ---------------- */
+  /* ---------------- Companies (server collection) ---------------- */
   const [findingCompanies, setFindingCompanies] = useState(false);
   const [companyResult, setCompanyResult] = useState<CompanyResult | null>(null);
-  // Wikidata discovery offset, persisted locally so presses keep walking
-  // the live result set. Losing it is harmless — the server also filters
-  // against the database, so no company is ever returned twice. The v2 key
-  // exists because the discovery query grew (headquarters path added), which
-  // changed the result order — old offsets would point at the wrong page.
-  const [discoveryOffset, setDiscoveryOffset] = useState<number>(() => {
-    try {
-      return Number(localStorage.getItem('jobboard-finder-offset-v2') ?? 0) || 0;
-    } catch {
-      return 0;
-    }
-  });
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [totalCompanies, setTotalCompanies] = useState(0);
+  const [companyError, setCompanyError] = useState('');
   const [companyQuery, setCompanyQuery] = useState('');
   const [companyPage, setCompanyPage] = useState(1);
 
-  const sortedCompanies = useMemo(
-    () => [...companies].sort((a, b) => a.name.localeCompare(b.name)),
-    [companies],
-  );
-  const filteredCompanies = useMemo(() => {
-    const q = companyQuery.trim().toLowerCase();
-    if (!q) return sortedCompanies;
-    return sortedCompanies.filter(
-      (c) =>
-        c.name.toLowerCase().includes(q) ||
-        c.category.toLowerCase().includes(q) ||
-        c.website.toLowerCase().includes(q),
-    );
-  }, [sortedCompanies, companyQuery]);
-  const companyPageCount = Math.max(1, Math.ceil(filteredCompanies.length / COMPANIES_PER_PAGE));
-  const companyPageRows = filteredCompanies.slice(
-    (companyPage - 1) * COMPANIES_PER_PAGE,
-    companyPage * COMPANIES_PER_PAGE,
-  );
+  // The discovery cursor moved server-side: the server holds it now, so the
+  // old client offset is dead state. Delete it once so it never comes back.
+  useEffect(() => {
+    try {
+      localStorage.removeItem('jobboard-finder-offset-v2');
+    } catch {
+      // Storage blocked — the key is simply never read again.
+    }
+  }, []);
+
+  const loadCompanies = useCallback(async (page: number, query: string) => {
+    try {
+      const key = getSyncKey();
+      const params = new URLSearchParams({
+        skip: String((page - 1) * COMPANIES_PER_PAGE),
+        limit: String(COMPANIES_PER_PAGE),
+        q: query.trim(),
+      });
+      const r = await fetch(`/api/companies?${params.toString()}`, {
+        headers: key ? { 'x-sync-key': key } : {},
+      });
+      if (!r.ok) {
+        setCompanyError(
+          r.status === 401
+            ? 'Company list was not authorized. Check the app sync key and try again.'
+            : `Could not load companies (HTTP ${r.status}).`,
+        );
+        return;
+      }
+      const data = await r.json();
+      setCompanies(Array.isArray(data.companies) ? (data.companies as Company[]) : []);
+      setTotalCompanies(typeof data.total === 'number' ? data.total : 0);
+      setCompanyError('');
+    } catch {
+      // Keep the current list on a network error; only the error line changes.
+      setCompanyError('Could not load companies (network error).');
+    }
+  }, []);
+
+  // Load page 1 on mount, and reload whenever the page or search query changes.
+  useEffect(() => {
+    void loadCompanies(companyPage, companyQuery);
+  }, [companyPage, companyQuery, loadCompanies]);
+
+  const companyPageCount = Math.max(1, Math.ceil(totalCompanies / COMPANIES_PER_PAGE));
 
   async function handleFindCompanies() {
     setFindingCompanies(true);
@@ -72,7 +91,7 @@ export function FinderView() {
       if (!key) {
         setCompanyResult({
           added: 0,
-          nextOffset: discoveryOffset,
+          total: totalCompanies,
           exhausted: false,
           error: "Find Companies needs the app's sync key, which isn't set in this build.",
         });
@@ -81,12 +100,16 @@ export function FinderView() {
       const r = await fetch('/api/find-companies', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-sync-key': key },
-        body: JSON.stringify({ limit: 500, offset: discoveryOffset }),
+        // No offset: the server holds the discovery cursor and inserts new
+        // companies into the collection during the press. The response
+        // carries no company rows — the list is refreshed from
+        // GET /api/companies below.
+        body: JSON.stringify({ limit: 2000 }),
       });
       if (!r.ok) {
         setCompanyResult({
           added: 0,
-          nextOffset: discoveryOffset,
+          total: totalCompanies,
           exhausted: false,
           error:
             r.status === 401
@@ -96,39 +119,24 @@ export function FinderView() {
         return;
       }
       const data = await r.json();
-      const rows = ((data.companies ?? []) as {
-        name: string;
-        website: string;
-        careersUrl: string;
-        category: string;
-        source: string;
-      }[]).map((c) => ({
-        name: c.name,
-        website: c.website,
-        careersUrl: c.careersUrl ?? '',
-        category: c.category ?? '',
-        source: c.source ?? 'Wikidata',
-      }));
-      const { unique } = dedupeCompanies(rows, companies);
-      addCompanies(unique);
-      const nextOffset = typeof data.nextOffset === 'number' ? data.nextOffset : discoveryOffset;
-      setDiscoveryOffset(nextOffset);
-      try {
-        localStorage.setItem('jobboard-finder-offset-v2', String(nextOffset));
-      } catch {
-        // Storage blocked — offset resets next visit, but dedupe still prevents repeats.
-      }
+      const added = typeof data.added === 'number' ? data.added : 0;
       setCompanyResult({
-        added: unique.length,
-        nextOffset,
+        added,
+        total: typeof data.total === 'number' ? data.total : totalCompanies,
+        source: typeof data.source === 'string' ? data.source : undefined,
         exhausted: !!data.exhausted,
         error: typeof data.error === 'string' ? data.error : undefined,
+        note: typeof data.note === 'string' ? data.note : undefined,
       });
-      setCompanyPage(1);
+      if (added > 0) {
+        // The new rows live in the collection now — reset to page 1 and reload.
+        setCompanyPage(1);
+        await loadCompanies(1, companyQuery);
+      }
     } catch {
       setCompanyResult({
         added: 0,
-        nextOffset: discoveryOffset,
+        total: totalCompanies,
         exhausted: false,
         error: 'Find Companies hit a network error. Nothing was lost — press again.',
       });
@@ -200,11 +208,11 @@ export function FinderView() {
         const r = await fetch('/api/find-jobs', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-sync-key': key },
+          // The server pages the companies collection itself — the client
+          // sends only the resume text and the collection cursor, never a
+          // companies array.
           body: JSON.stringify({
             resumeText: selectedResume.text,
-            // Search the companies in this database — the API resolves
-            // these names against its seed and never takes a URL from us.
-            companies: companies.map((c) => c.name),
             cursor,
             limit: JOBS_CHUNK,
           }),
@@ -300,6 +308,8 @@ export function FinderView() {
     knownRef.current.add(k);
   }
 
+  const showEmptyState = totalCompanies === 0 && companyQuery.trim() === '';
+
   return (
     <div className="space-y-10">
       {/* ---------------- Companies ---------------- */}
@@ -308,17 +318,21 @@ export function FinderView() {
           <div>
             <h1 className="text-xl font-bold tracking-tight text-zinc-100">Finder</h1>
             <p className="mt-0.5 text-sm text-zinc-500">
-              {companies.length} {companies.length === 1 ? 'company' : 'companies'} in your database
+              {totalCompanies} {totalCompanies === 1 ? 'company' : 'companies'} in your database
               {companyResult && (
                 <>
                   {' · '}
                   {companyResult.added} added just now
+                  {companyResult.source ? <> · {companyResult.source}</> : null}
+                  {companyResult.total > 0 ? <> · {companyResult.total} total</> : null}
                   {companyResult.error ? (
                     <> · {companyResult.error}</>
+                  ) : companyResult.note ? (
+                    <> · {companyResult.note}</>
                   ) : companyResult.exhausted ? (
                     <> · No more companies found from current sources</>
                   ) : (
-                    <> · Discovered live — press again for 500 more</>
+                    <> · Discovered live — press again for more</>
                   )}
                 </>
               )}
@@ -329,12 +343,13 @@ export function FinderView() {
           </Button>
         </div>
         <p className="text-sm text-zinc-400">
-          Find Companies discovers companies not already in your database, live, at most 500
+          Find Companies discovers companies not already in your database, live, up to 2,000
           new ones per click. Press it again for the next batch; it never duplicates, and it
           keeps finding new ones until every source is exhausted.
         </p>
+        {companyError && <p className="text-sm text-red-400">{companyError}</p>}
 
-        {companies.length === 0 ? (
+        {showEmptyState ? (
           <EmptyState
             title="No companies yet"
             description="Press Find Companies to discover companies live. Then Find Jobs searches those companies' careers pages."
@@ -357,7 +372,7 @@ export function FinderView() {
                 aria-label="Search companies"
               />
             </div>
-            {filteredCompanies.length === 0 ? (
+            {companies.length === 0 ? (
               <p className="py-6 text-center text-sm text-zinc-500">
                 No companies match “{companyQuery}”.
               </p>
@@ -365,11 +380,11 @@ export function FinderView() {
               <>
                 <p className="text-xs text-zinc-500">
                   Showing {(companyPage - 1) * COMPANIES_PER_PAGE + 1}–
-                  {(companyPage - 1) * COMPANIES_PER_PAGE + companyPageRows.length} of{' '}
-                  {filteredCompanies.length}
+                  {(companyPage - 1) * COMPANIES_PER_PAGE + companies.length} of{' '}
+                  {totalCompanies}
                 </p>
                 <div className="overflow-hidden rounded-2xl border border-white/10">
-                  {companyPageRows.map((c) => (
+                  {companies.map((c) => (
                     <div
                       key={c.id}
                       className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-white/5 bg-zinc-900/60 px-4 py-3 last:border-b-0"
@@ -453,7 +468,7 @@ export function FinderView() {
             <Button
               variant="primary"
               onClick={handleFindJobs}
-              disabled={!selectedResume || searching || companies.length === 0}
+              disabled={!selectedResume || searching || totalCompanies === 0}
             >
               {searching ? 'Searching…' : 'Find Jobs'}
             </Button>
@@ -493,7 +508,7 @@ export function FinderView() {
           </p>
         )}
         {jobError && <p className="text-sm text-red-400">{jobError}</p>}
-        {masterResumes.length > 0 && companies.length === 0 && (
+        {masterResumes.length > 0 && totalCompanies === 0 && (
           <p className="text-sm text-amber-400">
             Run Find Companies first — Find Jobs searches the companies in your database.
           </p>
