@@ -462,16 +462,26 @@ async function testFindJobs() {
   // a hand-built fake collection.
   const companiesCol = new FakeCollection();
   await companiesCol.insertMany([
-    { name: 'TestCorp', website: 'https://testcorp.com', domain: 'testcorp.com', nameKey: 'testcorp', careersUrl: 'https://boards.greenhouse.io/testcorp', category: 'General', source: 'Wikidata', addedAt: '2026-10-29T00:00:00Z' },
-    { name: 'NoBoard Inc', website: 'https://noboard.example', domain: 'noboard.example', nameKey: 'noboard inc', careersUrl: '', category: 'General', source: 'Wikidata', addedAt: '2026-10-29T00:00:00Z' },
+    { name: 'PageCo', website: 'https://pageco.example', domain: 'pageco.example', nameKey: 'pageco', careersUrl: '', category: 'General', source: 'Wikidata', addedAt: '2026-10-29T00:00:00Z' },
+    { name: 'NoSource Inc', website: 'https://nosource.example', domain: 'nosource.example', nameKey: 'nosource inc', careersUrl: '', category: 'General', source: 'Wikidata', addedAt: '2026-10-29T00:00:00Z' },
   ]);
-  globalThis.fetch = boardsFetchStub;
+  const rawHtml = `<html><body>
+<div class="job-listing"><h3>Frontend Developer</h3><p>Location: Remote</p><a href="/jobs/frontend-developer">Apply</a></div>
+<div class="job-listing"><h3>Loan Analyst</h3><p>Location: Remote</p><a href="/jobs/loan-analyst">Apply</a></div>
+</body></html>`;
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u === 'https://pageco.example/careers') {
+      return { ok: true, text: async () => rawHtml };
+    }
+    return { ok: true, text: async () => '<html><body>No careers here.</body></html>' };
+  };
   const out = await mod.runFindJobs(
     { companiesCol },
     { resumeText: 'React TypeScript JavaScript frontend developer with Storybook and design systems experience', cursor: 0, limit: 15 },
   );
-  check('find-jobs leads 1 (backend filtered)', out.leads.length === 1, out);
-  check('find-jobs lead is Frontend Engineer @ TestCorp, score 100', out.leads[0]?.title === 'Frontend Engineer' && out.leads[0]?.company === 'TestCorp' && out.leads[0]?.matchScore === 100, out.leads[0]);
+  check('find-jobs leads 1 (loan filtered)', out.leads.length === 1, out);
+  check('find-jobs lead is Frontend Developer @ PageCo, score 63', out.leads[0]?.title === 'Frontend Developer' && out.leads[0]?.company === 'PageCo' && out.leads[0]?.matchScore === 63, out.leads[0]);
   check('find-jobs checked 2, total 2, done', out.checked === 2 && out.totalCompanies === 2 && out.done === true && out.nextCursor === null, out);
   check('find-jobs stats', out.stats.postingsSeen === 2 && out.stats.noBoard === 1 && out.stats.boardErrors === 0, out.stats);
   // Paging: limit 1.
@@ -489,32 +499,17 @@ async function testFindJobsNonFrontend() {
   const mod = freshRequire(`${OUT}/find-jobs.cjs`);
   const companiesCol = new FakeCollection();
   await companiesCol.insertMany([
-    { name: 'SupportCo', website: 'https://supportco.example', domain: 'supportco.example', nameKey: 'supportco', careersUrl: 'https://boards.greenhouse.io/supportco', category: 'General', source: 'Wikidata', addedAt: '2026-10-29T00:00:00Z' },
+    { name: 'SupportCo', website: 'https://supportco.example', domain: 'supportco.example', nameKey: 'supportco', careersUrl: '', category: 'General', source: 'Wikidata', addedAt: '2026-10-29T00:00:00Z' },
   ]);
   globalThis.fetch = async (url) => {
     const u = String(url);
-    if (u.includes('boards-api.greenhouse.io')) {
+    if (u === 'https://supportco.example/careers') {
       return {
         ok: true,
-        text: async () =>
-          JSON.stringify({
-            jobs: [
-              {
-                title: 'Customer Support Specialist',
-                location: { name: 'Remote US' },
-                absolute_url: 'https://job-boards.greenhouse.io/supportco/jobs/1',
-                content: '<p>Help SaaS customers via chat support and troubleshoot issues with Zendesk.</p>',
-                created_at: '2026-10-20T00:00:00Z',
-              },
-              {
-                title: 'Frontend Engineer',
-                location: { name: 'Remote US' },
-                absolute_url: 'https://job-boards.greenhouse.io/supportco/jobs/2',
-                content: '<p>React TypeScript frontend developer.</p>',
-                created_at: '2026-10-20T00:00:00Z',
-              },
-            ],
-          }),
+        text: async () => `<html><body>
+<div class="job-listing"><h3>Customer Support Specialist</h3><p>Location: Remote</p><a href="/jobs/support-specialist">Apply</a></div>
+<div class="job-listing"><h3>Frontend Engineer</h3><p>Location: Remote</p><a href="/jobs/frontend-engineer">Apply</a></div>
+</body></html>`,
       };
     }
     return { ok: true, text: async () => '<html><body>No careers here.</body></html>' };
@@ -524,49 +519,50 @@ async function testFindJobsNonFrontend() {
     { resumeText: 'Customer support specialist with Zendesk, chat support, and troubleshooting experience for SaaS customers', cursor: 0, limit: 15 },
   );
   check('find-jobs non-frontend: support lead found, frontend not surfaced', out.leads.length === 1 && out.leads[0]?.title === 'Customer Support Specialist', out.leads);
-  check('find-jobs non-frontend: support lead scores 94', out.leads[0]?.matchScore === 94, out.leads[0]);
+  check('find-jobs non-frontend: support lead scores 69', out.leads[0]?.matchScore === 69, out.leads[0]);
 }
 
 async function testTestCompany() {
-  // Single-company test: same board detection + resume matching as the
-  // full sweep, for one company, with no database writes.
+  // Single-company test: same business-site search + resume matching
+  // as the full sweep, for one company, with no database writes.
   const mod = freshRequire(`${OUT}/test-company.cjs`);
   const handler = mod.default;
-  // Board via the careers link, with a matching + a non-matching posting.
-  globalThis.fetch = boardsFetchStub;
+  const rawHtml = `<html><body>
+<div class="job-listing"><h3>Frontend Developer</h3><p>Location: Remote</p><a href="/jobs/frontend-developer">Apply</a></div>
+<div class="job-listing"><h3>Loan Analyst</h3><p>Location: Remote</p><a href="/jobs/loan-analyst">Apply</a></div>
+</body></html>`;
+  // Careers page given directly: listings parsed off the business page.
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u === 'https://pageco.example/careers') {
+      return { ok: true, text: async () => rawHtml };
+    }
+    return { ok: true, text: async () => '<html><body>No careers here.</body></html>' };
+  };
   const res = mkRes();
   await handler(
     mkReq('POST', {
-      company: { name: 'TestCorp', website: 'https://testcorp.com', careersUrl: 'https://boards.greenhouse.io/testcorp' },
+      company: { name: 'PageCo', website: '', careersUrl: 'https://pageco.example/careers' },
       resumeText: 'React TypeScript JavaScript frontend developer with Storybook and design systems experience',
     }, { 'x-sync-key': 'testkey' }),
     res,
   );
-  check('test-company: board found via careers link', res.body?.board?.board === 'greenhouse' && res.body?.board?.foundOn === 'careers link', res.body);
-  check('test-company: 1 matching lead, score 100', res.body?.leads?.length === 1 && res.body?.leads[0]?.matchScore === 100, res.body?.leads);
+  check('test-company: source is the given careers page', res.body?.sourcePage === 'https://pageco.example/careers', res.body);
+  check('test-company: 1 matching lead, score 63', res.body?.leads?.length === 1 && res.body?.leads[0]?.matchScore === 63, res.body?.leads);
   check('test-company: postings seen 2', res.body?.postingsSeen === 2, res.body);
-  // Board discovered from the homepage (careers link not given).
+  // Widget on the careers page, found from the homepage nav
+  // (Goldschmitt flow): the widget is part of the business page.
+  const widgetJs = `<div id="resumator-job-job_20261027144142_FGDHFERUIMWO9F2B" class="resumator-job resumator-jobs-text"><div class="resumator-job-title resumator-jobs-text">Frontend Developer</div><div class="resumator-job-info resumator-jobs-text"><span class="resumator-job-location resumator-job-heading resumator-jobs-text">Location: </span>Remote<span class="resumator-job-department resumator-job-heading resumator-jobs-text">Department: </span>Timeguard Solutions</div><div class="resumator-job-view-details resumator-jobs-text"><a class="resumator-job-link resumator-jobs-text" target="_blank" href="https://testco.applytojob.com/apply/MQD6Cg04z9/Frontend-Developer?source=Our Career Page Widget">+ View details</a></div></div>`;
   globalThis.fetch = async (url) => {
     const u = String(url);
-    if (u.includes('boards-api.greenhouse.io')) {
-      return {
-        ok: true,
-        text: async () =>
-          JSON.stringify({
-            jobs: [
-              {
-                title: 'Frontend Engineer',
-                location: { name: 'Remote US' },
-                absolute_url: 'https://job-boards.greenhouse.io/testcorp/jobs/1',
-                content: '<p>React TypeScript frontend developer.</p>',
-                created_at: '2026-10-20T00:00:00Z',
-              },
-            ],
-          }),
-      };
+    if (u === 'https://app.jazz.co/widgets/basic/create/testco') {
+      return { ok: true, text: async () => widgetJs };
+    }
+    if (u === 'https://discover.example/careers') {
+      return { ok: true, text: async () => '<html><body><script src="https://app.jazz.co/widgets/basic/create/testco"></script></body></html>' };
     }
     if (u === 'https://discover.example') {
-      return { ok: true, text: async () => '<html><body><a href="https://boards.greenhouse.io/testcorp">Careers</a></body></html>' };
+      return { ok: true, text: async () => '<html><body><nav><a href="/careers">Careers</a></nav></body></html>' };
     }
     return { ok: true, text: async () => '<html><body>No careers here.</body></html>' };
   };
@@ -578,9 +574,9 @@ async function testTestCompany() {
     }, { 'x-sync-key': 'testkey' }),
     res2,
   );
-  check('test-company: board discovered on homepage', res2.body?.board?.board === 'greenhouse' && res2.body?.board?.foundOn === 'https://discover.example', res2.body);
-  check('test-company: discovery lead found', res2.body?.leads?.length === 1, res2.body?.leads);
-  // No board anywhere: null board + tried URLs listed.
+  check('test-company: widget source is the careers page', res2.body?.sourcePage === 'https://discover.example/careers', res2.body);
+  check('test-company: widget lead found, score 75', res2.body?.leads?.length === 1 && res2.body?.leads[0]?.matchScore === 75, res2.body?.leads);
+  // No jobs anywhere on the business site: null source + tried URLs.
   globalThis.fetch = async () => ({ ok: true, text: async () => '<html><body>No careers here.</body></html>' });
   const res3 = mkRes();
   await handler(
@@ -590,14 +586,26 @@ async function testTestCompany() {
     }, { 'x-sync-key': 'testkey' }),
     res3,
   );
-  check('test-company: no board, tried URLs listed', res3.body?.board === null && res3.body?.triedUrls?.length === 3, res3.body);
-  // Auth + validation.
+  check('test-company: no jobs, tried URLs listed', res3.body?.sourcePage === null && res3.body?.triedUrls?.length === 3, res3.body);
+  // A board link on its own is not a source: nothing found, and the
+  // board is never contacted (the stub would serve jobs if asked).
+  globalThis.fetch = boardsFetchStub;
   const res4 = mkRes();
-  await handler(mkReq('POST', { company: { name: 'X', website: 'https://x.example', careersUrl: '' }, resumeText: 'React' }, { 'x-sync-key': 'wrong' }), res4);
-  check('test-company wrong key 401', res4.statusCode === 401, res4);
+  await handler(
+    mkReq('POST', {
+      company: { name: 'BoardOnly', website: '', careersUrl: 'https://boards.greenhouse.io/testcorp' },
+      resumeText: 'React TypeScript JavaScript frontend developer with Storybook and design systems experience',
+    }, { 'x-sync-key': 'testkey' }),
+    res4,
+  );
+  check('test-company: board link alone finds nothing', res4.body?.sourcePage === null && res4.body?.leads?.length === 0 && res4.body?.triedUrls?.length === 0, res4.body);
+  // Auth + validation.
   const res5 = mkRes();
-  await handler(mkReq('POST', { company: { name: '', website: '', careersUrl: '' }, resumeText: 'React' }, { 'x-sync-key': 'testkey' }), res5);
-  check('test-company missing details 400', res5.statusCode === 400, res5);
+  await handler(mkReq('POST', { company: { name: 'X', website: 'https://x.example', careersUrl: '' }, resumeText: 'React' }, { 'x-sync-key': 'wrong' }), res5);
+  check('test-company wrong key 401', res5.statusCode === 401, res5);
+  const res6 = mkRes();
+  await handler(mkReq('POST', { company: { name: '', website: '', careersUrl: '' }, resumeText: 'React' }, { 'x-sync-key': 'testkey' }), res6);
+  check('test-company missing details 400', res6.statusCode === 400, res6);
 }
 
 async function testJazzhr() {
@@ -634,10 +642,10 @@ async function testJazzhr() {
     }, { 'x-sync-key': 'testkey' }),
     res,
   );
-  check('jazzhr: board found on careers page', res.body?.board?.board === 'jazzhr' && res.body?.board?.foundOn === 'https://testco.example/careers', res.body);
+  check('jazzhr: source is the careers page', res.body?.sourcePage === 'https://testco.example/careers', res.body);
   check('jazzhr: frontend lead found, loan gated out', res.body?.leads?.length === 1 && res.body?.leads[0]?.title === 'Frontend Developer', res.body?.leads);
   check('jazzhr: frontend lead scores 63', res.body?.leads[0]?.matchScore === 63, res.body?.leads[0]);
-  // Careers link given directly as the widget URL.
+  // A widget link on its own is not a business page: nothing found.
   const res2 = mkRes();
   await testMod.default(
     mkReq('POST', {
@@ -646,8 +654,7 @@ async function testJazzhr() {
     }, { 'x-sync-key': 'testkey' }),
     res2,
   );
-  check('jazzhr: board found via careers link', res2.body?.board?.board === 'jazzhr' && res2.body?.board?.foundOn === 'careers link', res2.body);
-  check('jazzhr: careers-link lead found', res2.body?.leads?.length === 1, res2.body?.leads);
+  check('jazzhr: widget link alone finds nothing', res2.body?.sourcePage === null && res2.body?.leads?.length === 0, res2.body);
   // Homepage nav link followed: the careers page lives at a
   // non-standard path (/join-us) that guessing would never try, and
   // the /careers and /jobs guesses are never reached.
@@ -672,9 +679,73 @@ async function testJazzhr() {
     }, { 'x-sync-key': 'testkey' }),
     res3,
   );
-  check('nav: board found on the nav-linked page', res3.body?.board?.board === 'jazzhr' && res3.body?.board?.foundOn === 'https://navco.example/join-us', res3.body);
+  check('nav: source is the nav-linked page', res3.body?.sourcePage === 'https://navco.example/join-us', res3.body);
   check('nav: guesses never tried', JSON.stringify(res3.body?.triedUrls) === JSON.stringify(['https://navco.example', 'https://navco.example/join-us']), res3.body?.triedUrls);
   check('nav: frontend lead found', res3.body?.leads?.length === 1 && res3.body?.leads[0]?.title === 'Frontend Developer', res3.body?.leads);
+}
+
+async function testBusinessSiteFirst() {
+  // The rule: jobs must come from the business site itself — listings
+  // parsed off its own careers page win over any board link, and a
+  // board link given by the user is only a fallback.
+  const jobsMod = freshRequire(`${OUT}/find-jobs.cjs`);
+  const rawHtml = `<html><body>
+<div class="job-listing"><h3>Frontend Developer</h3><p>Location: Remote</p><a href="/jobs/frontend-developer">Apply</a></div>
+<div class="job-listing"><h3>Loan Analyst</h3><p>Location: Remote</p><a href="/jobs/loan-analyst">Apply</a></div>
+</body></html>`;
+  const parsed = jobsMod.parseCareersPage(rawHtml, 'https://rawco.example/careers');
+  check('page parser: 2 listings from job blocks', parsed.length === 2, parsed);
+  check('page parser: frontend fields resolved', parsed[0]?.title === 'Frontend Developer' && parsed[0]?.location === 'Remote' && parsed[0]?.url === 'https://rawco.example/jobs/frontend-developer', parsed[0]);
+  const detailsHtml = `<html><body><div><strong>Frontend Developer</strong><p>Location: Remote</p><a href="/careers/frontend">+ View details</a></div></body></html>`;
+  const parsedDetails = jobsMod.parseCareersPage(detailsHtml, 'https://detailco.example/careers');
+  check('page parser: title + view-details pair', parsedDetails.length === 1 && parsedDetails[0]?.title === 'Frontend Developer' && parsedDetails[0]?.url === 'https://detailco.example/careers/frontend', parsedDetails);
+  const heroHtml = `<html><body><nav><a href="/">Home</a><a href="/about">About</a><a href="/careers">Careers</a></nav><div class="careers-hero"><h2>Join our team</h2><a href="/careers">See open roles</a></div></body></html>`;
+  check('page parser: hero and nav yield nothing', jobsMod.parseCareersPage(heroHtml, 'https://hero.example/careers').length === 0);
+  const hubHtml = `<html><body><div class="job-board"><a href="https://job-boards.greenhouse.io/hubco">View jobs</a></div></body></html>`;
+  check('page parser: board hub link is not a listing', jobsMod.parseCareersPage(hubHtml, 'https://hub.example/careers').length === 0);
+  // End to end: raw listings on the business site's own careers page.
+  const testMod = freshRequire(`${OUT}/test-company.cjs`);
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u === 'https://rawco.example/careers') {
+      return { ok: true, text: async () => rawHtml };
+    }
+    return { ok: true, text: async () => '<html><body>No careers here.</body></html>' };
+  };
+  const res = mkRes();
+  await testMod.default(
+    mkReq('POST', {
+      company: { name: 'RawCo', website: 'https://rawco.example', careersUrl: '' },
+      resumeText: 'React TypeScript JavaScript frontend developer with Storybook and design systems experience',
+    }, { 'x-sync-key': 'testkey' }),
+    res,
+  );
+  check('business-first: source is the careers page', res.body?.sourcePage === 'https://rawco.example/careers', res.body);
+  check('business-first: frontend lead from the page', res.body?.leads?.length === 1 && res.body?.leads[0]?.title === 'Frontend Developer' && res.body?.leads[0]?.matchScore === 63, res.body?.leads);
+  // Business site only: the raw page is used and the given board
+  // link is ignored, never read.
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u.includes('boards-api.greenhouse.io')) {
+      return {
+        ok: true,
+        text: async () => JSON.stringify({ jobs: [{ title: 'Frontend Engineer', location: { name: 'Remote US' }, absolute_url: 'https://job-boards.greenhouse.io/bothco/jobs/1', content: '<p>React frontend.</p>', created_at: '2026-10-20T00:00:00Z' }] }),
+      };
+    }
+    if (u === 'https://bothco.example/careers') {
+      return { ok: true, text: async () => rawHtml };
+    }
+    return { ok: true, text: async () => '<html><body>No careers here.</body></html>' };
+  };
+  const res2 = mkRes();
+  await testMod.default(
+    mkReq('POST', {
+      company: { name: 'BothCo', website: 'https://bothco.example', careersUrl: 'https://boards.greenhouse.io/bothco' },
+      resumeText: 'React TypeScript JavaScript frontend developer with Storybook and design systems experience',
+    }, { 'x-sync-key': 'testkey' }),
+    res2,
+  );
+  check('business-first: page used, board link ignored', res2.body?.sourcePage === 'https://bothco.example/careers' && res2.body?.leads[0]?.title === 'Frontend Developer', res2.body);
 }
 
 async function testCompaniesApi() {
@@ -1018,6 +1089,7 @@ await testFindJobs();
 await testFindJobsNonFrontend();
 await testTestCompany();
 await testJazzhr();
+await testBusinessSiteFirst();
 await testCompaniesApi();
 
 console.log(`\n${passed} passed, ${failed} failed`);

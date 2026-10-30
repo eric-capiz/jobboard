@@ -19,7 +19,7 @@ interface CompanyResult {
 
 interface TestResult {
   company: string;
-  board: { board: string; slug: string; foundOn: string } | null;
+  sourcePage: string | null;
   triedUrls: string[];
   postingsSeen: number;
   leads: FinderLead[];
@@ -455,7 +455,7 @@ export function FinderView() {
       const data = await r.json();
       setTestResult({
         company: typeof data.company === 'string' ? data.company : name,
-        board: data.board ?? null,
+        sourcePage: typeof data.sourcePage === 'string' ? data.sourcePage : null,
         triedUrls: Array.isArray(data.triedUrls) ? data.triedUrls : [],
         postingsSeen: typeof data.postingsSeen === 'number' ? data.postingsSeen : 0,
         leads: Array.isArray(data.leads) ? (data.leads as FinderLead[]) : [],
@@ -814,11 +814,12 @@ export function FinderView() {
           </p>
         )}
         <p className="text-xs text-zinc-600">
-          Method: the search reads each company's own careers board (Greenhouse, Lever, Ashby,
-          JazzHR, or the board linked from its careers page) — never aggregators. Companies on
-          boards it can't read are skipped, not guessed at. Jobs scoring 60% and up are added to
-          your Pipeline automatically; near misses stay here for you to add by hand. Nothing ever
-          auto-applies, and tailored resumes are still made only when you ask.
+          Method: the search reads each company's own careers page — the jobs listed there —
+          never job boards, never aggregators. If a job's apply link leads to a board, that's
+          where you apply, but the job itself was found on the company's site. Jobs scoring 60%
+          and up are added to your Pipeline automatically; near misses stay here for you to add
+          by hand. Nothing ever auto-applies, and tailored resumes are still made only when you
+          ask.
         </p>
       </section>
 
@@ -897,8 +898,8 @@ export function FinderView() {
               setTestCareersUrl(e.target.value);
               setTestFromDb(false);
             }}
-            placeholder="https://boards.greenhouse.io/acme"
-            hint="Leave blank and the test will look for the board on the company's own pages."
+            placeholder="https://example.com/careers"
+            hint="The company's own careers page. Leave blank and the test will find it from the company's site."
           />
         </div>
         {testFromDb && (
@@ -956,22 +957,20 @@ export function FinderView() {
         {testResult && (
           <div className="space-y-3">
             <div className="rounded-2xl border border-white/10 bg-zinc-900/60 p-4">
-              {testResult.board ? (
+              {testResult.sourcePage ? (
                 <p className="text-sm text-zinc-100">
-                  Board detected: {testResult.board.board} — found on{' '}
-                  {testResult.board.foundOn === 'careers link'
-                    ? 'the careers link you gave'
-                    : testResult.board.foundOn}
-                  . {testResult.postingsSeen} {testResult.postingsSeen === 1 ? 'posting' : 'postings'}{' '}
+                  Jobs found on the company's own careers page: {testResult.sourcePage}.{' '}
+                  {testResult.postingsSeen} {testResult.postingsSeen === 1 ? 'posting' : 'postings'}{' '}
                   checked.
                 </p>
               ) : (
                 <p className="text-sm text-zinc-100">
-                  No readable careers board found.
+                  No jobs found on the company's own site.
                   {testResult.triedUrls.length > 0 && (
                     <> Tried: {testResult.triedUrls.join(', ')}.</>
                   )}{' '}
-                  If you know the board link, paste it as the careers link and test again.
+                  If you know the company's careers page, paste it as the careers link and test
+                  again.
                 </p>
               )}
             </div>
@@ -1038,9 +1037,9 @@ export function FinderView() {
                 );
               })
             ) : (
-              testResult.board && (
+              testResult.sourcePage && (
                 <p className="py-4 text-center text-sm text-zinc-500">
-                  Board found with {testResult.postingsSeen}{' '}
+                  Jobs found with {testResult.postingsSeen}{' '}
                   {testResult.postingsSeen === 1 ? 'posting' : 'postings'}, but none matched this
                   resume.
                 </p>
@@ -1049,9 +1048,9 @@ export function FinderView() {
           </div>
         )}
         <p className="text-xs text-zinc-600">
-          The test runs the exact same board detection and resume matching as a full Find Jobs
-          sweep, for this one company only — so if it finds the job here, the sweep would find it
-          too.
+          The test runs the exact same business-site search and resume matching as a full Find
+          Jobs sweep, for this one company only — so if it finds the job here, the sweep would
+          find it too.
         </p>
       </section>
     </div>

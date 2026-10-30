@@ -31,7 +31,7 @@ const CONCURRENCY = 5;
 const MAX_LIMIT = 25;
 
 /* ------------------------------------------------------------------ */
-/* Board helpers (same method as the LeadFinder engine)                */
+/* Page-fetch helpers                                                    */
 /* ------------------------------------------------------------------ */
 
 interface Posting {
@@ -63,83 +63,22 @@ function stripTags(text: string): string {
     .trim();
 }
 
-function greenhouseSlug(url: string): string | null {
-  const m = url.match(/(?:job-boards|boards)\.greenhouse\.io\/([a-z0-9\-_]+)/);
-  if (m) return m[1];
-  try {
-    const q = new URL(url).searchParams.get('for');
-    return q || null;
-  } catch {
-    return null;
-  }
-}
-
-function leverSlug(url: string): string | null {
-  const m = url.match(/jobs\.lever\.co\/([a-z0-9\-_]+)/);
+/** The job-list widget embedded IN a business careers page: some
+ *  companies render their own page's job list through a JazzHR widget
+ *  script. The widget is part of the page — the jobs it carries are
+ *  the jobs displayed on that page, and their apply links may point at
+ *  the board. Only an embed found on the business page itself is ever
+ *  read; no board list page, board API, or board link is ever fetched
+ *  as a source. */
+function jazzhrWidgetSlug(pageHtml: string): string | null {
+  const m = pageHtml.match(/app\.jazz\.co\/widgets\/basic\/create\/([a-z0-9\-_]+)/);
   return m ? m[1] : null;
 }
 
-function ashbySlug(url: string): string | null {
-  const m = url.match(/(?:jobs\.ashbyhq\.com|ashbyhq\.com)\/([a-z0-9\-_]+)/);
-  return m ? m[1] : null;
-}
-
-function jazzhrSlug(url: string): string | null {
-  const m = url.match(/app\.jazz\.co\/widgets\/basic\/create\/([a-z0-9\-_]+)/);
-  if (m) return m[1];
-  const a = url.match(/([a-z0-9\-_]+)\.applytojob\.com/);
-  return a ? a[1] : null;
-}
-
-type Board = 'greenhouse' | 'lever' | 'ashby' | 'jazzhr';
-
-function boardFromUrl(url: string): { board: Board; slug: string } | null {
-  if (url.includes('greenhouse')) {
-    const s = greenhouseSlug(url);
-    return s ? { board: 'greenhouse', slug: s } : null;
-  }
-  if (url.includes('lever.co')) {
-    const s = leverSlug(url);
-    return s ? { board: 'lever', slug: s } : null;
-  }
-  if (url.includes('ashbyhq')) {
-    const s = ashbySlug(url);
-    return s ? { board: 'ashby', slug: s } : null;
-  }
-  if (url.includes('jazz.co') || url.includes('applytojob.com')) {
-    const s = jazzhrSlug(url);
-    return s ? { board: 'jazzhr', slug: s } : null;
-  }
-  return null;
-}
-
-function discoverBoard(hubHtml: string): { board: Board; slug: string } | null {
-  const gh = hubHtml.match(/https?:\/\/(?:job-boards|boards)\.greenhouse\.io\/[a-z0-9\-_]+/);
-  if (gh) {
-    const s = greenhouseSlug(gh[0]);
-    if (s) return { board: 'greenhouse', slug: s };
-  }
-  const lv = hubHtml.match(/https?:\/\/jobs\.lever\.co\/[a-z0-9\-_]+/);
-  if (lv) {
-    const s = leverSlug(lv[0]);
-    if (s) return { board: 'lever', slug: s };
-  }
-  const ab = hubHtml.match(/https?:\/\/(?:jobs\.ashbyhq\.com|ashbyhq\.com)\/[a-z0-9\-_]+/);
-  if (ab) {
-    const s = ashbySlug(ab[0]);
-    if (s) return { board: 'ashby', slug: s };
-  }
-  const jz = hubHtml.match(/https?:\/\/app\.jazz\.co\/widgets\/basic\/create\/[a-z0-9\-_]+/);
-  if (jz) {
-    const s = jazzhrSlug(jz[0]);
-    if (s) return { board: 'jazzhr', slug: s };
-  }
-  const ap = hubHtml.match(/https?:\/\/[a-z0-9\-_]+\.applytojob\.com/);
-  if (ap) {
-    const s = jazzhrSlug(ap[0]);
-    if (s) return { board: 'jazzhr', slug: s };
-  }
-  return null;
+/** Board domains are never a source: a URL on one is skipped outright,
+ *  whether the user pasted it or a page links to it. */
+function isBoardUrl(url: string): boolean {
+  return /greenhouse\.io|lever\.co|ashbyhq\.com|jazz\.co|applytojob\.com/i.test(url);
 }
 
 /** Parse a JazzHR basic widget script: each job is a resumator-job block
@@ -169,64 +108,6 @@ export function parseJazzhrWidget(js: string): Posting[] {
     });
   }
   return postings;
-}
-
-function toDate(raw: unknown): string {
-  if (typeof raw === 'number' && raw > 0) {
-    const d = new Date(raw < 1e12 ? raw * 1000 : raw);
-    return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
-  }
-  if (typeof raw === 'string' && raw) {
-    const d = new Date(raw);
-    return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
-  }
-  return '';
-}
-
-async function fetchBoard(board: Board, slug: string): Promise<Posting[]> {
-  if (board === 'greenhouse') {
-    const data = JSON.parse(
-      await fetchText(`https://boards-api.greenhouse.io/v1/boards/${slug}/jobs?content=true`),
-    );
-    return (data.jobs ?? []).map((j: any) => ({
-      title: j.title ?? '',
-      location: j.location?.name ?? '',
-      url: j.absolute_url ?? '',
-      description: stripTags(j.content ?? ''),
-      postedDate: toDate(j.created_at),
-    }));
-  }
-  if (board === 'lever') {
-    const data = JSON.parse(await fetchText(`https://api.lever.co/v0/postings/${slug}?mode=json`));
-    return (Array.isArray(data) ? data : []).map((j: any) => ({
-      title: j.text ?? '',
-      location: j.categories?.location ?? '',
-      url: j.hostedUrl ?? j.applyUrl ?? '',
-      description: stripTags(j.descriptionPlain ?? j.description ?? ''),
-      postedDate: toDate(j.createdAt),
-    }));
-  }
-  if (board === 'ashby') {
-    const data = JSON.parse(
-      await fetchText('https://api.ashbyhq.com/posting-api/job-board/' + slug, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: '{}',
-      }),
-    );
-    return (data.jobs ?? []).map((j: any) => ({
-      title: j.title ?? '',
-      location: typeof j.location === 'string' ? j.location : (j.location?.name ?? ''),
-      url: j.jobUrl ?? '',
-      description: stripTags(j.description ?? ''),
-      postedDate: toDate(j.publishedAt ?? j.createdAt),
-    }));
-  }
-  if (board === 'jazzhr') {
-    const js = await fetchText(`https://app.jazz.co/widgets/basic/create/${slug}`);
-    return parseJazzhrWidget(js);
-  }
-  return [];
 }
 
 /* ------------------------------------------------------------------ */
@@ -356,16 +237,131 @@ export interface CompanySearchInput {
 export interface CompanySearchResult {
   leads: FinderLead[];
   postingsSeen: number;
-  board: { board: Board; slug: string; foundOn: string } | null;
+  /** The business site's own careers page the jobs were read from. */
+  sourcePage: string | null;
   triedUrls: string[];
 }
 
-/** Search ONE company: detect its careers board (from its careers link,
- *  or by fetching its careers page / homepage / careers / jobs paths),
- *  read the board, and match postings to the resume. Shared by the full
- *  Find Jobs sweep and by the single-company test — so a test predicts
- *  exactly what the sweep would find for that company. Throws when the
- *  board itself fails to load (the caller counts it as a board error). */
+const GENERIC_TITLE_TEXT = /^(home|about|about us|careers|jobs|job|contact|contact us|login|sign in|join our team|work with us|open positions|current openings|open roles|all roles|see all jobs|view all jobs|view jobs|see jobs|browse jobs|search jobs|browse all jobs|view openings|see openings|view open positions|all jobs|all positions|explore careers|explore jobs|learn more|apply now|view details|view job|see details)$/i;
+
+function resolvePageLink(href: string, pageUrl: string): string | null {
+  const h = href.trim();
+  if (!h || h.startsWith('#') || h.startsWith('mailto:') || h.startsWith('tel:') || h.startsWith('javascript:')) return null;
+  try {
+    const abs = new URL(h, pageUrl).href;
+    return abs.startsWith('http://') || abs.startsWith('https://') ? abs : null;
+  } catch {
+    return null;
+  }
+}
+
+function cleanTitle(text: string): string {
+  return stripTags(text).replace(/\s+/g, ' ').trim();
+}
+
+function titleOk(title: string): boolean {
+  if (title.length < 2 || GENERIC_TITLE_TEXT.test(title)) return false;
+  // "See open roles", "View jobs", "Browse positions" — hub/hero copy,
+  // never a role title.
+  if (/^(see|view|browse|explore|find|search|discover)\b/i.test(title) && /\b(jobs?|roles?|openings?|positions?|careers?|opportunities)\b/i.test(title)) return false;
+  return true;
+}
+
+function locationIn(text: string): string {
+  const m = text.match(/Location:\s*([^<\n]{2,60})/i);
+  if (m) return stripTags(m[1]).trim();
+  if (/\bRemote\b/i.test(text)) return 'Remote';
+  return '';
+}
+
+const APPLY_HREF = /job|apply|position|opening|detail|career|posting|vacancy|role/i;
+
+/** Parse job listings straight off a company's own careers page HTML:
+ *  job blocks (class/id mentioning job/career/position/opening) and
+ *  title + View-details/Apply link pairs. Only listings with a usable
+ *  title AND an apply/detail link are kept, and a block only qualifies
+ *  when its link looks like a job link or the block states a location —
+ *  so a hero banner, nav link, or "see open roles" hub link never
+ *  qualifies. Script/style content is stripped first so widget code
+ *  can't ghost-match. */
+export function parseCareersPage(html: string, pageUrl: string): Posting[] {
+  const clean = html
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '');
+  const postings: Posting[] = [];
+  const seen = new Set<string>();
+  const push = (title: string, location: string, url: string | null) => {
+    if (!titleOk(title) || !url || seen.has(url)) return;
+    seen.add(url);
+    postings.push({ title, location, url, description: '', postedDate: '' });
+  };
+  // Strategy A: job blocks.
+  const chunks = clean.split(/(?=<[^>]*\b(?:class|id)="[^"]*(?:job|career|position|opening)[^"]*")/i);
+  for (let i = 1; i < chunks.length; i++) {
+    const chunk = chunks[i].slice(0, 3000);
+    const heading = chunk.match(/<h[234][^>]*>([\s\S]{0,200}?)<\/h[234]>/i);
+    const strong = chunk.match(/<(?:strong|b)[^>]*>([\s\S]{0,200}?)<\/(?:strong|b)>/i);
+    const link = chunk.match(/<a[^>]*href=["']([^"']+)["'][^>]*>([\s\S]{0,200}?)<\/a>/i);
+    let title = '';
+    if (heading) title = cleanTitle(heading[1]);
+    if (!titleOk(title) && link) title = cleanTitle(link[2]);
+    if (!titleOk(title) && strong) title = cleanTitle(strong[1]);
+    if (!titleOk(title)) continue;
+    let apply: string | null = null;
+    let first: string | null = null;
+    const linkRe = /<a[^>]*href=["']([^"']+)["'][^>]*>/gi;
+    let lm: RegExpExecArray | null;
+    while ((lm = linkRe.exec(chunk)) !== null) {
+      const abs = resolvePageLink(lm[1], pageUrl);
+      if (!abs) continue;
+      if (!first) first = abs;
+      if (APPLY_HREF.test(lm[1])) {
+        apply = abs;
+        break;
+      }
+    }
+    if (!apply) apply = first;
+    const loc = locationIn(chunk);
+    if (!apply) continue;
+    if (!APPLY_HREF.test(apply) && !loc) continue;
+    push(title, loc, apply);
+  }
+  // Strategy B: View-details / Apply links with a title just before them.
+  const viewRe = /<a[^>]*href=["']([^"']+)["'][^>]*>([\s\S]{0,80}?)<\/a>/gi;
+  let vm: RegExpExecArray | null;
+  while ((vm = viewRe.exec(clean)) !== null) {
+    if (!/view details|view job|apply|see details|learn more/i.test(cleanTitle(vm[2]))) continue;
+    const apply = resolvePageLink(vm[1], pageUrl);
+    if (!apply) continue;
+    const windowText = clean.slice(Math.max(0, vm.index - 900), vm.index);
+    const headings = [...windowText.matchAll(/<h[234][^>]*>([\s\S]{0,200}?)<\/h[234]>/gi)];
+    const bolds = [...windowText.matchAll(/<(?:strong|b)[^>]*>([\s\S]{0,200}?)<\/(?:strong|b)>/gi)];
+    let title = '';
+    const lastHeading = headings[headings.length - 1];
+    if (lastHeading) title = cleanTitle(lastHeading[1]);
+    if (!titleOk(title)) {
+      const lastBold = bolds[bolds.length - 1];
+      if (lastBold) title = cleanTitle(lastBold[1]);
+    }
+    if (!titleOk(title)) continue;
+    const loc = locationIn(windowText);
+    if (!APPLY_HREF.test(apply) && !loc) continue;
+    push(title, loc, apply);
+  }
+  return postings.slice(0, 50);
+}
+
+/** Search ONE company — business site ONLY, no exceptions. Jobs come
+ *  from the company's own pages and nowhere else: listings parsed
+ *  straight off its careers page, or the job-list widget embedded in
+ *  that page (the widget is part of the page's own display). A board
+ *  link is never fetched as a source — not a link the user pasted, not
+ *  a link found on the company's pages. The ONLY board contact allowed
+ *  is the apply link on a listing found on the business page: if
+ *  applying takes the user to a board, that's fine, but the job itself
+ *  was found on the company's site. Shared by the full Find Jobs sweep
+ *  and by the single-company test — so a test predicts exactly what
+ *  the sweep would find for that company. */
 /** Links on a page that look like a careers page: the href mentions
  *  careers/jobs, or the link text does (nav "Careers", "Open
  *  positions", "Join our team"). Relative links resolve against the
@@ -397,58 +393,69 @@ export async function searchCompanyJobs(
 ): Promise<CompanySearchResult> {
   const careersUrl = company.careersUrl || '';
   const website = company.website || '';
-  let board: { board: Board; slug: string } | null = careersUrl ? boardFromUrl(careersUrl) : null;
-  let foundOn = board ? 'careers link' : '';
   const triedUrls: string[] = [];
-  if (!board) {
-    // Fetch the company's own pages and look for a board link: the
-    // careers page first (when one was given), then the homepage. A
-    // page with no board may still LINK to the careers page — the
-    // homepage nav "Careers" is the classic case — so those links are
-    // followed next, before the guessed /careers and /jobs paths. A
-    // board link found on the company's own pages is verified; a path
-    // that doesn't resolve to a board is simply skipped.
-    const candidates: string[] = [];
-    if (careersUrl) candidates.push(careersUrl);
-    if (website) {
-      const base = website.replace(/\/$/, '');
-      for (const u of [website, `${base}/careers`, `${base}/jobs`]) {
-        if (!candidates.includes(u)) candidates.push(u);
-      }
+  // Only pages on the business site are ever fetched: a careers link
+  // the user gave (it names the company's own careers page), plus the
+  // website's homepage, its nav-linked careers pages, and the /careers
+  // and /jobs guesses. A board link — pasted or found on a page — is
+  // never followed as a source.
+  const candidates: string[] = [];
+  if (careersUrl && !isBoardUrl(careersUrl)) candidates.push(careersUrl);
+  if (website && !isBoardUrl(website)) {
+    const base = website.replace(/\/$/, '');
+    for (const u of [website, `${base}/careers`, `${base}/jobs`]) {
+      if (!candidates.includes(u)) candidates.push(u);
     }
-    for (let i = 0; i < candidates.length; i++) {
-      const u = candidates[i];
-      triedUrls.push(u);
+  }
+  for (let i = 0; i < candidates.length; i++) {
+    const u = candidates[i];
+    triedUrls.push(u);
+    let html: string;
+    try {
+      html = await fetchText(u);
+    } catch {
+      continue;
+    }
+    // Jobs listed on the page itself.
+    const pagePostings = parseCareersPage(html, u);
+    if (pagePostings.length > 0) {
+      return {
+        leads: screenPostings(company.name, pagePostings, resumeText),
+        postingsSeen: pagePostings.length,
+        sourcePage: u,
+        triedUrls,
+      };
+    }
+    // Jobs displayed on the page through its embedded widget — the
+    // widget is part of this page, so these jobs are still the page's
+    // own listings. Their apply links may point at the board.
+    const widgetSlug = jazzhrWidgetSlug(html);
+    if (widgetSlug) {
       try {
-        const html = await fetchText(u);
-        const found = discoverBoard(html);
-        if (found) {
-          board = found;
-          foundOn = u;
-          break;
-        }
-        let at = i + 1;
-        for (const link of careersLinksOnPage(html, u)) {
-          if (candidates.length < 8 && !candidates.includes(link) && !triedUrls.includes(link)) {
-            candidates.splice(at, 0, link);
-            at++;
-          }
+        const widgetPostings = parseJazzhrWidget(
+          await fetchText(`https://app.jazz.co/widgets/basic/create/${widgetSlug}`),
+        );
+        if (widgetPostings.length > 0) {
+          return {
+            leads: screenPostings(company.name, widgetPostings, resumeText),
+            postingsSeen: widgetPostings.length,
+            sourcePage: u,
+            triedUrls,
+          };
         }
       } catch {
-        // Next candidate path.
+        // Widget unreadable — keep looking at the company's own pages.
+      }
+    }
+    let at = i + 1;
+    for (const link of careersLinksOnPage(html, u)) {
+      if (!isBoardUrl(link) && candidates.length < 8 && !candidates.includes(link) && !triedUrls.includes(link)) {
+        candidates.splice(at, 0, link);
+        at++;
       }
     }
   }
-  if (!board) {
-    return { leads: [], postingsSeen: 0, board: null, triedUrls };
-  }
-  const postings = await fetchBoard(board.board, board.slug);
-  return {
-    leads: screenPostings(company.name, postings, resumeText),
-    postingsSeen: postings.length,
-    board: { ...board, foundOn },
-    triedUrls,
-  };
+  return { leads: [], postingsSeen: 0, sourcePage: null, triedUrls };
 }
 
 function screenPostings(company: string, postings: Posting[], resumeText: string): FinderLead[] {
@@ -546,7 +553,7 @@ export async function runFindJobs(
       resumeText,
     );
     postingsSeen += result.postingsSeen;
-    if (!result.board) noBoard += 1;
+    if (!result.sourcePage) noBoard += 1;
     return result.leads;
   }
 

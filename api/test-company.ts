@@ -2,13 +2,15 @@
  *
  * POST { company: { name, website, careersUrl }, resumeText } and the
  * endpoint runs exactly the same search the full Find Jobs sweep runs
- * for one company: detect its careers board (from its careers link, or
- * by fetching its careers page / homepage / careers / jobs paths), read
- * the board, and match postings to the resume. Nothing is written: the
- * company is NOT added to the database and no lead touches the Pipeline
- * — the caller decides what to do with the result. That makes it a true
- * test: if you know a company is hiring for your resume's skill set,
- * this tells you whether its careers page is detected and the job found.
+ * for one company, business site ONLY: listings parsed straight off
+ * the company's own careers page, or the job-list widget embedded in
+ * that page. No board is ever fetched as a source — the only board
+ * contact allowed is the apply link on a listing found on the business
+ * page. Nothing is written: the company is NOT added to the database
+ * and no lead touches the Pipeline — the caller decides what to do
+ * with the result. That makes it a true test: if you know a company
+ * is hiring for your resume's skill set, this tells you whether its
+ * careers page is detected and the job found.
  *
  * Auth mirrors /api/state: x-sync-key must match SYNC_KEY.
  */
@@ -43,7 +45,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     const result = await searchCompanyJobs({ name, website, careersUrl }, resumeText);
     res.status(200).json({
       company: name,
-      board: result.board,
+      sourcePage: result.sourcePage,
       triedUrls: result.triedUrls,
       postingsSeen: result.postingsSeen,
       leads: result.leads,
