@@ -53,12 +53,20 @@ async function fetchText(url: string, init?: RequestInit): Promise<string> {
 }
 
 function stripTags(text: string): string {
+  // Entities decoded BEFORE tags are stripped: board descriptions
+  // often carry double-escaped markup (&amp;nbsp;, &lt;li&gt;), and
+  // decoding after stripping leaves junk tokens (nbsp, lt, gt, li)
+  // in the text — which then pollute the gaps list.
   return text
     .replace(/<script.*?<\/script>/gis, ' ')
     .replace(/<style.*?<\/style>/gis, ' ')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&nbsp;/g, ' ')
     .replace(/&amp;/g, '&')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/<[^>]+>/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
