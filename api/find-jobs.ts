@@ -1,10 +1,11 @@
 /* Finder job search — Vercel serverless function.
  *
- * Searches companies' OWN careers boards for live remote frontend postings
- * matched to the resume the user selected. It never touches aggregators,
- * never takes a URL from the client (the server pages its own companies
- * collection — no seed fallback exists), and never writes anything: leads
- * are returned to the app, and only the user can add one to the board.
+ * Searches companies' OWN careers boards for live remote postings
+ * matched to the resume the user selected — whatever its field. It never
+ * touches aggregators, never takes a URL from the client (the server
+ * pages its own companies collection — no seed fallback exists), and
+ * never writes anything: leads are returned to the app, which adds 60%+
+ * matches to the Pipeline and leaves the rest as near misses.
  *
  * Chunked + idempotent: the server pages the companies collection by
  * insertion order with a cursor the client passes back; the function
@@ -175,35 +176,68 @@ async function fetchBoard(board: Board, slug: string): Promise<Posting[]> {
 /* Filters + resume scoring                                            */
 /* ------------------------------------------------------------------ */
 
-const TITLE_TERMS = ['front end', 'front-end', 'frontend', 'react', 'web developer', 'ui engineer', 'ui developer'];
-const TITLE_EXCLUDE = ['backend', 'back-end', 'mobile', 'ios', 'android', 'manager', 'director', 'intern', 'qa ', 'data engineer', 'devops', 'security', 'designer'];
-const FULLSTACK_TERMS = ['full stack', 'full-stack', 'fullstack'];
 const EXCLUDED_PLACES = ['canada', 'mexico', 'brazil', 'uk', 'united kingdom', 'london', 'europe', 'emea', 'apac', 'singapore', 'india', 'australia', 'germany', 'france', 'spain', 'poland', 'portugal', 'netherlands', 'ireland', 'philippines', 'colombia', 'argentina', 'chile', 'japan', 'korea', 'china', 'israel', 'kenya', 'nigeria', 'south africa', 'new zealand'];
 
-/** Skills the resume is checked against. A skill only counts when it
- *  actually appears in the resume text — nothing is credited that the
- *  resume doesn't claim. */
-const SKILL_VOCAB: { term: string; label: string }[] = [
-  { term: 'react', label: 'React' },
-  { term: 'typescript', label: 'TypeScript' },
-  { term: 'javascript', label: 'JavaScript' },
-  { term: 'next.js', label: 'Next.js' },
-  { term: 'node', label: 'Node' },
-  { term: 'html', label: 'HTML' },
-  { term: 'css', label: 'CSS' },
-  { term: 'storybook', label: 'Storybook' },
-  { term: 'lit', label: 'LitElement' },
-  { term: 'design system', label: 'Design systems' },
-  { term: 'redux', label: 'Redux' },
-  { term: 'tailwind', label: 'Tailwind' },
-  { term: 'vite', label: 'Vite' },
-  { term: 'aem', label: 'AEM' },
-  { term: 'figma', label: 'Figma' },
-];
+/* ------------------------------------------------------------------ */
+/* Resume-driven matching — no hardcoded field                         */
+/* ------------------------------------------------------------------ */
 
-/** Asks that count as gaps when the posting wants them and the resume
- *  doesn't have them. Never used to invent a skill — only to flag. */
-const GAP_VOCAB = ['angular', 'vue', 'svelte', 'python', 'java', 'c#', '.net', 'kubernetes', 'docker', 'graphql', 'jest', 'cypress', 'playwright', 'terraform', 'sap', 'php', 'golang', 'kafka', 'spring', 'salesforce', 'palantir'];
+// The match vocabulary comes from the resume the user selected, not
+// from a fixed list: a frontend resume matches frontend roles, a
+// support resume matches support roles, and so on. Field words
+// (support, customer, nurse, analyst, engineer) are NEVER stopwords —
+// only function words and generic resume/posting boilerplate are.
+const STOPWORDS = new Set([
+  'a', 'an', 'the', 'and', 'or', 'of', 'to', 'in', 'on', 'at', 'by', 'for',
+  'with', 'from', 'as', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+  'have', 'has', 'had', 'will', 'would', 'can', 'could', 'should', 'may',
+  'might', 'do', 'does', 'did', 'we', 'you', 'they', 'he', 'she', 'it',
+  'its', 'this', 'that', 'these', 'those', 'my', 'our', 'your', 'their',
+  'his', 'her', 'not', 'no', 'if', 'but', 'so', 'than', 'then', 'when',
+  'while', 'who', 'whom', 'what', 'which', 'how', 'all', 'any', 'both',
+  'each', 'few', 'more', 'most', 'other', 'some', 'such', 'only', 'own',
+  'same', 'too', 'very', 'just', 'also', 'over', 'under', 'between',
+  'into', 'through', 'during', 'before', 'after', 'above', 'below', 'up',
+  'down', 'out', 'off', 'again', 'further', 'once', 'here', 'there',
+  'where', 'why', 'because', 'until', 'per', 'via', 'am',
+  'experience', 'experiences', 'skills', 'skill', 'responsibilities',
+  'responsible', 'duties', 'education', 'work', 'worked', 'working',
+  'years', 'year', 'strong', 'excellent', 'passionate', 'proven',
+  'ability', 'including', 'include', 'includes', 'team', 'teams', 'role',
+  'roles', 'position', 'positions', 'company', 'companies', 'join',
+  'joining', 'looking', 'seek', 'seeking', 'need', 'needs', 'required',
+  'requirements', 'preferred', 'bonus', 'plus', 'etc',
+]);
+
+/** Lowercase word tokens, minus stopwords, minus pure numbers and
+ *  single letters. Applied identically to resumes, titles, and posting
+ *  text, so a term matches only when both sides actually use the word. */
+function tokenize(text: string): string[] {
+  return (text.toLowerCase().match(/[a-z0-9]+/g) ?? []).filter(
+    (t) => t.length >= 2 && !/^\d+$/.test(t) && !STOPWORDS.has(t),
+  );
+}
+
+/** The resume's signature terms: its most frequent tokens, capped at
+ *  40 (ties broken alphabetically for determinism). A term only counts
+ *  when it actually appears in the resume text — nothing is credited
+ *  that the resume doesn't claim. */
+function extractResumeTerms(resumeText: string): string[] {
+  const counts = new Map<string, number>();
+  for (const t of tokenize(resumeText)) counts.set(t, (counts.get(t) ?? 0) + 1);
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))
+    .slice(0, 40)
+    .map(([t]) => t);
+}
+
+/** A posting title passes when it shares at least one word with the
+ *  resume — the title gate, field-agnostic. */
+function titleMatchesResume(title: string, resumeTerms: string[]): boolean {
+  if (resumeTerms.length === 0) return false;
+  const titleWords = new Set(tokenize(title));
+  return resumeTerms.some((t) => titleWords.has(t));
+}
 
 function locationVerdict(loc: string): { ok: boolean; flag: string } {
   const l = (loc ?? '').toLowerCase();
@@ -233,12 +267,8 @@ function locationVerdict(loc: string): { ok: boolean; flag: string } {
   return { ok: true, flag: 'Remote (no country stated — verify)' };
 }
 
-function titleVerdict(title: string): 'frontend' | 'fullstack' | null {
-  const t = title.toLowerCase();
-  if (TITLE_EXCLUDE.some((x) => t.includes(x))) return null;
-  if (TITLE_TERMS.some((x) => t.includes(x))) return 'frontend';
-  if (FULLSTACK_TERMS.some((x) => t.includes(x))) return 'fullstack';
-  return null;
+function titleVerdict(title: string, resumeTerms: string[]): boolean {
+  return titleMatchesResume(title, resumeTerms);
 }
 
 function parsePay(text: string): string {
@@ -261,24 +291,32 @@ export interface FinderLead {
 }
 
 function screenPostings(company: string, postings: Posting[], resumeText: string): FinderLead[] {
-  const resumeLower = resumeText.toLowerCase();
-  const resumeSkills = SKILL_VOCAB.filter((s) => resumeLower.includes(s.term));
+  const resumeTerms = extractResumeTerms(resumeText);
+  const resumeSet = new Set(resumeTerms);
   const leads: FinderLead[] = [];
   for (const p of postings) {
-    const tier = titleVerdict(p.title);
-    if (!tier) continue;
-    if (tier === 'fullstack') {
-      const d = p.description.toLowerCase();
-      if (!d.includes('react') && !d.includes('frontend') && !d.includes('front end')) continue;
-    }
+    if (!titleVerdict(p.title, resumeTerms)) continue;
     const loc = locationVerdict(p.location);
     if (!loc.ok) continue;
-    const hay = `${p.title} ${p.description}`.toLowerCase();
-    const matched = resumeSkills.filter((s) => hay.includes(s.term));
-    const overlap = resumeSkills.length === 0 ? 0 : matched.length / Math.min(resumeSkills.length, 10);
-    const titleWeight = tier === 'frontend' ? 1 : 0.8;
-    const matchScore = Math.round(50 * titleWeight + 50 * overlap);
-    const gaps = GAP_VOCAB.filter((g) => hay.includes(g) && !resumeLower.includes(g)).slice(0, 5);
+    const postingWords = new Set(tokenize(`${p.title} ${p.description}`));
+    const matched = resumeTerms.filter((t) => postingWords.has(t));
+    const overlap = resumeTerms.length === 0 ? 0 : matched.length / Math.min(resumeTerms.length, 10);
+    // The title gate already establishes title relevance, so the score
+    // is 50 (title) + 50 (skill overlap). A title-only match lands in
+    // the mid-50s (near miss); auto-add at 60+ needs real overlap.
+    const matchScore = Math.round(50 + 50 * overlap);
+    // Gaps: the posting description's most frequent terms the resume
+    // doesn't mention — what the posting wants that the resume lacks.
+    // Never used to invent a skill — only to flag.
+    const descCounts = new Map<string, number>();
+    for (const t of tokenize(p.description)) {
+      if (resumeSet.has(t)) continue;
+      descCounts.set(t, (descCounts.get(t) ?? 0) + 1);
+    }
+    const gaps = [...descCounts.entries()]
+      .sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))
+      .slice(0, 5)
+      .map(([t]) => t);
     if (/staff|principal/.test(p.title.toLowerCase())) gaps.unshift('Staff/principal-level ask');
     leads.push({
       company,
@@ -290,7 +328,7 @@ function screenPostings(company: string, postings: Posting[], resumeText: string
       description: p.description.slice(0, 2000),
       postedDate: p.postedDate,
       matchScore,
-      strengths: matched.slice(0, 6).map((s) => s.label),
+      strengths: matched.slice(0, 6).map((t) => t.charAt(0).toUpperCase() + t.slice(1)),
       gaps,
     });
   }

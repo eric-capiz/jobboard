@@ -483,6 +483,50 @@ async function testFindJobs() {
   check('find-jobs wrong key 401', res.statusCode === 401, res);
 }
 
+async function testFindJobsNonFrontend() {
+  // Resume-driven, not frontend-forced: a support resume must find a
+  // support role and must NOT surface a frontend role.
+  const mod = freshRequire(`${OUT}/find-jobs.cjs`);
+  const companiesCol = new FakeCollection();
+  await companiesCol.insertMany([
+    { name: 'SupportCo', website: 'https://supportco.example', domain: 'supportco.example', nameKey: 'supportco', careersUrl: 'https://boards.greenhouse.io/supportco', category: 'General', source: 'Wikidata', addedAt: '2026-10-29T00:00:00Z' },
+  ]);
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u.includes('boards-api.greenhouse.io')) {
+      return {
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            jobs: [
+              {
+                title: 'Customer Support Specialist',
+                location: { name: 'Remote US' },
+                absolute_url: 'https://job-boards.greenhouse.io/supportco/jobs/1',
+                content: '<p>Help SaaS customers via chat support and troubleshoot issues with Zendesk.</p>',
+                created_at: '2026-10-20T00:00:00Z',
+              },
+              {
+                title: 'Frontend Engineer',
+                location: { name: 'Remote US' },
+                absolute_url: 'https://job-boards.greenhouse.io/supportco/jobs/2',
+                content: '<p>React TypeScript frontend developer.</p>',
+                created_at: '2026-10-20T00:00:00Z',
+              },
+            ],
+          }),
+      };
+    }
+    return { ok: true, text: async () => '<html><body>No careers here.</body></html>' };
+  };
+  const out = await mod.runFindJobs(
+    { companiesCol },
+    { resumeText: 'Customer support specialist with Zendesk, chat support, and troubleshooting experience for SaaS customers', cursor: 0, limit: 15 },
+  );
+  check('find-jobs non-frontend: support lead found, frontend not surfaced', out.leads.length === 1 && out.leads[0]?.title === 'Customer Support Specialist', out.leads);
+  check('find-jobs non-frontend: support lead scores 94', out.leads[0]?.matchScore === 94, out.leads[0]);
+}
+
 async function testCompaniesApi() {
   const lib = freshRequire(`${OUT}/finder-lib.cjs`);
   const col = new FakeCollection();
@@ -821,6 +865,7 @@ await testSocialPresence();
 await testWikidataSocial();
 await testWebsiteUpgrade();
 await testFindJobs();
+await testFindJobsNonFrontend();
 await testCompaniesApi();
 
 console.log(`\n${passed} passed, ${failed} failed`);
