@@ -88,13 +88,16 @@ export function FinderView() {
   async function handleFindCompanies() {
     setFindingCompanies(true);
     setFindingCount(0);
-    // One press must find at least 500 new companies. A single server call
+    // One press finds exactly 100 new companies. A single server call
     // cannot fit that many inside the ~60s function limit, so the press
     // loops: each call inserts what it found and advances the server-side
-    // cursor, and the press keeps going until 500 new companies are in,
-    // the sources are exhausted, or a call fails. Companies found before
-    // a failure or exhaustion stay found — a press never loses progress.
-    const MIN_PER_PRESS = 500;
+    // cursor, and the press keeps going until exactly 100 new companies
+    // are in, the sources are exhausted, or a call fails. The server
+    // caps inserts at the requested limit per call (banking any excess
+    // for the next call), so the loop converges exactly — it can never
+    // overshoot. Companies found before a failure or exhaustion stay
+    // found — a press never loses progress.
+    const EXACT_PER_PRESS = 100;
     const MAX_CALLS_PER_PRESS = 30;
     let accumulated = 0;
     let total = totalCompanies;
@@ -115,7 +118,7 @@ export function FinderView() {
       }
       for (
         let call = 0;
-        call < MAX_CALLS_PER_PRESS && accumulated < MIN_PER_PRESS && !exhausted && !error;
+        call < MAX_CALLS_PER_PRESS && accumulated < EXACT_PER_PRESS && !exhausted && !error;
         call += 1
       ) {
         let r: Response;
@@ -127,7 +130,7 @@ export function FinderView() {
             // new companies into the collection during the call. The
             // response carries no company rows — the list is refreshed from
             // GET /api/companies below.
-            body: JSON.stringify({ limit: MIN_PER_PRESS - accumulated }),
+            body: JSON.stringify({ limit: EXACT_PER_PRESS - accumulated }),
           });
         } catch {
           error = 'Find Companies hit a network error. Nothing was lost — press again.';
@@ -163,7 +166,7 @@ export function FinderView() {
         if (typeof data.note === 'string') note = data.note;
         if (data.exhausted) exhausted = true;
       }
-      if (!exhausted && !error && accumulated < MIN_PER_PRESS) {
+      if (!exhausted && !error && accumulated < EXACT_PER_PRESS) {
         note = `Stopped after ${MAX_CALLS_PER_PRESS} calls with ${accumulated} found — press again to continue.`;
       }
       setCompanyResult({ added: accumulated, total, source, exhausted, error, note });
@@ -383,11 +386,11 @@ export function FinderView() {
             </p>
           </div>
           <Button variant="primary" onClick={handleFindCompanies} disabled={findingCompanies}>
-            {findingCompanies ? `Finding companies… (${findingCount}/500)` : 'Find Companies'}
+            {findingCompanies ? `Finding companies… (${findingCount}/100)` : 'Find Companies'}
           </Button>
         </div>
         <p className="text-sm text-zinc-400">
-          Find Companies discovers companies not already in your database, live, at least 500
+          Find Companies discovers companies not already in your database, live, exactly 100
           new ones per click. Press it again for the next batch; it never duplicates, and it
           keeps finding new ones until every source is exhausted.
         </p>
@@ -399,7 +402,7 @@ export function FinderView() {
             description="Press Find Companies to discover companies live. Then Find Jobs searches those companies' careers pages."
             action={
               <Button variant="primary" onClick={handleFindCompanies} disabled={findingCompanies}>
-                {findingCompanies ? `Finding companies… (${findingCount}/500)` : 'Find Companies'}
+                {findingCompanies ? `Finding companies… (${findingCount}/100)` : 'Find Companies'}
               </Button>
             }
           />

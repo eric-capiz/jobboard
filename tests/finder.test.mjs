@@ -657,12 +657,55 @@ async function testFailureSkip() {
   check('failure-skip: cursor past wikidata and edgar', cursorDoc?.sourceIndex === 2, cursorDoc);
 }
 
+async function testExactCounts() {
+  // A call must add EXACTLY the requested count, never more, even when a
+  // source page yields more fresh companies than the call needs. The
+  // excess is banked in the cursor's pending buffer and drained first on
+  // the next call — nothing is lost, nothing repeats, nothing overshoots.
+  const runMod = freshRequire(`${OUT}/find-companies.cjs`);
+  const companiesCol = new FakeCollection();
+  const metaCol = new FakeCollection();
+  const page = (startQ, count) => {
+    const bindings = [];
+    for (let e = 0; e < count; e++) {
+      const q = startQ + e;
+      bindings.push({
+        company: { value: `http://www.wikidata.org/entity/Q${q}` },
+        companyLabel: { value: `ExactCo ${q}` },
+        website: { value: `https://exactco${q}.example` },
+      });
+    }
+    return bindings;
+  };
+  globalThis.fetch = routeFetch(wdqsFetchFactory([page(5000, 150), page(6000, 150)]), {}, null);
+  const deps = { companiesCol, metaCol, fetchFn: globalThis.fetch };
+  const c1 = await runMod.runFindCompanies(deps, { limit: 100 });
+  check('exact: call 1 added exactly 100 (page yielded 150)', c1.added === 100, c1);
+  const cur1 = await metaCol.findOne({ _id: 'find-companies' });
+  check('exact: call 1 banked 50 pending', (cur1?.pending ?? []).length === 50, cur1?.pending?.length);
+  const c2 = await runMod.runFindCompanies(deps, { limit: 100 });
+  check('exact: call 2 added exactly 100 (50 pending + 50 fresh)', c2.added === 100, c2);
+  const cur2 = await metaCol.findOne({ _id: 'find-companies' });
+  check('exact: call 2 banked 100 pending', (cur2?.pending ?? []).length === 100, cur2?.pending?.length);
+  check('exact: total 200, no repeats', (await companiesCol.countDocuments()) === 200, await companiesCol.countDocuments());
+  // Drain-only call: pending covers the whole request, so no fetch is
+  // needed — prove it by making fetch throw.
+  globalThis.fetch = async () => { throw new Error('must not fetch'); };
+  const deps2 = { companiesCol, metaCol, fetchFn: globalThis.fetch };
+  const c3 = await runMod.runFindCompanies(deps2, { limit: 100 });
+  check('exact: call 3 drained pending without fetching', c3.added === 100 && !c3.error, c3);
+  const cur3 = await metaCol.findOne({ _id: 'find-companies' });
+  check('exact: pending empty after full drain', (cur3?.pending ?? []).length === 0, cur3?.pending?.length);
+  check('exact: total 300, still no repeats', (await companiesCol.countDocuments()) === 300, await companiesCol.countDocuments());
+}
+
 await testFindCompanies();
 await testFindCompaniesTransientError();
 await testFindCompaniesDupeStretch();
 await testWikidataPerType();
 await testEdgar();
 await testFailureSkip();
+await testExactCounts();
 await testFindJobs();
 await testCompaniesApi();
 

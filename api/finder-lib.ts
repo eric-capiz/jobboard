@@ -336,6 +336,12 @@ export interface FinderCursor {
   version: number;
   sourceIndex: number;
   state: Record<string, Record<string, unknown>>;
+  /** Companies already fetched from a page but not yet inserted because
+   *  an earlier call hit its exact limit. The next call drains these
+   *  first, so no fetched company is ever lost or skipped — this is what
+   *  makes an exact per-press count possible despite page-granular
+   *  source pages. */
+  pending?: CompanyInput[];
 }
 
 /** finder_meta doc: the Finder's persistent server-side cursor. */
@@ -344,6 +350,7 @@ export interface FinderMetaDoc {
   version?: number;
   sourceIndex?: number;
   state?: Record<string, Record<string, unknown>>;
+  pending?: CompanyInput[];
   updatedAt?: Date;
 }
 
@@ -356,11 +363,12 @@ export interface AppStateDoc {
 
 export async function getFinderCursor(meta: Collection<FinderMetaDoc>): Promise<FinderCursor> {
   const doc = await meta.findOne({ _id: 'find-companies' });
-  if (!doc) return { version: 0, sourceIndex: 0, state: {} };
+  if (!doc) return { version: 0, sourceIndex: 0, state: {}, pending: [] };
   return {
     version: typeof doc.version === 'number' ? doc.version : 0,
     sourceIndex: typeof doc.sourceIndex === 'number' ? doc.sourceIndex : 0,
     state: doc.state ?? {},
+    pending: Array.isArray(doc.pending) ? doc.pending : [],
   };
 }
 

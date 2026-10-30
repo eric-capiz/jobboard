@@ -39,6 +39,12 @@
  * whole press runs under a 55s budget and no single fetch may run past
  * the remaining budget. Partial batches are successes.
  *
+ * Exact counts: inserts are capped at the requested limit per call.
+ * Any excess from a fetched page is banked in the cursor's pending
+ * buffer and drained first on the next call, so repeated calls converge
+ * exactly on a requested count without ever losing or repeating a
+ * company — a page-granular source can never overshoot a press.
+ *
  * Auth mirrors /api/state: x-sync-key must match SYNC_KEY. Nothing here
  * takes a URL from the client; every row comes from a public source
  * queried live at press time.
@@ -47,10 +53,14 @@
 import {
   addCompanies,
   authorized,
+  findExistingPairs,
   getCompaniesCollection,
   getDb,
   getFinderCursor,
+  insertCompanies,
   saveFinderCursor,
+  splitNew,
+  toCompanyDoc,
   type CompanyDoc,
   type CompanyInput,
   type FinderCursor,
@@ -350,15 +360,27 @@ export async function runFindCompanies(
 
   let cursor: FinderCursor = await getFinderCursor(deps.metaCol);
   if (cursor.version !== SOURCES_VERSION) {
-    cursor = { version: SOURCES_VERSION, sourceIndex: 0, state: {} };
+    cursor = { version: SOURCES_VERSION, sourceIndex: 0, state: {}, pending: [] };
     await saveFinderCursor(deps.metaCol, cursor);
   }
+  cursor.pending ??= [];
 
   let added = 0;
   let source = '';
   let transientError = false;
   let advancedPastWork = false;
   let skipNote: string | undefined;
+
+  // Drain companies banked by an earlier call that hit its exact limit.
+  // These go first, so no fetched company is ever lost or skipped.
+  if (cursor.pending.length > 0 && added < limit) {
+    const take = cursor.pending.slice(0, limit - added);
+    const drained = await addCompanies(deps.companiesCol, take);
+    added += drained.inserted;
+    cursor.pending = cursor.pending.slice(take.length);
+    advancedPastWork = true;
+    await saveFinderCursor(deps.metaCol, cursor);
+  }
 
   while (added < limit && cursor.sourceIndex < SOURCES.length) {
     const remaining = FUNCTION_BUDGET_MS - (now() - startedAt);
@@ -388,9 +410,39 @@ export async function runFindCompanies(
       transientError = true;
       break;
     }
-    const inserted = (await addCompanies(deps.companiesCol, page.companies)).inserted;
+    // Cap inserts at this call's remaining limit: take only what the
+    // call still needs, bank the rest into pending for the next call.
+    // Dedupe covers the collection AND pending, so a company banked
+    // earlier is never re-added from a later page of another type.
+    const docs: CompanyDoc[] = [];
+    for (const input of page.companies) {
+      const doc = toCompanyDoc(input);
+      if (doc) docs.push(doc);
+    }
+    const existing = await findExistingPairs(deps.companiesCol, docs);
+    for (const p of cursor.pending) {
+      const d = toCompanyDoc(p);
+      if (!d) continue;
+      existing.pairs.add(`${d.nameKey}|${d.domain ?? ''}`);
+      if (d.sourceId) existing.sourceIds.add(d.sourceId);
+    }
+    const { fresh } = splitNew(docs, existing);
+    const take = fresh.slice(0, limit - added);
+    const rest = fresh.slice(limit - added);
+    const inserted = await insertCompanies(deps.companiesCol, take);
     added += inserted;
     advancedPastWork = true;
+    cursor.pending = [
+      ...cursor.pending,
+      ...rest.map((d) => ({
+        name: d.name,
+        website: d.website,
+        careersUrl: d.careersUrl,
+        category: d.category,
+        source: d.source,
+        sourceId: d.sourceId,
+      })),
+    ];
     cursor.state[adapter.key] = { ...page.nextState, failures: 0 };
     if (page.exhausted) cursor.sourceIndex += 1;
     await saveFinderCursor(deps.metaCol, cursor);
