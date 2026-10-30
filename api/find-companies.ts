@@ -1,23 +1,22 @@
 /* Finder company discovery — Vercel serverless function.
  *
  * Every press returns up to 500 companies NOT already in the user's
- * database, with no total cap: verified seed companies first, then live
- * discovery from Wikidata (US companies with official websites, including
- * ones headquartered in the US even when no country is recorded), paged by
- * OFFSET in a stable result order. The client persists the Wikidata offset
- * and sends it back each press, so presses walk the whole result set
- * exactly once — no repeats, nothing skipped. The function also reads the
- * user's own state doc from MongoDB and filters against it, so a company
- * already in the database is never returned again even if the client's
- * offset state is lost.
+ * database, found live from Wikidata (US companies with official websites,
+ * including ones headquartered in the US even when no country is recorded),
+ * paged by OFFSET in a stable result order. No pre-loaded list is served:
+ * every company comes from live discovery. The client persists the
+ * discovery offset and sends it back each press, so presses walk the whole
+ * result set exactly once — no repeats, nothing skipped. The function also
+ * reads the user's own state doc from MongoDB and filters against it, so a
+ * company already in the database is never returned again even if the
+ * client's offset state is lost.
  *
- * Nothing here takes a URL from the client. Seed rows come from the
- * bundled verified seed; Wikidata rows come from the public SPARQL
- * endpoint. Auth mirrors /api/state: x-sync-key must match SYNC_KEY.
+ * Nothing here takes a URL from the client. Wikidata rows come from the
+ * public SPARQL endpoint. Auth mirrors /api/state: x-sync-key must match
+ * SYNC_KEY.
  */
 
 import { MongoClient } from 'mongodb';
-import { COMPANIES_SEED } from './companies-seed.js';
 
 // Vercel provides process.env at runtime; the project has no @types/node.
 declare const process: { env: Record<string, string | undefined> };
@@ -208,20 +207,10 @@ async function handlerInner(req: VercelRequest, res: VercelResponse) {
 
   const batch: FoundCompany[] = [];
 
-  // 1. Verified seed first — these have real careers pages, so they are
-  //    immediately searchable for jobs.
-  const seedLeft = COMPANIES_SEED.filter((s) => !isDup(s.n, s.w));
-  for (const s of seedLeft) {
-    if (batch.length >= limit) break;
-    batch.push({ name: s.n, website: s.w, careersUrl: s.c, category: s.g, source: 'Seed' });
-    claim(s.n, s.w);
-  }
-  const seedRemaining = seedLeft.length - batch.length;
-
-  // 2. Live discovery from Wikidata until the batch is full, the soft
-  //    deadline hits, or the result set runs out. The offset only advances
-  //    past pages that returned successfully, so a timeout loses nothing —
-  //    the next press retries the same page.
+  // Live discovery from Wikidata until the batch is full, the soft
+  // deadline hits, or the result set runs out. The offset only advances
+  // past pages that returned successfully, so a timeout loses nothing —
+  // the next press retries the same page.
   const startedAt = Date.now();
   let cursor = offset;
   let wikidataExhausted = false;
@@ -260,9 +249,8 @@ async function handlerInner(req: VercelRequest, res: VercelResponse) {
   return res.status(200).json({
     companies: batch,
     nextOffset: cursor,
-    seedRemaining,
     wikidataExhausted,
-    exhausted: seedRemaining === 0 && wikidataExhausted,
+    exhausted: wikidataExhausted,
     error:
       batch.length === 0 && wdqsError
         ? 'Discovery timed out — press again, nothing was lost.'

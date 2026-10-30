@@ -10,7 +10,6 @@ const JOBS_CHUNK = 15;
 
 interface CompanyResult {
   added: number;
-  seedRemaining: number;
   nextOffset: number;
   exhausted: boolean;
   error?: string;
@@ -73,7 +72,6 @@ export function FinderView() {
       if (!key) {
         setCompanyResult({
           added: 0,
-          seedRemaining: 0,
           nextOffset: discoveryOffset,
           exhausted: false,
           error: "Find Companies needs the app's sync key, which isn't set in this build.",
@@ -88,7 +86,6 @@ export function FinderView() {
       if (!r.ok) {
         setCompanyResult({
           added: 0,
-          seedRemaining: 0,
           nextOffset: discoveryOffset,
           exhausted: false,
           error:
@@ -110,7 +107,7 @@ export function FinderView() {
         website: c.website,
         careersUrl: c.careersUrl ?? '',
         category: c.category ?? '',
-        source: c.source ?? 'Seed',
+        source: c.source ?? 'Wikidata',
       }));
       const { unique } = dedupeCompanies(rows, companies);
       addCompanies(unique);
@@ -123,7 +120,6 @@ export function FinderView() {
       }
       setCompanyResult({
         added: unique.length,
-        seedRemaining: typeof data.seedRemaining === 'number' ? data.seedRemaining : 0,
         nextOffset,
         exhausted: !!data.exhausted,
         error: typeof data.error === 'string' ? data.error : undefined,
@@ -132,7 +128,6 @@ export function FinderView() {
     } catch {
       setCompanyResult({
         added: 0,
-        seedRemaining: 0,
         nextOffset: discoveryOffset,
         exhausted: false,
         error: 'Find Companies hit a network error. Nothing was lost — press again.',
@@ -322,10 +317,8 @@ export function FinderView() {
                     <> · {companyResult.error}</>
                   ) : companyResult.exhausted ? (
                     <> · No more companies found from current sources</>
-                  ) : companyResult.seedRemaining > 0 ? (
-                    <> · {companyResult.seedRemaining} verified seed companies left</>
                   ) : (
-                    <> · Discovering from live sources — press again for 500 more</>
+                    <> · Discovered live — press again for 500 more</>
                   )}
                 </>
               )}
@@ -336,16 +329,15 @@ export function FinderView() {
           </Button>
         </div>
         <p className="text-sm text-zinc-400">
-          Find Companies finds companies not already in your database — verified seed companies
-          first, then live discovery — at most 500 new ones per click. Press it again for the
-          next batch; it never duplicates, and it keeps finding new ones until every source is
-          exhausted.
+          Find Companies discovers companies not already in your database, live, at most 500
+          new ones per click. Press it again for the next batch; it never duplicates, and it
+          keeps finding new ones until every source is exhausted.
         </p>
 
         {companies.length === 0 ? (
           <EmptyState
             title="No companies yet"
-            description="Press Find Companies to load the verified company database. Then Find Jobs searches those companies' careers pages."
+            description="Press Find Companies to discover companies live. Then Find Jobs searches those companies' careers pages."
             action={
               <Button variant="primary" onClick={handleFindCompanies} disabled={findingCompanies}>
                 Find Companies
