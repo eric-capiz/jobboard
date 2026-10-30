@@ -81,6 +81,48 @@ function isBoardUrl(url: string): boolean {
   return /greenhouse\.io|lever\.co|ashbyhq\.com|jazz\.co|applytojob\.com/i.test(url);
 }
 
+/** The job-list iframe embedded IN a business careers page: some
+ *  companies display their own page's job list through an iSolved Hire
+ *  iframe. Like the JazzHR widget, the iframe is part of the page — the
+ *  jobs it carries are the jobs displayed on that page, and their apply
+ *  links may point at the board. Only an iframe found on the business
+ *  page itself is ever read. */
+function isolvedIframeUrl(pageHtml: string): string | null {
+  const m = pageHtml.match(/<iframe[^>]*src="([^"]*isolvedhire\.com[^"]*)"/i);
+  return m ? m[1] : null;
+}
+
+/** Parse an iSolved Hire iframe job list: each job is a link wrapping a
+ *  job-info div with an h4 title and a listing-details list whose first
+ *  item is the location. When the title itself says (Remote), the role
+ *  is remote — the location line underneath is the office, and the
+ *  remote-only verdict must see the title's Remote, not the office. */
+export function parseIsolvedIframe(html: string, pageUrl: string): Posting[] {
+  const postings: Posting[] = [];
+  const re = /<a\s+href="([^"]+)"[^>]*>\s*<div class="job-info">\s*<h4>([^<]+)<\/h4>\s*<ul class="listing-details">\s*<li>([^<]*)<\/li>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html)) !== null) {
+    const title = m[2].trim();
+    const liLoc = m[3].trim();
+    if (!title) continue;
+    let url: string | null = null;
+    try {
+      url = new URL(m[1], pageUrl).href;
+    } catch {
+      url = null;
+    }
+    if (!url || !(url.startsWith('http://') || url.startsWith('https://'))) continue;
+    postings.push({
+      title,
+      location: /\(remote\)|\bremote\b/i.test(title) ? 'Remote' : liLoc,
+      url,
+      description: '',
+      postedDate: '',
+    });
+  }
+  return postings;
+}
+
 /** Parse a JazzHR basic widget script: each job is a resumator-job block
  *  with a title div, a "Location: X" span, a "Department: Y" span, and a
  *  + View details link to the apply page. The widget renders jobs
@@ -151,7 +193,15 @@ const STOPWORDS = new Set([
  *  single letters. Applied identically to resumes, titles, and posting
  *  text, so a term matches only when both sides actually use the word. */
 function tokenize(text: string): string[] {
-  return (text.toLowerCase().match(/[a-z0-9]+/g) ?? []).filter(
+  // "Front End" and "Frontend" are the same skill — normalize before
+  // splitting so a "Front End Developer" posting matches a "Frontend"
+  // resume (and likewise Back End / Backend). Applied to resumes and
+  // postings alike, so matching stays symmetric.
+  const normalized = text
+    .toLowerCase()
+    .replace(/\bfront[\s\-]+end\b/g, 'frontend')
+    .replace(/\bback[\s\-]+end\b/g, 'backend');
+  return (normalized.match(/[a-z0-9]+/g) ?? []).filter(
     (t) => t.length >= 2 && !/^\d+$/.test(t) && !STOPWORDS.has(t),
   );
 }
@@ -445,6 +495,24 @@ export async function searchCompanyJobs(
         }
       } catch {
         // Widget unreadable — keep looking at the company's own pages.
+      }
+    }
+    // Jobs displayed on the page through an embedded iframe — same
+    // rule as the widget: the iframe is part of this page.
+    const iframeUrl = isolvedIframeUrl(html);
+    if (iframeUrl) {
+      try {
+        const iframePostings = parseIsolvedIframe(await fetchText(iframeUrl), iframeUrl);
+        if (iframePostings.length > 0) {
+          return {
+            leads: screenPostings(company.name, iframePostings, resumeText),
+            postingsSeen: iframePostings.length,
+            sourcePage: u,
+            triedUrls,
+          };
+        }
+      } catch {
+        // Iframe unreadable — keep looking at the company's own pages.
       }
     }
     let at = i + 1;

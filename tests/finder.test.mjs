@@ -748,6 +748,46 @@ async function testBusinessSiteFirst() {
   check('business-first: page used, board link ignored', res2.body?.sourcePage === 'https://bothco.example/careers' && res2.body?.leads[0]?.title === 'Frontend Developer', res2.body);
 }
 
+async function testHalvik() {
+  // Halvik pattern: the business page shows NO listings in its own
+  // HTML — its job list is an embedded iSolved Hire iframe. The iframe
+  // is part of the page, so reading it is reading the page.
+  const jobsMod = freshRequire(`${OUT}/find-jobs.cjs`);
+  const iframeHtml = `<html><body>
+<a href="https://halvik.isolvedhire.com/iframe/1894977.html" class="list-group-item strip-side-borders"><div class="job-info"><h4>Front End Developer (Remote)</h4><ul class="listing-details"><li>McLean, VA, USA</li><li>Full Time</li></ul></div></a>
+<a href="https://halvik.isolvedhire.com/iframe/1875066.html" class="list-group-item strip-side-borders"><div class="job-info"><h4>Full Stack Development Lead</h4><ul class="listing-details"><li>McLean, VA, USA</li><li>Full Time</li></ul></div></a>
+</body></html>`;
+  const parsed = jobsMod.parseIsolvedIframe(iframeHtml, 'https://halvik.isolvedhire.com/iframe/');
+  check('isolved: 2 listings parsed', parsed.length === 2, parsed);
+  check('isolved: remote title wins over office location', parsed[0]?.title === 'Front End Developer (Remote)' && parsed[0]?.location === 'Remote' && parsed[0]?.url === 'https://halvik.isolvedhire.com/iframe/1894977.html', parsed[0]);
+  check('isolved: on-site role keeps office location', parsed[1]?.location === 'McLean, VA, USA', parsed[1]);
+  // End to end: homepage nav -> careers page -> iframe -> lead.
+  const testMod = freshRequire(`${OUT}/test-company.cjs`);
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u === 'https://halvik.isolvedhire.com/iframe/') {
+      return { ok: true, text: async () => iframeHtml };
+    }
+    if (u === 'https://halvik.example/careers/') {
+      return { ok: true, text: async () => '<html><body><iframe id="advanced_iframe" src="https://halvik.isolvedhire.com/iframe/"></iframe></body></html>' };
+    }
+    if (u === 'https://halvik.example') {
+      return { ok: true, text: async () => '<html><body><nav><a href="/careers/">Careers</a></nav></body></html>' };
+    }
+    return { ok: true, text: async () => '<html><body>No careers here.</body></html>' };
+  };
+  const res = mkRes();
+  await testMod.default(
+    mkReq('POST', {
+      company: { name: 'Halvik', website: 'https://halvik.example', careersUrl: '' },
+      resumeText: 'React TypeScript JavaScript frontend developer with Storybook and design systems experience',
+    }, { 'x-sync-key': 'testkey' }),
+    res,
+  );
+  check('halvik: source is the careers page', res.body?.sourcePage === 'https://halvik.example/careers/', res.body);
+  check('halvik: front end developer found at 63', res.body?.leads?.length === 1 && res.body?.leads[0]?.title === 'Front End Developer (Remote)' && res.body?.leads[0]?.matchScore === 63, res.body?.leads);
+}
+
 async function testCompaniesApi() {
   const lib = freshRequire(`${OUT}/finder-lib.cjs`);
   const col = new FakeCollection();
@@ -1090,6 +1130,7 @@ await testFindJobsNonFrontend();
 await testTestCompany();
 await testJazzhr();
 await testBusinessSiteFirst();
+await testHalvik();
 await testCompaniesApi();
 
 console.log(`\n${passed} passed, ${failed} failed`);
