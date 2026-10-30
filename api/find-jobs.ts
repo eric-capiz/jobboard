@@ -590,7 +590,9 @@ function screenPostings(company: string, postings: Posting[], resumeText: string
     // The title gate already establishes title relevance, so the score
     // is 50 (title) + 50 (skill overlap). A title-only match lands in
     // the mid-50s (near miss); auto-add at 60+ needs real overlap.
-    const matchScore = Math.round(50 + 50 * overlap);
+    // Capped at 100: a rich description can match more than 10 resume
+    // terms, and a score above 100 reads as broken.
+    const matchScore = Math.min(100, Math.round(50 + 50 * overlap));
     // Gaps: the posting description's most frequent terms the resume
     // doesn't mention — what the posting wants that the resume lacks.
     // Never used to invent a skill — only to flag.

@@ -831,6 +831,32 @@ async function testHouseRx() {
   check('houserx: source is the careers page', res.body?.sourcePage === 'https://houserx.example/careers', res.body);
   check('houserx: union postings seen 4', res.body?.postingsSeen === 4, res.body);
   check('houserx: sr ui engineer found at 81', res.body?.leads?.length === 1 && res.body?.leads[0]?.title === 'Sr. UI Engineer, Front End' && res.body?.leads[0]?.matchScore === 81, res.body?.leads);
+  // Scores cap at 100: a rich description matching 16 resume terms
+  // would otherwise score 130.
+  const richJson = JSON.stringify({
+    jobs: [
+      { title: 'Frontend Developer', location: { name: 'Remote' }, absolute_url: 'https://www.rich.example/careers?gh_jid=1', content: '<p>React TypeScript JavaScript frontend developer with Storybook design systems web built node api testing agile ci cd experience.</p>', created_at: '2026-10-20T00:00:00Z' },
+    ],
+  });
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u.includes('boards-api.greenhouse.io')) {
+      return { ok: true, text: async () => richJson };
+    }
+    if (u === 'https://rich.example/careers') {
+      return { ok: true, text: async () => '<html><body><script src="https://boards.greenhouse.io/embed/job_board/js?for=rich"></script></body></html>' };
+    }
+    return { ok: true, text: async () => '<html><body>No careers here.</body></html>' };
+  };
+  const resCap = mkRes();
+  await testMod.default(
+    mkReq('POST', {
+      company: { name: 'Rich Co', website: 'https://rich.example', careersUrl: '' },
+      resumeText: 'React TypeScript JavaScript frontend developer with Storybook design systems web built node api testing agile ci cd',
+    }, { 'x-sync-key': 'testkey' }),
+    resCap,
+  );
+  check('score caps at 100', resCap.body?.leads?.length === 1 && resCap.body?.leads[0]?.matchScore === 100, resCap.body?.leads);
 }
 
 async function testCompaniesApi() {
