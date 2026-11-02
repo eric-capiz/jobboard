@@ -291,11 +291,13 @@ export function FinderView() {
           );
           allLeadsRef.current = [...allLeadsRef.current, ...deduped];
           setLeads(allLeadsRef.current);
-          // 60% and up go straight to the Pipeline; under 60% stays here
-          // as a near miss for Eric to add by hand.
+          // 60% and up go straight to the Pipeline — unless the location
+          // couldn't be confirmed as US-remote (needsReview), in which
+          // case the lead stays here as a near miss for Eric to add by
+          // hand, whatever its score. Under 60% also stays a near miss.
           for (const lead of deduped) {
             const k = jobDedupeKey(lead.title, lead.company);
-            if (lead.matchScore >= 60 && !knownRef.current.has(k)) {
+            if (lead.matchScore >= 60 && !lead.needsReview && !knownRef.current.has(k)) {
               addLeadToBoard(lead);
               knownRef.current.add(k);
               autoAddedRef.current.add(k);

@@ -48,6 +48,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       sourcePage: result.sourcePage,
       triedUrls: result.triedUrls,
       postingsSeen: result.postingsSeen,
+      fetchOk: result.fetchOk,
+      screened: result.screened,
       leads: result.leads,
     });
   } catch (e) {

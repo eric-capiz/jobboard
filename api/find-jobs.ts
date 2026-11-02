@@ -40,6 +40,11 @@ interface Posting {
   url: string;
   description: string;
   postedDate: string;
+  /** Which reader produced this posting, stamped when sources are
+   *  unioned: 'html' (page listings), 'jazzhr' / 'isolved' /
+   *  'greenhouse' (embedded widget/iframe/embed), 'jsonld' (structured
+   *  data on the same page). Provenance for the lead card. */
+  source?: string;
 }
 
 async function fetchText(url: string, init?: RequestInit): Promise<string> {
@@ -231,7 +236,12 @@ const STOPWORDS = new Set([
 
 /** Lowercase word tokens, minus stopwords, minus pure numbers and
  *  single letters. Applied identically to resumes, titles, and posting
- *  text, so a term matches only when both sides actually use the word. */
+ *  text, so a term matches only when both sides actually use the word.
+ *  Plurals are stemmed (developers → developer, systems → system) so
+ *  a plural on one side still matches the singular on the other — the
+ *  stem runs BEFORE the stopword filter, so a plural of a stopword
+ *  (teams → team) is still filtered. Words ending in 'ss'/'us' and
+ *  words of 3 letters or fewer are never stemmed. */
 function tokenize(text: string): string[] {
   // "Front End" and "Frontend" are the same skill — normalize before
   // splitting so a "Front End Developer" posting matches a "Frontend"
@@ -241,9 +251,13 @@ function tokenize(text: string): string[] {
     .toLowerCase()
     .replace(/\bfront[\s\-]+end\b/g, 'frontend')
     .replace(/\bback[\s\-]+end\b/g, 'backend');
-  return (normalized.match(/[a-z0-9]+/g) ?? []).filter(
-    (t) => t.length >= 2 && !/^\d+$/.test(t) && !STOPWORDS.has(t),
-  );
+  return (normalized.match(/[a-z0-9]+/g) ?? [])
+    .map((t) =>
+      t.length > 3 && t.endsWith('s') && !t.endsWith('ss') && !t.endsWith('us')
+        ? t.slice(0, -1)
+        : t,
+    )
+    .filter((t) => t.length >= 2 && !/^\d+$/.test(t) && !STOPWORDS.has(t));
 }
 
 /** The resume's signature terms: its most frequent tokens, capped at
@@ -259,23 +273,193 @@ function extractResumeTerms(resumeText: string): string[] {
     .map(([t]) => t);
 }
 
-/** A posting title passes when it shares at least one word with the
- *  resume — the title gate, field-agnostic. */
-function titleMatchesResume(title: string, resumeTerms: string[]): boolean {
-  if (resumeTerms.length === 0) return false;
-  const titleWords = new Set(tokenize(title));
-  return resumeTerms.some((t) => titleWords.has(t));
+/* Synonym groups for matching — approved aliases only. Two words are
+ *  deliberately NOT groups: 'development' (it matches 'Business
+ *  Development' roles that are not developer roles) and 'client' (it
+ *  matches 'Client Success' / 'Client Services' roles). 'software' is
+ *  deliberately NOT a group either: 'Software Sales' is not a developer
+ *  role, and 'Software Engineer' already matches through the
+ *  engineer → developer alias. Groups expand MATCHING only — the resume
+ *  text itself is never changed, and overlap counts each original
+ *  resume term once, however many group mates a posting uses. */
+const SYNONYM_GROUPS: string[][] = [
+  ['developer', 'engineer', 'programmer'],
+  ['frontend', 'web', 'ui'],
+  ['javascript', 'js'],
+  ['typescript', 'ts'],
+  ['react', 'reactjs'],
+];
+
+/** Group mates of a word (itself included when it is in no group). */
+function groupMates(word: string): string[] {
+  for (const g of SYNONYM_GROUPS) {
+    if (g.includes(word)) return g;
+  }
+  return [word];
 }
 
-function locationVerdict(loc: string): { ok: boolean; flag: string } {
-  const l = (loc ?? '').toLowerCase();
-  if (!l) return { ok: false, flag: 'no location listed' };
-  if (l.includes('hybrid') || l.includes('on-site') || l.includes('onsite') || l.includes('in office')) {
-    return { ok: false, flag: 'not remote' };
+/** Posting words whose group match is AMBIGUOUS: 'web', 'ui', and 'ts'
+ *  all have common non-technical readings ('Web Content', 'UI
+ *  Research', 'TS/SCI clearance'). A match that comes ONLY through an
+ *  ambiguous word never qualifies a posting on its own — a second,
+ *  non-ambiguous match must also be present. Exact matches are never
+ *  ambiguous, even for these words. */
+const AMBIGUOUS_GROUP_WORDS = new Set(['web', 'ui', 'ts']);
+
+interface TermMatch {
+  /** The original resume term. */
+  term: string;
+  /** The posting word that matched it. */
+  via: string;
+  /** True when via is the term itself. */
+  exact: boolean;
+  /** True when the match came through an ambiguous group word. */
+  ambiguousOnly: boolean;
+}
+
+/** Which resume terms a posting's words match, by exact word or by
+ *  synonym group. Each resume term appears at most once. */
+function matchResumeTerms(postingWords: Set<string>, resumeTerms: string[]): TermMatch[] {
+  const matches: TermMatch[] = [];
+  for (const term of resumeTerms) {
+    if (postingWords.has(term)) {
+      matches.push({ term, via: term, exact: true, ambiguousOnly: false });
+      continue;
+    }
+    for (const mate of groupMates(term)) {
+      if (mate !== term && postingWords.has(mate)) {
+        matches.push({
+          term,
+          via: mate,
+          exact: false,
+          ambiguousOnly: AMBIGUOUS_GROUP_WORDS.has(mate),
+        });
+        break;
+      }
+    }
   }
-  if (!l.includes('remote')) return { ok: false, flag: 'not remote' };
+  return matches;
+}
+
+/* Full US state names → abbreviations, longest first so 'west
+ *  virginia' wins over 'virginia'. Applied to location lines before
+ *  any other check — it also fixes a substring trap: 'Indiana'
+ *  contains 'india', which the excluded-places check would otherwise
+ *  misread as the country. */
+const STATE_NAMES: [string, string][] = [
+  ['district of columbia', 'dc'],
+  ['west virginia', 'wv'],
+  ['north carolina', 'nc'],
+  ['south carolina', 'sc'],
+  ['north dakota', 'nd'],
+  ['south dakota', 'sd'],
+  ['new hampshire', 'nh'],
+  ['new jersey', 'nj'],
+  ['new mexico', 'nm'],
+  ['new york', 'ny'],
+  ['rhode island', 'ri'],
+  ['alabama', 'al'],
+  ['alaska', 'ak'],
+  ['arizona', 'az'],
+  ['arkansas', 'ar'],
+  ['california', 'ca'],
+  ['colorado', 'co'],
+  ['connecticut', 'ct'],
+  ['delaware', 'de'],
+  ['florida', 'fl'],
+  ['georgia', 'ga'],
+  ['hawaii', 'hi'],
+  ['idaho', 'id'],
+  ['illinois', 'il'],
+  ['indiana', 'in'],
+  ['iowa', 'ia'],
+  ['kansas', 'ks'],
+  ['kentucky', 'ky'],
+  ['louisiana', 'la'],
+  ['maine', 'me'],
+  ['maryland', 'md'],
+  ['massachusetts', 'ma'],
+  ['michigan', 'mi'],
+  ['minnesota', 'mn'],
+  ['mississippi', 'ms'],
+  ['missouri', 'mo'],
+  ['montana', 'mt'],
+  ['nebraska', 'ne'],
+  ['nevada', 'nv'],
+  ['ohio', 'oh'],
+  ['oklahoma', 'ok'],
+  ['oregon', 'or'],
+  ['pennsylvania', 'pa'],
+  ['tennessee', 'tn'],
+  ['texas', 'tx'],
+  ['utah', 'ut'],
+  ['vermont', 'vt'],
+  ['virginia', 'va'],
+  ['washington', 'wa'],
+  ['wisconsin', 'wi'],
+  ['wyoming', 'wy'],
+];
+
+function normalizeStateNames(l: string): string {
+  let out = l;
+  for (const [name, abbr] of STATE_NAMES) {
+    out = out.replace(new RegExp(`\\b${name}\\b`, 'g'), ` ${abbr} `);
+  }
+  return out;
+}
+
+/* US-eligibility evidence in a posting's OWN text (title or
+ *  description — never page-level boilerplate). Deliberately phrase-
+ *  based: a bare 'us' token is a pronoun ('join us') as often as a
+ *  country, so it is never evidence on its own. */
+const US_EVIDENCE_RES = [
+  /\bunited states\b/,
+  /\busa\b/,
+  /\bu\.s\.a?\b/,
+  /\bus-based\b/,
+  /\bauthorized to work in the (united states|us)\b/,
+  /\beligible to work in the (united states|us)\b/,
+  /\bus citizen\b/,
+  /\b(based|located|reside|residing) in the united states\b/,
+];
+
+function hasUsEvidence(text: string): boolean {
+  return US_EVIDENCE_RES.some((re) => re.test(text));
+}
+
+export type LocationDisposition = 'ok' | 'review' | 'reject';
+
+/** Three-way location verdict. 'ok' auto-saves normally; 'review'
+ *  surfaces the posting as a near miss for manual check, never
+ *  auto-added whatever the score; 'reject' drops it. Body text (the
+ *  job's own title + description) can only UPGRADE — it can confirm US
+ *  eligibility for a bare-'Remote' or empty location, but it can never
+ *  override a location line that says hybrid, on-site, an excluded
+ *  place, or a state restriction. A posting whose location line says
+ *  nothing at all is never silently discarded when it matches skills:
+ *  it goes to review. */
+export function locationVerdict(
+  loc: string,
+  bodyText: string,
+): { verdict: LocationDisposition; flag: string } {
+  const body = (bodyText ?? '').toLowerCase();
+  const raw = (loc ?? '').toLowerCase();
+  if (!raw) {
+    if (/\bremote\b/.test(body) && hasUsEvidence(body)) {
+      return { verdict: 'ok', flag: 'Remote (US, confirmed in posting)' };
+    }
+    if (/\bremote\b/.test(body)) {
+      return { verdict: 'review', flag: 'Remote (no country stated — verify)' };
+    }
+    return { verdict: 'review', flag: 'no location listed — verify' };
+  }
+  const l = normalizeStateNames(raw);
+  if (l.includes('hybrid') || l.includes('on-site') || l.includes('onsite') || l.includes('in office')) {
+    return { verdict: 'reject', flag: 'not remote' };
+  }
+  if (!l.includes('remote')) return { verdict: 'reject', flag: 'not remote' };
   for (const place of EXCLUDED_PLACES) {
-    if (l.includes(place)) return { ok: false, flag: `excluded place: ${place}` };
+    if (l.includes(place)) return { verdict: 'reject', flag: `excluded place: ${place}` };
   }
   const states = l.match(/\b(al|ak|az|ar|ca|co|ct|de|fl|ga|hi|id|il|in|ia|ks|ky|la|me|md|ma|mi|mn|ms|mo|mt|ne|nv|nh|nj|nm|ny|nc|nd|oh|ok|or|pa|ri|sc|sd|tn|tx|ut|vt|va|wa|wv|wi|wy|dc)\b/g) ?? [];
   if (
@@ -286,17 +470,19 @@ function locationVerdict(loc: string): { ok: boolean; flag: string } {
     l.includes('anywhere') ||
     l.includes('nationwide')
   ) {
-    return { ok: true, flag: 'Remote (US)' };
+    return { verdict: 'ok', flag: 'Remote (US)' };
   }
   if (states.length > 0 && states.every((s) => s === 'tx')) {
-    return { ok: true, flag: 'Remote (TX only)' };
+    return { verdict: 'ok', flag: 'Remote (TX only)' };
   }
-  if (states.length > 0) return { ok: false, flag: `state-restricted remote: ${[...new Set(states)].join(', ')}` };
-  return { ok: true, flag: 'Remote (no country stated — verify)' };
-}
-
-function titleVerdict(title: string, resumeTerms: string[]): boolean {
-  return titleMatchesResume(title, resumeTerms);
+  if (states.length > 0) return { verdict: 'reject', flag: `state-restricted remote: ${[...new Set(states)].join(', ')}` };
+  // Bare 'Remote': the location line proves remote but not US
+  // eligibility. The job's own text can confirm it; otherwise the
+  // posting goes to manual review — 'Remote' alone never auto-adds.
+  if (hasUsEvidence(body)) {
+    return { verdict: 'ok', flag: 'Remote (US, confirmed in posting)' };
+  }
+  return { verdict: 'review', flag: 'Remote (no country stated — verify)' };
 }
 
 function parsePay(text: string): string {
@@ -320,6 +506,13 @@ export interface FinderLead {
    *  and explicit skill requirements the resume doesn't show. Empty
    *  when nothing specific mismatches. */
   reasons: string[];
+  /** Location could not be confirmed as US-remote (bare 'Remote' or no
+   *  location): shown as a near miss for manual review, never
+   *  auto-added, whatever the score. */
+  needsReview: boolean;
+  /** Which reader produced the posting: page HTML, an embedded
+   *  widget/iframe/embed, or JSON-LD from the same page. */
+  sourceType: string;
 }
 
 export interface CompanySearchInput {
@@ -334,6 +527,13 @@ export interface CompanySearchResult {
   /** The business site's own careers page the jobs were read from. */
   sourcePage: string | null;
   triedUrls: string[];
+  /** True when at least one candidate page actually loaded — separates
+   *  'pages read, no listings' from 'nothing reachable'. */
+  fetchOk: boolean;
+  /** The screening funnel for this company: how many postings died on
+   *  no resume match, on location, and how many survived only as
+   *  review-only (uncertain location). */
+  screened: { rejectedNoMatch: number; rejectedLocation: number; reviewLocation: number };
 }
 
 const GENERIC_TITLE_TEXT = /^(home|about|about us|careers|jobs|job|contact|contact us|login|sign in|join our team|work with us|open positions|current openings|open roles|all roles|see all jobs|view all jobs|view jobs|see jobs|browse jobs|search jobs|browse all jobs|view openings|see openings|view open positions|all jobs|all positions|explore careers|explore jobs|learn more|apply now|view details|view job|see details)$/i;
@@ -450,6 +650,114 @@ export function parseCareersPage(html: string, pageUrl: string): Posting[] {
   return postings.slice(0, 50);
 }
 
+/** Parse schema.org JobPosting blocks embedded in the SAME careers
+ *  page HTML. Same-page structured data only: nothing new is fetched,
+ *  and fields are never merged across blocks — each JobPosting object
+ *  becomes one posting or nothing. Entries whose apply URL leaves the
+ *  business site for a board, entries with no usable apply link, and
+ *  entries past validThrough are skipped: the visible listings on the
+ *  page are the primary source, and JSON-LD only adds what the visible
+ *  HTML doesn't already show (the caller drops title dupes). */
+export function parseJsonLdPostings(html: string, pageUrl: string): Posting[] {
+  const postings: Posting[] = [];
+  const locationFromJobLocation = (jl: any): string => {
+    if (!jl) return '';
+    if (typeof jl === 'string') return jl.trim();
+    if (Array.isArray(jl)) {
+      for (const item of jl) {
+        const s = locationFromJobLocation(item);
+        if (s) return s;
+      }
+      return '';
+    }
+    if (typeof jl === 'object') {
+      const addr = jl.address;
+      if (addr && typeof addr === 'object') {
+        const parts = [addr.addressLocality, addr.addressRegion, addr.addressCountry]
+          .filter((x) => typeof x === 'string' && x.trim())
+          .map((x: string) => x.trim());
+        if (parts.length > 0) return parts.join(', ');
+      }
+      if (typeof jl.name === 'string') return jl.name.trim();
+    }
+    return '';
+  };
+  const requirementText = (req: any): string => {
+    if (!req) return '';
+    if (typeof req === 'string') return req.trim();
+    if (Array.isArray(req)) {
+      for (const item of req) {
+        const s = requirementText(item);
+        if (s) return s;
+      }
+      return '';
+    }
+    if (typeof req === 'object' && typeof req.name === 'string') return req.name.trim();
+    return '';
+  };
+  const pushPosting = (j: any) => {
+    const title = typeof j.title === 'string' ? cleanTitle(j.title) : '';
+    if (!titleOk(title)) return;
+    let url: string | null = null;
+    if (typeof j.url === 'string' && j.url.trim()) {
+      try {
+        const abs = new URL(j.url.trim(), pageUrl).href;
+        if (abs.startsWith('http://') || abs.startsWith('https://')) url = abs;
+      } catch {
+        // Unusable URL — the posting is skipped below.
+      }
+    }
+    if (!url || isBoardUrl(url)) return;
+    if (typeof j.validThrough === 'string') {
+      const vt = new Date(j.validThrough);
+      if (!Number.isNaN(vt.getTime()) && vt.getTime() < Date.now()) return;
+    }
+    const description = typeof j.description === 'string' ? stripTags(j.description) : '';
+    let location = '';
+    const locType = j.jobLocationType;
+    const locTypes = Array.isArray(locType) ? locType : [locType];
+    const telecommute = locTypes.some(
+      (t) => typeof t === 'string' && t.toUpperCase().includes('TELECOMMUTE'),
+    );
+    const reqText = requirementText(j.applicantLocationRequirements);
+    if (telecommute) {
+      location = reqText ? `Remote, ${reqText}` : 'Remote';
+    } else {
+      location = locationFromJobLocation(j.jobLocation) || reqText;
+    }
+    let postedDate = '';
+    if (typeof j.datePosted === 'string') {
+      const d = new Date(j.datePosted);
+      if (!Number.isNaN(d.getTime())) postedDate = d.toISOString().slice(0, 10);
+    }
+    postings.push({ title, location, url, description, postedDate });
+  };
+  const collect = (node: any) => {
+    if (!node || typeof node !== 'object') return;
+    if (Array.isArray(node)) {
+      for (const n of node) collect(n);
+      return;
+    }
+    const type = node['@type'];
+    const types = Array.isArray(type) ? type : [type];
+    if (types.includes('JobPosting')) {
+      pushPosting(node);
+      return;
+    }
+    if (node['@graph']) collect(node['@graph']);
+  };
+  const scriptRe = /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  let sm: RegExpExecArray | null;
+  while ((sm = scriptRe.exec(html)) !== null) {
+    try {
+      collect(JSON.parse(sm[1]));
+    } catch {
+      // Malformed JSON-LD — ignore the block, keep the page's listings.
+    }
+  }
+  return postings.slice(0, 50);
+}
+
 /** Search ONE company — business site ONLY, no exceptions. Jobs come
  *  from the company's own pages and nowhere else: listings parsed
  *  straight off a page, or the job displays embedded in that page (a
@@ -507,12 +815,14 @@ export async function searchCompanyJobs(
       if (!candidates.includes(u)) candidates.push(u);
     }
   }
+  let anyFetchOk = false;
   for (let i = 0; i < candidates.length; i++) {
     const u = candidates[i];
     triedUrls.push(u);
     let html: string;
     try {
       html = await fetchText(u);
+      anyFetchOk = true;
     } catch {
       continue;
     }
@@ -525,16 +835,16 @@ export async function searchCompanyJobs(
     // source, and a board link found on the page is never followed.
     const pagePostings: Posting[] = [];
     const seenKeys = new Set<string>();
-    const addPostings = (ps: Posting[]) => {
+    const addPostings = (ps: Posting[], source: string) => {
       for (const p of ps) {
         const k = `${p.title}\n${p.url}`;
         if (!seenKeys.has(k)) {
           seenKeys.add(k);
-          pagePostings.push(p);
+          pagePostings.push({ ...p, source });
         }
       }
     };
-    addPostings(parseCareersPage(html, u));
+    addPostings(parseCareersPage(html, u), 'html');
     const widgetSlug = jazzhrWidgetSlug(html);
     if (widgetSlug) {
       try {
@@ -542,6 +852,7 @@ export async function searchCompanyJobs(
           parseJazzhrWidget(
             await fetchText(`https://app.jazz.co/widgets/basic/create/${widgetSlug}`),
           ),
+          'jazzhr',
         );
       } catch {
         // Widget unreadable — the page's other sources still count.
@@ -550,7 +861,7 @@ export async function searchCompanyJobs(
     const iframeUrl = isolvedIframeUrl(html);
     if (iframeUrl) {
       try {
-        addPostings(parseIsolvedIframe(await fetchText(iframeUrl), iframeUrl));
+        addPostings(parseIsolvedIframe(await fetchText(iframeUrl), iframeUrl), 'isolved');
       } catch {
         // Iframe unreadable — the page's other sources still count.
       }
@@ -564,17 +875,32 @@ export async function searchCompanyJobs(
               `https://boards-api.greenhouse.io/v1/boards/${ghSlug}/jobs?content=true`,
             ),
           ),
+          'greenhouse',
         );
       } catch {
         // Embed unreadable — the page's other sources still count.
       }
     }
+    // JSON-LD last: it duplicates the visible listings, so a block
+    // whose title is already on the page adds nothing.
+    const visibleTitles = new Set(pagePostings.map((p) => p.title.toLowerCase()));
+    addPostings(
+      parseJsonLdPostings(html, u).filter((p) => !visibleTitles.has(p.title.toLowerCase())),
+      'jsonld',
+    );
     if (pagePostings.length > 0) {
+      const screened = screenPostings(company.name, pagePostings, resumeText);
       return {
-        leads: screenPostings(company.name, pagePostings, resumeText),
+        leads: screened.leads,
         postingsSeen: pagePostings.length,
         sourcePage: u,
         triedUrls,
+        fetchOk: true,
+        screened: {
+          rejectedNoMatch: screened.rejectedNoMatch,
+          rejectedLocation: screened.rejectedLocation,
+          reviewLocation: screened.reviewLocation,
+        },
       };
     }
     let at = i + 1;
@@ -585,7 +911,14 @@ export async function searchCompanyJobs(
       }
     }
   }
-  return { leads: [], postingsSeen: 0, sourcePage: null, triedUrls };
+  return {
+    leads: [],
+    postingsSeen: 0,
+    sourcePage: null,
+    triedUrls,
+    fetchOk: anyFetchOk,
+    screened: { rejectedNoMatch: 0, rejectedLocation: 0, reviewLocation: 0 },
+  };
 }
 
 /** The highest years-of-experience figure a text states, or null.
@@ -629,30 +962,58 @@ function extractRequiredSkills(description: string, resumeSet: Set<string>): str
   return out;
 }
 
-function screenPostings(company: string, postings: Posting[], resumeText: string): FinderLead[] {
+export interface ScreenedPostings {
+  leads: FinderLead[];
+  rejectedNoMatch: number;
+  rejectedLocation: number;
+  reviewLocation: number;
+}
+
+/** Score postings against the resume. The old hard title gate is gone:
+ *  a posting is scored when at least one resume term matches (exact or
+ *  synonym) in its title or description — the floor, not a gate. The
+ *  score formula is unchanged: 50 + 50 × overlap, where overlap is the
+ *  ratio of matched resume terms to min(terms, 10), capped at 100. A
+ *  single match lands in the mid-50s (near miss); auto-add at 60+ still
+ *  needs real overlap, so the score — not the floor — is the precision
+ *  gate. Location is classified before scoring: hard rejects drop out,
+ *  uncertain locations become review-only leads. */
+function screenPostings(company: string, postings: Posting[], resumeText: string): ScreenedPostings {
   const resumeTerms = extractResumeTerms(resumeText);
   const resumeSet = new Set(resumeTerms);
   const resumeYears = extractYears(resumeText);
   const leads: FinderLead[] = [];
+  let rejectedNoMatch = 0;
+  let rejectedLocation = 0;
+  let reviewLocation = 0;
+  const cap = (t: string): string => t.charAt(0).toUpperCase() + t.slice(1);
   for (const p of postings) {
-    if (!titleVerdict(p.title, resumeTerms)) continue;
-    const loc = locationVerdict(p.location);
-    if (!loc.ok) continue;
     const postingWords = new Set(tokenize(`${p.title} ${p.description}`));
-    const matched = resumeTerms.filter((t) => postingWords.has(t));
-    const overlap = resumeTerms.length === 0 ? 0 : matched.length / Math.min(resumeTerms.length, 10);
-    // The title gate already establishes title relevance, so the score
-    // is 50 (title) + 50 (skill overlap). A title-only match lands in
-    // the mid-50s (near miss); auto-add at 60+ needs real overlap.
+    const matches = matchResumeTerms(postingWords, resumeTerms);
+    if (matches.length === 0 || !matches.some((m) => !m.ambiguousOnly)) {
+      rejectedNoMatch += 1;
+      continue;
+    }
+    const loc = locationVerdict(p.location, `${p.title} ${p.description}`);
+    if (loc.verdict === 'reject') {
+      rejectedLocation += 1;
+      continue;
+    }
+    const needsReview = loc.verdict === 'review';
+    if (needsReview) reviewLocation += 1;
+    const overlap = resumeTerms.length === 0 ? 0 : matches.length / Math.min(resumeTerms.length, 10);
     // Capped at 100: a rich description can match more than 10 resume
     // terms, and a score above 100 reads as broken.
     const matchScore = Math.min(100, Math.round(50 + 50 * overlap));
     // Gaps: the posting description's most frequent terms the resume
     // doesn't mention — what the posting wants that the resume lacks.
-    // Never used to invent a skill — only to flag.
+    // Group-aware: a description word counts as shown when the resume
+    // has it or any group mate ('engineer' is not a gap for a
+    // 'developer' resume). Never used to invent a skill — only to flag.
     const descCounts = new Map<string, number>();
     for (const t of tokenize(p.description)) {
       if (resumeSet.has(t)) continue;
+      if (groupMates(t).some((m) => resumeSet.has(m))) continue;
       descCounts.set(t, (descCounts.get(t) ?? 0) + 1);
     }
     const gaps = [...descCounts.entries()]
@@ -685,12 +1046,17 @@ function screenPostings(company: string, postings: Posting[], resumeText: string
       description: p.description.slice(0, 2000),
       postedDate: p.postedDate,
       matchScore,
-      strengths: matched.slice(0, 6).map((t) => t.charAt(0).toUpperCase() + t.slice(1)),
+      // Provenance: an expanded match names the posting word it came
+      // through, so a 'Developer (via Engineer)' strength can be
+      // audited instead of trusted.
+      strengths: matches.slice(0, 6).map((m) => (m.exact ? cap(m.term) : `${cap(m.term)} (via ${cap(m.via)})`)),
       gaps,
       reasons,
+      needsReview,
+      sourceType: p.source ?? 'html',
     });
   }
-  return leads;
+  return { leads, rejectedNoMatch, rejectedLocation, reviewLocation };
 }
 
 /* ------------------------------------------------------------------ */
@@ -707,7 +1073,20 @@ export interface FindJobsResult {
   totalCompanies: number;
   nextCursor: number | null;
   done: boolean;
-  stats: { postingsSeen: number; boardErrors: number; noBoard: number };
+  stats: {
+    postingsSeen: number;
+    boardErrors: number;
+    noBoard: number;
+    /** No candidate page loaded at all (all fetches failed). */
+    unreachable: number;
+    /** Pages loaded but carried zero listings. */
+    noListings: number;
+    /** Postings dropped: no resume-term match / location reject. */
+    rejectedNoMatch: number;
+    rejectedLocation: number;
+    /** Leads kept as review-only (uncertain location). */
+    reviewLocation: number;
+  };
 }
 
 export async function runFindJobs(
@@ -736,6 +1115,11 @@ export async function runFindJobs(
   let postingsSeen = 0;
   let boardErrors = 0;
   let noBoard = 0;
+  let unreachable = 0;
+  let noListings = 0;
+  let rejectedNoMatch = 0;
+  let rejectedLocation = 0;
+  let reviewLocation = 0;
 
   async function processCompany(company: CompanyDoc): Promise<FinderLead[]> {
     const result = await searchCompanyJobs(
@@ -743,7 +1127,14 @@ export async function runFindJobs(
       resumeText,
     );
     postingsSeen += result.postingsSeen;
-    if (!result.sourcePage) noBoard += 1;
+    if (!result.sourcePage) {
+      noBoard += 1;
+      if (result.fetchOk) noListings += 1;
+      else unreachable += 1;
+    }
+    rejectedNoMatch += result.screened.rejectedNoMatch;
+    rejectedLocation += result.screened.rejectedLocation;
+    reviewLocation += result.screened.reviewLocation;
     return result.leads;
   }
 
@@ -780,7 +1171,16 @@ export async function runFindJobs(
     totalCompanies: total,
     nextCursor: done ? null : nextCursor,
     done,
-    stats: { postingsSeen, boardErrors, noBoard },
+    stats: {
+      postingsSeen,
+      boardErrors,
+      noBoard,
+      unreachable,
+      noListings,
+      rejectedNoMatch,
+      rejectedLocation,
+      reviewLocation,
+    },
   };
 }
 

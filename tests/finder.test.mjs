@@ -519,7 +519,10 @@ async function testFindJobsNonFrontend() {
     { resumeText: 'Customer support specialist with Zendesk, chat support, and troubleshooting experience for SaaS customers', cursor: 0, limit: 15 },
   );
   check('find-jobs non-frontend: support lead found, frontend not surfaced', out.leads.length === 1 && out.leads[0]?.title === 'Customer Support Specialist', out.leads);
-  check('find-jobs non-frontend: support lead scores 69', out.leads[0]?.matchScore === 69, out.leads[0]);
+  // 71, not the old 69: plural stemming merges the resume's 'customer' /
+  // 'customers' into one term, so the signature tightens from 8 terms
+  // to 7 and the same 3 matches score higher (50 + 50*3/7 = 71).
+  check('find-jobs non-frontend: support lead scores 71', out.leads[0]?.matchScore === 71, out.leads[0]);
 }
 
 async function testTestCompany() {
@@ -1229,6 +1232,308 @@ async function testWebsiteUpgrade() {
   check('upgrade: real website never downgrades', real?.website === 'https://realco.com', real);
 }
 
+async function testMatchingFixes() {
+  // The 0/3004 fix round: synonym groups replace the hard title gate,
+  // location becomes three-way (ok / review / reject), and JSON-LD on
+  // the same page joins the page's sources.
+  const mod = freshRequire(`${OUT}/test-company.cjs`);
+  const handler = mod.default;
+  const jobsMod = freshRequire(`${OUT}/find-jobs.cjs`);
+  const resume =
+    'React TypeScript JavaScript frontend developer with Storybook and design systems experience';
+  // Resume terms after plural stemming (all count 1, alphabetical):
+  // design, developer, frontend, javascript, react, storybook, system,
+  // typescript = 8 terms, so each matched term is worth 50/8 = 6.25.
+
+  // Direct location verdicts.
+  const lv = jobsMod.locationVerdict;
+  check('location: Remote, US ok', lv('Remote, US', '').verdict === 'ok', lv('Remote, US', ''));
+  check(
+    'location: bare Remote is review, not ok',
+    lv('Remote', '').verdict === 'review',
+    lv('Remote', ''),
+  );
+  check(
+    'location: bare Remote + body US evidence ok',
+    lv('Remote', 'Candidates must be based in the United States').verdict === 'ok',
+    lv('Remote', 'Candidates must be based in the United States'),
+  );
+  check(
+    'location: empty + body remote/US ok',
+    lv('', 'Remote role. Must be based in the United States.').verdict === 'ok',
+    lv('', 'Remote role. Must be based in the United States.'),
+  );
+  check(
+    'location: empty + no remote is review',
+    lv('', 'Frontend Developer').verdict === 'review',
+    lv('', 'Frontend Developer'),
+  );
+  check(
+    'location: Indiana maps to in, not excluded india',
+    lv('Remote, Indiana', '').verdict === 'reject' &&
+      lv('Remote, Indiana', '').flag === 'state-restricted remote: in',
+    lv('Remote, Indiana', ''),
+  );
+  check(
+    'location: hybrid still rejects',
+    lv('Hybrid, Austin TX', '').verdict === 'reject',
+    lv('Hybrid, Austin TX', ''),
+  );
+
+  // Helper: run test-company against one canned careers page.
+  async function runPage(html) {
+    globalThis.fetch = async (url) => {
+      const u = String(url);
+      if (u === 'https://fixco.example/careers') return { ok: true, text: async () => html };
+      return { ok: true, text: async () => '<html><body>No careers here.</body></html>' };
+    };
+    const res = mkRes();
+    await handler(
+      mkReq(
+        'POST',
+        {
+          company: { name: 'FixCo', website: '', careersUrl: 'https://fixco.example/careers' },
+          resumeText: resume,
+        },
+        { 'x-sync-key': 'testkey' },
+      ),
+      res,
+    );
+    return res.body;
+  }
+  const listing = (title, locLine, href) =>
+    `<div class="job-listing"><h3>${title}</h3>${locLine ? `<p>Location: ${locLine}</p>` : ''}<a href="${href}">Apply</a></div>`;
+  const page = (body) => `<html><body>${body}</body></html>`;
+
+  // The headline bug: 'Software Engineer' used to die on the title gate
+  // (the resume never says 'software' or 'engineer'). Now it matches
+  // through the engineer → developer alias.
+  const se = await runPage(
+    page(listing('Software Engineer (Frontend)', 'Remote, US', '/jobs/se-frontend')),
+  );
+  check(
+    'software engineer (frontend) found at 63, not gated out',
+    se.leads?.length === 1 && se.leads[0]?.matchScore === 63 && se.leads[0]?.needsReview === false,
+    se.leads,
+  );
+  check(
+    'software engineer strength shows the alias path',
+    se.leads?.[0]?.strengths?.includes('Developer (via Engineer)') === true,
+    se.leads?.[0]?.strengths,
+  );
+
+  // Dropped synonyms must not match.
+  const client = await runPage(
+    page(listing('Client Success Manager', 'Remote, US', '/jobs/client-success')),
+  );
+  check('client success manager excluded (client dropped)', client.leads?.length === 0, client.leads);
+  const bizdev = await runPage(
+    page(listing('Business Development Manager', 'Remote, US', '/jobs/bizdev')),
+  );
+  check(
+    'business development manager excluded (development dropped)',
+    bizdev.leads?.length === 0,
+    bizdev.leads,
+  );
+
+  // Ambiguous-only matches never qualify a posting on their own.
+  const webContent = await runPage(
+    page(listing('Web Content Specialist', 'Remote, US', '/jobs/web-content')),
+  );
+  check(
+    'web content specialist excluded (web-only match)',
+    webContent.leads?.length === 0,
+    webContent.leads,
+  );
+  const webEng = await runPage(page(listing('Web Engineer', 'Remote, US', '/jobs/web-eng')));
+  check(
+    'web engineer included (web + engineer)',
+    webEng.leads?.length === 1 && webEng.leads[0]?.matchScore === 63,
+    webEng.leads,
+  );
+
+  // Plurals stem: 'Frontend Developers' matches 'developer'.
+  const plurals = await runPage(
+    page(listing('Frontend Developers Wanted', 'Remote, US', '/jobs/frontend-devs')),
+  );
+  check(
+    'plural title matches',
+    plurals.leads?.length === 1 && plurals.leads[0]?.matchScore === 63,
+    plurals.leads,
+  );
+
+  // Bare 'Remote' and empty location: review-only, never auto-add.
+  const bare = await runPage(page(listing('Frontend Developer', 'Remote', '/jobs/frontend-dev')));
+  check(
+    'bare Remote lead is review-only',
+    bare.leads?.length === 1 &&
+      bare.leads[0]?.needsReview === true &&
+      bare.leads[0]?.locationFlag === 'Remote (no country stated — verify)',
+    bare.leads?.[0],
+  );
+  const noLoc = await runPage(
+    page(
+      `<div class="job-listing"><h3>Frontend Developer</h3><a href="/jobs/frontend-dev">Apply</a></div>`,
+    ),
+  );
+  check(
+    'empty location lead is review-only',
+    noLoc.leads?.length === 1 &&
+      noLoc.leads[0]?.needsReview === true &&
+      noLoc.leads[0]?.locationFlag === 'no location listed — verify',
+    noLoc.leads?.[0],
+  );
+
+  // Greenhouse embed: description-carried matches + body US evidence.
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u === 'https://boards-api.greenhouse.io/v1/boards/fixco/jobs?content=true') {
+      return {
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            jobs: [
+              {
+                title: 'Software Engineer',
+                location: { name: 'Remote, US' },
+                absolute_url: 'https://fixco.example/careers?gh_jid=1',
+                content: '<p>Build React interfaces with TypeScript.</p>',
+                created_at: '2026-10-20T00:00:00Z',
+              },
+              {
+                title: 'Security Analyst',
+                location: { name: 'Remote, US' },
+                absolute_url: 'https://fixco.example/careers?gh_jid=2',
+                content: '<p>TS/SCI clearance required.</p>',
+                created_at: '2026-10-20T00:00:00Z',
+              },
+              {
+                title: 'Frontend Developer',
+                location: { name: '' },
+                absolute_url: 'https://fixco.example/careers?gh_jid=3',
+                content:
+                  '<p>Remote role. Candidates must be based in the United States. React TypeScript work.</p>',
+                created_at: '2026-10-20T00:00:00Z',
+              },
+            ],
+          }),
+      };
+    }
+    if (u === 'https://fixco.example/careers') {
+      return {
+        ok: true,
+        text: async () =>
+          '<html><body><script src="https://boards.greenhouse.io/embed/job_board/js?for=fixco"></script></body></html>',
+      };
+    }
+    return { ok: true, text: async () => '<html><body>No careers here.</body></html>' };
+  };
+  const ghRes = mkRes();
+  await handler(
+    mkReq(
+      'POST',
+      {
+        company: { name: 'FixCo', website: '', careersUrl: 'https://fixco.example/careers' },
+        resumeText: resume,
+      },
+      { 'x-sync-key': 'testkey' },
+    ),
+    ghRes,
+  );
+  const gh = ghRes.body;
+  check(
+    'greenhouse: software engineer found at 69 via description',
+    gh.leads?.some((l) => l.title === 'Software Engineer' && l.matchScore === 69) === true,
+    gh.leads,
+  );
+  check(
+    'greenhouse: TS/SCI-only posting excluded (ts ambiguous)',
+    gh.leads?.some((l) => l.title === 'Security Analyst') === false,
+    gh.leads,
+  );
+  const emptyLocLead = gh.leads?.find((l) => l.title === 'Frontend Developer');
+  check(
+    'greenhouse: empty location + body US evidence is ok, not review',
+    emptyLocLead?.needsReview === false &&
+      emptyLocLead?.locationFlag === 'Remote (US, confirmed in posting)' &&
+      emptyLocLead?.matchScore === 75,
+    emptyLocLead,
+  );
+  check(
+    'greenhouse: lead sourceType recorded',
+    gh.leads?.every((l) => l.sourceType === 'greenhouse') === true,
+    gh.leads,
+  );
+
+  // JSON-LD: direct parser + end-to-end through the page union.
+  const ldHtml = `<html><body>
+<div class="job-listing"><h3>Loan Analyst</h3><p>Location: Remote, US</p><a href="/jobs/loan-analyst">Apply</a></div>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@graph":[
+{"@type":"JobPosting","title":"Frontend Developer","url":"https://fixco.example/jobs/frontend-developer","description":"React work.","datePosted":"2026-10-20","jobLocationType":"TELECOMMUTE","applicantLocationRequirements":{"@type":"Country","name":"United States"}},
+{"@type":"JobPosting","title":"Backend Engineer","url":"https://boards.greenhouse.io/fixco/jobs/9","description":"Node work."},
+{"@type":"JobPosting","title":"Stale Role","url":"https://fixco.example/jobs/stale","description":"Old.","validThrough":"2020-01-01"},
+{"@type":"JobPosting","title":"Data Analyst","url":"https://fixco.example/jobs/data-analyst","description":"SQL work.","datePosted":"2026-10-21","jobLocation":{"@type":"Place","address":{"addressRegion":"Texas"}},"jobLocationType":"TELECOMMUTE"}
+]}
+</script></body></html>`;
+  const parsed = jobsMod.parseJsonLdPostings(ldHtml, 'https://fixco.example/careers');
+  check(
+    'jsonld: board-URL and stale entries skipped, valid kept',
+    parsed.length === 2 &&
+      parsed[0]?.title === 'Frontend Developer' &&
+      parsed[0]?.location === 'Remote, United States' &&
+      // Telecommute without applicantLocationRequirements stays bare
+      // Remote (review): a jobLocation place must not restrict it.
+      parsed[1]?.title === 'Data Analyst' &&
+      parsed[1]?.location === 'Remote',
+    parsed,
+  );
+  const ld = await runPage(ldHtml);
+  check(
+    'jsonld: frontend developer found through structured data, sourceType jsonld',
+    ld.leads?.length === 1 &&
+      ld.leads[0]?.title === 'Frontend Developer' &&
+      ld.leads[0]?.sourceType === 'jsonld' &&
+      ld.leads[0]?.matchScore === 69,
+    ld.leads,
+  );
+  check(
+    'jsonld: funnel counts (loan + data analyst rejected, 3 postings seen)',
+    ld.screened?.rejectedNoMatch === 2 && ld.postingsSeen === 3,
+    ld,
+  );
+
+  // Sweep stats: funnel counts aggregate.
+  const companiesCol = new FakeCollection();
+  await companiesCol.insertMany([
+    { name: 'PageCo', website: 'https://pageco.example', domain: 'pageco.example', nameKey: 'pageco', careersUrl: '', category: 'General', source: 'Wikidata', addedAt: '2026-10-29T00:00:00Z' },
+    { name: 'NoSource Inc', website: 'https://nosource.example', domain: 'nosource.example', nameKey: 'nosource inc', careersUrl: '', category: 'General', source: 'Wikidata', addedAt: '2026-10-29T00:00:00Z' },
+  ]);
+  const rawHtml = `<html><body>
+<div class="job-listing"><h3>Frontend Developer</h3><p>Location: Remote</p><a href="/jobs/frontend-developer">Apply</a></div>
+<div class="job-listing"><h3>Loan Analyst</h3><p>Location: Remote</p><a href="/jobs/loan-analyst">Apply</a></div>
+</body></html>`;
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u === 'https://pageco.example/careers') {
+      return { ok: true, text: async () => rawHtml };
+    }
+    return { ok: true, text: async () => '<html><body>No careers here.</body></html>' };
+  };
+  const statsOut = await jobsMod.runFindJobs(
+    { companiesCol },
+    { resumeText: resume, cursor: 0, limit: 15 },
+  );
+  check(
+    'stats: funnel counts',
+    statsOut.stats.rejectedNoMatch === 1 &&
+      statsOut.stats.reviewLocation === 1 &&
+      statsOut.stats.noListings === 1 &&
+      statsOut.stats.unreachable === 0,
+    statsOut.stats,
+  );
+}
+
 await testFindCompanies();
 await testFindCompaniesTransientError();
 await testFindCompaniesDupeStretch();
@@ -1247,6 +1552,7 @@ await testBusinessSiteFirst();
 await testHalvik();
 await testHouseRx();
 await testFitReasons();
+await testMatchingFixes();
 await testCompaniesApi();
 
 console.log(`\n${passed} passed, ${failed} failed`);
