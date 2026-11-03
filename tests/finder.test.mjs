@@ -413,7 +413,7 @@ async function testFindCompanies() {
       JSON.stringify(cursorDoc?.state?.['wikidata-social-organization']?.offsets) === JSON.stringify([300, 300, 300, 300, 300, 300]) &&
       cursorDoc?.state?.['wikidata-organization']?.offset === 300 &&
       cursorDoc?.state?.['wikidata-organization-keyset']?.lastIri === '' &&
-      cursorDoc?.state?.['wikidata-types-keyset']?.typeIndex === 9,
+      cursorDoc?.state?.['wikidata-types-keyset']?.typeIndex === 17,
     cursorDoc,
   );
   const comp1 = (await companiesCol.find({ name: 'Company 1' }).toArray())[0];
@@ -477,7 +477,7 @@ async function testFindCompaniesDupeStretch() {
       JSON.stringify(cursorDoc?.state?.['wikidata-social-organization']?.offsets) === JSON.stringify([300, 300, 300, 300, 300, 300]) &&
       cursorDoc?.state?.['wikidata-organization']?.offset === 300 &&
       cursorDoc?.state?.['wikidata-organization-keyset']?.lastIri === '' &&
-      cursorDoc?.state?.['wikidata-types-keyset']?.typeIndex === 9 &&
+      cursorDoc?.state?.['wikidata-types-keyset']?.typeIndex === 17 &&
       cursorDoc?.sourceIndex === 7,
     cursorDoc,
   );
@@ -1511,7 +1511,7 @@ async function testTypesSkipRetry() {
     { companiesCol, metaCol, fetchFn: globalThis.fetch },
     { limit: 2000 },
   );
-  check('types-skip-retry: added 8 (one per surviving type)', out.added === 8, out);
+  check('types-skip-retry: added 16 (one per surviving type)', out.added === 16, out);
   check('types-skip-retry: exhausted after retry round', out.exhausted === true, out);
   check('types-skip-retry: dead type tried 3 + 3 times', type0Throws === 6, type0Throws);
   const cursorDoc = await metaCol.findOne({ _id: 'find-companies' });

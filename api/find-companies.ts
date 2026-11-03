@@ -678,6 +678,19 @@ const WDQS_TYPE_KEYSET_IDS = [
   'Q189004',
   'Q7075',
   'Q24354',
+  // Batch 2 (2026-11-03, all first pages 1-4s): bank, airline,
+  // insurance company, retailer, manufacturer, sports club,
+  // government agency, nonprofit organization. APPEND ONLY — the
+  // live cursor indexes into this list, so inserting or reordering
+  // would send the walk to the wrong type.
+  'Q22687',
+  'Q46970',
+  'Q2143354',
+  'Q99536263',
+  'Q13235160',
+  'Q847017',
+  'Q327333',
+  'Q163740',
 ];
 
 async function wdqsJson(
