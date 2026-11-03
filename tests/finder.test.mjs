@@ -403,8 +403,8 @@ async function testFindCompanies() {
   check('find-companies core full walk added 93', out.added === 93, out);
   const cursorDoc = await metaCol.findOne({ _id: 'find-companies' });
   check(
-    'find-companies core cursor past all sources (social + per-type wikidata + empty edgar + organization + keyset)',
-    cursorDoc?.sourceIndex === 6 &&
+    'find-companies core cursor past all sources (social + per-type wikidata + empty edgar + organization + keyset + types)',
+    cursorDoc?.sourceIndex === 7 &&
       cursorDoc?.state?.['wikidata-social']?.comboIndex === 24 &&
       JSON.stringify(cursorDoc?.state?.['wikidata-social']?.offsets?.slice(0, 1)) === JSON.stringify([600]) &&
       cursorDoc?.state?.wikidata?.typeIndex === 4 &&
@@ -412,7 +412,8 @@ async function testFindCompanies() {
       cursorDoc?.state?.['wikidata-social-organization']?.comboIndex === 6 &&
       JSON.stringify(cursorDoc?.state?.['wikidata-social-organization']?.offsets) === JSON.stringify([300, 300, 300, 300, 300, 300]) &&
       cursorDoc?.state?.['wikidata-organization']?.offset === 300 &&
-      cursorDoc?.state?.['wikidata-organization-keyset']?.lastIri === '',
+      cursorDoc?.state?.['wikidata-organization-keyset']?.lastIri === '' &&
+      cursorDoc?.state?.['wikidata-types-keyset']?.typeIndex === 9,
     cursorDoc,
   );
   const comp1 = (await companiesCol.find({ name: 'Company 1' }).toArray())[0];
@@ -476,7 +477,8 @@ async function testFindCompaniesDupeStretch() {
       JSON.stringify(cursorDoc?.state?.['wikidata-social-organization']?.offsets) === JSON.stringify([300, 300, 300, 300, 300, 300]) &&
       cursorDoc?.state?.['wikidata-organization']?.offset === 300 &&
       cursorDoc?.state?.['wikidata-organization-keyset']?.lastIri === '' &&
-      cursorDoc?.sourceIndex === 6,
+      cursorDoc?.state?.['wikidata-types-keyset']?.typeIndex === 9 &&
+      cursorDoc?.sourceIndex === 7,
     cursorDoc,
   );
 }
@@ -1064,7 +1066,7 @@ async function testEdgar() {
     { limit: 2000 },
   );
   check('edgar: added 3 (US+website only)', out.added === 3, out);
-  check('edgar: walk ends at Wikidata organization keyset', out.source === 'Wikidata organization keyset', out);
+  check('edgar: walk ends at Wikidata types keyset', out.source === 'Wikidata types keyset', out);
   check('edgar: exhausted after map end', out.exhausted === true, out);
   const cursorDoc = await metaCol.findOne({ _id: 'find-companies' });
   check('edgar: tickerIndex advanced past all 6 entries', cursorDoc?.state?.edgar?.tickerIndex === 6, cursorDoc);
@@ -1353,7 +1355,7 @@ async function testOrgKeysetPaging() {
     { limit: 2000 },
   );
   check('keyset: added 302 across both pages', out.added === 302, out);
-  check('keyset: source label', out.source === 'Wikidata organization keyset', out);
+  check('keyset: source label (walk continues into types after)', out.source === 'Wikidata types keyset', out);
   check('keyset: page 1 has no resume filter', !seenUrls[0].includes('FILTER(STR'), seenUrls[0]);
   check(
     'keyset: page 2 filters past page 1 last entity (Q399)',
@@ -1364,7 +1366,7 @@ async function testOrgKeysetPaging() {
   const cursorDoc = await metaCol.findOne({ _id: 'find-companies' });
   check(
     'keyset: cursor past source, lastIri at Q500',
-    cursorDoc?.sourceIndex === 6 &&
+    cursorDoc?.sourceIndex === 7 &&
       cursorDoc?.state?.['wikidata-organization-keyset']?.lastIri === 'http://www.wikidata.org/entity/Q500',
     cursorDoc,
   );
@@ -1393,6 +1395,127 @@ async function testNeverSkip() {
   }
   const cursorDoc = await metaCol.findOne({ _id: 'find-companies' });
   check('neverSkip: cursor still at keyset after 3 failures', cursorDoc?.sourceIndex === 5, cursorDoc);
+}
+
+async function testTypesKeysetPaging() {
+  // 2026-11-03: multi-type keyset walk. Phase 1 sorts IRIs + websites
+  // without labels; phase 2 looks labels up via VALUES chunks. A full
+  // 300-binding page must resume from its last IRI on the next press
+  // (FILTER past it), and labels must merge onto the rows.
+  const runMod = freshRequire(`${OUT}/find-companies.cjs`);
+  const companiesCol = new FakeCollection();
+  const metaCol = new FakeCollection();
+  await metaCol.updateOne(
+    { _id: 'find-companies' },
+    { $set: { version: 2, sourceIndex: 6, state: {}, pending: [] } },
+    { upsert: true },
+  );
+  const seenUrls = [];
+  const fullPage = [];
+  for (let q = 1000; q < 1300; q++) {
+    fullPage.push({ company: { value: `http://www.wikidata.org/entity/Q${q}` }, website: { value: `https://place${q}.example` } });
+  }
+  let phase1Calls = 0;
+  globalThis.fetch = async (url) => {
+    const u = decodeURIComponent(String(url)).replace(/\+/g, ' ');
+    seenUrls.push(u);
+    if (u.includes('VALUES')) {
+      const iris = [...new Set([...u.matchAll(/entity\/(Q\d+)/g)].map((m) => m[1]))];
+      return {
+        ok: true,
+        json: async () => ({
+          results: {
+            bindings: iris.map((qid) => ({
+              company: { value: `http://www.wikidata.org/entity/${qid}` },
+              companyLabel: { value: `Label-${qid}` },
+            })),
+          },
+        }),
+      };
+    }
+    phase1Calls += 1;
+    const page = phase1Calls === 1 ? fullPage : [];
+    return { ok: true, json: async () => ({ results: { bindings: page } }) };
+  };
+  const deps = { companiesCol, metaCol, fetchFn: globalThis.fetch };
+  const p1 = await runMod.runFindCompanies(deps, { limit: 300 });
+  check('types-keyset press 1: added 300', p1.added === 300, p1);
+  const row = (await companiesCol.find({ name: 'Label-Q1000' }).toArray())[0];
+  check('types-keyset: phase-2 label merged onto row', row?.website === 'https://place1000.example' && row?.sourceId === 'Q1000', row);
+  const cur1 = await metaCol.findOne({ _id: 'find-companies' });
+  check(
+    'types-keyset press 1: still on type 0, lastIri at Q1299',
+    cur1?.sourceIndex === 6 &&
+      cur1?.state?.['wikidata-types-keyset']?.typeIndex === 0 &&
+      cur1?.state?.['wikidata-types-keyset']?.lastIri === 'http://www.wikidata.org/entity/Q1299',
+    cur1,
+  );
+  const p2 = await runMod.runFindCompanies(deps, { limit: 2000 });
+  check('types-keyset press 2: added 0, exhausted', p2.added === 0 && p2.exhausted === true, p2);
+  const press2Phase1 = seenUrls.filter((u) => !u.includes('VALUES')).slice(1);
+  check(
+    'types-keyset press 2: first phase-1 filters past Q1299',
+    press2Phase1[0].includes("FILTER(STR(?company) > 'http://www.wikidata.org/entity/Q1299')"),
+    press2Phase1[0],
+  );
+}
+
+async function testTypesSkipRetry() {
+  // 2026-11-03: a type failing 3 times is skipped (not the whole
+  // source), and skipped types get exactly one retry round at the end
+  // of the list before the source exhausts.
+  const runMod = freshRequire(`${OUT}/find-companies.cjs`);
+  const companiesCol = new FakeCollection();
+  const metaCol = new FakeCollection();
+  await metaCol.updateOne(
+    { _id: 'find-companies' },
+    { $set: { version: 2, sourceIndex: 6, state: {}, pending: [] } },
+    { upsert: true },
+  );
+  let type0Throws = 0;
+  globalThis.fetch = async (url) => {
+    const u = decodeURIComponent(String(url)).replace(/\+/g, ' ');
+    if (u.includes('VALUES')) {
+      const iris = [...new Set([...u.matchAll(/entity\/(Q\d+)/g)].map((m) => m[1]))];
+      return {
+        ok: true,
+        json: async () => ({
+          results: {
+            bindings: iris.map((qid) => ({
+              company: { value: `http://www.wikidata.org/entity/${qid}` },
+              companyLabel: { value: `Label-${qid}` },
+            })),
+          },
+        }),
+      };
+    }
+    const m = u.match(/wdt:P31 wd:(Q\d+)/);
+    const typeId = m ? m[1] : '';
+    if (typeId === 'Q3918') {
+      type0Throws += 1;
+      throw new Error('WDQS down for universities');
+    }
+    // Every other type: one short page, one distinct company.
+    return {
+      ok: true,
+      json: async () => ({
+        results: {
+          bindings: [
+            { company: { value: `http://www.wikidata.org/entity/${typeId}99` }, website: { value: `https://type${typeId}.example` } },
+          ],
+        },
+      }),
+    };
+  };
+  const out = await runMod.runFindCompanies(
+    { companiesCol, metaCol, fetchFn: globalThis.fetch },
+    { limit: 2000 },
+  );
+  check('types-skip-retry: added 8 (one per surviving type)', out.added === 8, out);
+  check('types-skip-retry: exhausted after retry round', out.exhausted === true, out);
+  check('types-skip-retry: dead type tried 3 + 3 times', type0Throws === 6, type0Throws);
+  const cursorDoc = await metaCol.findOne({ _id: 'find-companies' });
+  check('types-skip-retry: cursor past source', cursorDoc?.sourceIndex === 7, cursorDoc);
 }
 
 async function testMatchingFixes() {
@@ -1710,6 +1833,8 @@ await testWebsiteUpgrade();
 await testUpgradeCollision();
 await testOrgKeysetPaging();
 await testNeverSkip();
+await testTypesKeysetPaging();
+await testTypesSkipRetry();
 await testFindJobs();
 await testFindJobsNonFrontend();
 await testTestCompany();

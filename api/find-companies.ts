@@ -651,6 +651,218 @@ const wikidataOrgKeysetAdapter: SourceAdapter = {
   },
 };
 
+/** Multi-type keyset walk (2026-11-03): after the organization keyset
+ *  walk exhausted, every prior source was done and the roster stopped
+ *  at 13,581 — so the walk continues into further entity types
+ *  (universities, schools, hospitals, hotels, restaurants, museums,
+ *  colleges, libraries, theatres), each keyset-paged like the org
+ *  walk. Measured live first pages: 2-13s each (hotel 502'd once —
+ *  see skip handling). Two-phase fetch per page: phase 1 sorts
+ *  IRIs + websites WITHOUT the label service (the sort is the slow
+ *  part — an all-types single query with labels times out past 60s),
+ *  phase 2 looks labels up for exactly that page's IRIs via chunked
+ *  VALUES queries, so names stay real without slowing the sort.
+ *  Per-type failures: 3 consecutive failures skip ONLY that type
+ *  (recorded in state.skipped) and the walk continues; after the last
+ *  type, skipped types get exactly one retry round, then the source
+ *  exhausts. A WDQS slow spell can therefore never permanently strand
+ *  a type the way the old 3-failure source skip stranded the OFFSET
+ *  organization walk. */
+const WDQS_TYPE_KEYSET_IDS = [
+  'Q3918',
+  'Q3914',
+  'Q16917',
+  'Q27686',
+  'Q11707',
+  'Q33506',
+  'Q189004',
+  'Q7075',
+  'Q24354',
+];
+
+async function wdqsJson(
+  query: string,
+  budgetMs: number,
+  fetchFn: typeof fetch,
+): Promise<unknown[]> {
+  const r = await fetchFn(
+    'https://query.wikidata.org/sparql?' +
+      new URLSearchParams({ query, format: 'json' }).toString(),
+    {
+      headers: { 'User-Agent': 'JobBoardFinder/1.0 (job search research)' },
+      signal: AbortSignal.timeout(Math.max(1000, budgetMs)),
+    },
+  );
+  if (!r.ok) throw new Error(`WDQS HTTP ${r.status}`);
+  const data = await r.json();
+  return (data as { results?: { bindings?: unknown[] } })?.results?.bindings ?? [];
+}
+
+const wikidataTypesKeysetAdapter: SourceAdapter = {
+  key: 'wikidata-types-keyset',
+  label: 'Wikidata types keyset',
+  neverSkip: true,
+  async fetchPage(state, budgetMs, fetchFn): Promise<SourcePage> {
+    const startedAt = Date.now();
+    const types = WDQS_TYPE_KEYSET_IDS;
+    let typeIndex =
+      typeof state.typeIndex === 'number' &&
+      state.typeIndex >= 0 &&
+      state.typeIndex <= types.length
+        ? state.typeIndex
+        : 0;
+    let lastIri =
+      typeof state.lastIri === 'string' && state.lastIri ? state.lastIri : '';
+    let failures =
+      typeof state.failures === 'number' && state.failures >= 0
+        ? state.failures
+        : 0;
+    let skipped: number[] = Array.isArray(state.skipped)
+      ? (state.skipped as unknown[]).filter(
+          (n): n is number =>
+            typeof n === 'number' && n >= 0 && n < types.length,
+        )
+      : [];
+    let round = state.round === 1 ? 1 : 0;
+
+    // End of the type list: skipped types get one retry round, then
+    // the source is truly exhausted.
+    if (typeIndex >= types.length) {
+      if (skipped.length > 0 && round === 0) {
+        round = 1;
+        typeIndex = skipped[0];
+        skipped = [];
+        lastIri = '';
+        failures = 0;
+      } else {
+        return {
+          companies: [],
+          nextState: { typeIndex, lastIri: '', failures: 0, skipped, round },
+          exhausted: true,
+        };
+      }
+    }
+
+    const typeId = types[typeIndex];
+    const pageQuery =
+      'SELECT ?company ?website WHERE { ' +
+      `?company wdt:P31 wd:${typeId} . ` +
+      '{ ?company wdt:P17 wd:Q30 . } UNION { ?company wdt:P159 ?hq . ?hq wdt:P17 wd:Q30 . } ' +
+      '. ?company wdt:P856 ?website . ' +
+      (lastIri ? `FILTER(STR(?company) > '${lastIri}') ` : '') +
+      `} ORDER BY STR(?company) LIMIT ${WDQS_PAGE_ROWS}`;
+    let bindings: unknown[];
+    try {
+      bindings = await wdqsJson(pageQuery, budgetMs, fetchFn);
+    } catch {
+      // Type failure: count it in the returned state (the loop saves
+      // every page's state, so the count survives across presses).
+      // After 3, skip ONLY this type and move on; the retry round at
+      // the end of the list gives it a second chance.
+      failures += 1;
+      if (failures >= 3) {
+        if (!skipped.includes(typeIndex)) skipped.push(typeIndex);
+        return {
+          companies: [],
+          nextState: {
+            typeIndex: typeIndex + 1,
+            lastIri: '',
+            failures: 0,
+            skipped,
+            round,
+          },
+          exhausted: false,
+        };
+      }
+      return {
+        companies: [],
+        nextState: { typeIndex, lastIri, failures, skipped, round },
+        exhausted: false,
+      };
+    }
+
+    const byEnt = new Map<string, { name: string; website: string }>();
+    let lastSeen = lastIri;
+    for (const b of bindings as {
+      company?: { value?: string };
+      website?: { value?: string };
+    }[]) {
+      const uri: string = b.company?.value ?? '';
+      if (uri) lastSeen = uri;
+      const ent = uri.split('/').pop() ?? uri;
+      const site: string = b.website?.value ?? '';
+      if (!site) continue;
+      const cur = byEnt.get(ent);
+      if (!cur || websiteScore(site) < websiteScore(cur.website)) {
+        byEnt.set(ent, { name: ent, website: site });
+      }
+    }
+    // Phase 2: labels for exactly this page's entities, in chunks of
+    // 100 IRIs. A chunk that cannot finish in the remaining budget is
+    // skipped (those rows keep their QID as a name) so the page still
+    // lands inside the press budget.
+    const iris = [...byEnt.keys()];
+    const labels = new Map<string, string>();
+    for (let i = 0; i < iris.length; i += 100) {
+      if (Date.now() - startedAt > budgetMs - 8000) break;
+      const chunk = iris.slice(i, i + 100);
+      const values = chunk
+        .map((qid) => `<http://www.wikidata.org/entity/${qid}>`)
+        .join(' ');
+      try {
+        const labelBindings = await wdqsJson(
+          `SELECT ?company ?companyLabel WHERE { VALUES ?company { ${values} } ` +
+            'SERVICE wikibase:label { bd:serviceParam wikibase:language "en" . } }',
+          10000,
+          fetchFn,
+        );
+        for (const b of labelBindings as {
+          company?: { value?: string };
+          companyLabel?: { value?: string };
+        }[]) {
+          const ent = (b.company?.value ?? '').split('/').pop() ?? '';
+          if (ent && b.companyLabel?.value) labels.set(ent, b.companyLabel.value);
+        }
+      } catch {
+        // Labels are cosmetic: keep QID names for this chunk's rows.
+      }
+    }
+    for (const [qid, c] of byEnt) {
+      const label = labels.get(qid);
+      if (label) c.name = label;
+    }
+
+    const shortPage = bindings.length < WDQS_PAGE_ROWS;
+    const nextTypeIndex = shortPage ? typeIndex + 1 : typeIndex;
+    // Do NOT report exhausted while skipped types still await their
+    // retry round: the loop advances past the adapter on exhausted,
+    // which would strand the retry round. The next fetchPage call
+    // jumps to the first skipped type instead.
+    const exhausted =
+      nextTypeIndex >= types.length &&
+      shortPage &&
+      !(skipped.length > 0 && round === 0);
+    return {
+      companies: [...byEnt.entries()].map(([qid, c]) => ({
+        name: c.name,
+        website: c.website,
+        careersUrl: '',
+        category: 'General',
+        source: 'Wikidata',
+        sourceId: qid,
+      })),
+      nextState: {
+        typeIndex: nextTypeIndex,
+        lastIri: shortPage ? '' : lastSeen,
+        failures: 0,
+        skipped,
+        round,
+      },
+      exhausted,
+    };
+  },
+};
+
 /** Live sources, in the order the button walks them. */
 // Social runs first so social-only companies flow from the first press;
 // the website walk resumes from its saved cursor afterwards, and its
@@ -658,7 +870,9 @@ const wikidataOrgKeysetAdapter: SourceAdapter = {
 // Organization adapters are appended after the exhausted sources: a
 // stored cursor at index 3 moves straight onto them. The keyset
 // adapter is appended last: a stored cursor at index 5 (past the
-// skipped OFFSET organization walk) moves straight onto it.
+// skipped OFFSET organization walk) moves straight onto it. The
+// types keyset adapter is appended after that: a stored cursor at
+// index 6 (past the exhausted organization keyset walk) moves onto it.
 const SOURCES: SourceAdapter[] = [
   wikidataSocialAdapter,
   wikidataAdapter,
@@ -666,6 +880,7 @@ const SOURCES: SourceAdapter[] = [
   wikidataSocialOrgAdapter,
   wikidataOrgAdapter,
   wikidataOrgKeysetAdapter,
+  wikidataTypesKeysetAdapter,
 ];
 
 export interface FindCompaniesDeps {
@@ -793,7 +1008,16 @@ export async function runFindCompanies(
         sourceId: d.sourceId,
       })),
     ];
-    cursor.state[adapter.key] = { ...page.nextState, failures: 0 };
+    // Preserve a failure count an adapter encodes in its own nextState
+    // (the types adapter counts per-type failures across empty pages);
+    // adapters that don't set one still reset to 0 on a good page.
+    cursor.state[adapter.key] = {
+      ...page.nextState,
+      failures:
+        typeof page.nextState.failures === 'number'
+          ? page.nextState.failures
+          : 0,
+    };
     if (page.exhausted) cursor.sourceIndex += 1;
     await saveFinderCursor(deps.metaCol, cursor);
   }
