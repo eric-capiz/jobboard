@@ -383,12 +383,15 @@ async function testFindCompanies() {
   check('find-companies core full walk added 93', out.added === 93, out);
   const cursorDoc = await metaCol.findOne({ _id: 'find-companies' });
   check(
-    'find-companies core cursor past all sources (social + per-type wikidata + empty edgar)',
-    cursorDoc?.sourceIndex === 3 &&
+    'find-companies core cursor past all sources (social + per-type wikidata + empty edgar + organization)',
+    cursorDoc?.sourceIndex === 5 &&
       cursorDoc?.state?.['wikidata-social']?.comboIndex === 24 &&
       JSON.stringify(cursorDoc?.state?.['wikidata-social']?.offsets?.slice(0, 1)) === JSON.stringify([600]) &&
       cursorDoc?.state?.wikidata?.typeIndex === 4 &&
-      JSON.stringify(cursorDoc?.state?.wikidata?.offsets) === JSON.stringify([300, 300, 300, 300]),
+      JSON.stringify(cursorDoc?.state?.wikidata?.offsets) === JSON.stringify([300, 300, 300, 300]) &&
+      cursorDoc?.state?.['wikidata-social-organization']?.comboIndex === 6 &&
+      JSON.stringify(cursorDoc?.state?.['wikidata-social-organization']?.offsets) === JSON.stringify([300, 300, 300, 300, 300, 300]) &&
+      cursorDoc?.state?.['wikidata-organization']?.offset === 300,
     cursorDoc,
   );
   const comp1 = (await companiesCol.find({ name: 'Company 1' }).toArray())[0];
@@ -448,7 +451,10 @@ async function testFindCompaniesDupeStretch() {
     'dupe-stretch press: cursor advanced past consumed pages',
     JSON.stringify(cursorDoc?.state?.['wikidata-social']?.offsets?.slice(0, 1)) === JSON.stringify([600]) &&
       JSON.stringify(cursorDoc?.state?.wikidata?.offsets) === JSON.stringify([300, 300, 300, 300]) &&
-      cursorDoc?.sourceIndex === 3,
+      cursorDoc?.state?.['wikidata-social-organization']?.comboIndex === 6 &&
+      JSON.stringify(cursorDoc?.state?.['wikidata-social-organization']?.offsets) === JSON.stringify([300, 300, 300, 300, 300, 300]) &&
+      cursorDoc?.state?.['wikidata-organization']?.offset === 300 &&
+      cursorDoc?.sourceIndex === 5,
     cursorDoc,
   );
 }
@@ -1025,9 +1031,9 @@ async function testEdgar() {
     return { ok: true, json: async () => d };
   };
   globalThis.fetch = routeFetch(
-    async () => {
-      throw new Error('wikidata should not be called');
-    },
+    // Organization adapters run after EDGAR: serve them empty pages so
+    // the walk completes instead of erroring on an unserved URL.
+    async () => ({ ok: true, json: async () => ({ results: { bindings: [] } }) }),
     tickerMap,
     subs,
   );
@@ -1036,7 +1042,7 @@ async function testEdgar() {
     { limit: 2000 },
   );
   check('edgar: added 3 (US+website only)', out.added === 3, out);
-  check('edgar: source label', out.source === 'SEC EDGAR', out);
+  check('edgar: walk ends at Wikidata organization', out.source === 'Wikidata organization', out);
   check('edgar: exhausted after map end', out.exhausted === true, out);
   const cursorDoc = await metaCol.findOne({ _id: 'find-companies' });
   check('edgar: tickerIndex advanced past all 6 entries', cursorDoc?.state?.edgar?.tickerIndex === 6, cursorDoc);
@@ -1086,7 +1092,7 @@ async function testFailureSkip() {
   const p3 = await runMod.runFindCompanies(deps, { limit: 2000 });
   check('failure-skip press 3: wikidata skipped, edgar adds 2', p3.added === 2 && typeof p3.note === 'string' && p3.note.includes('skipped'), p3);
   const cursorDoc = await metaCol.findOne({ _id: 'find-companies' });
-  check('failure-skip: cursor past wikidata and edgar', cursorDoc?.sourceIndex === 3, cursorDoc);
+  check('failure-skip: cursor past wikidata and edgar (now at organization)', cursorDoc?.sourceIndex === 4 && cursorDoc?.state?.edgar?.tickerIndex === 2, cursorDoc);
 }
 
 async function testExactCounts() {

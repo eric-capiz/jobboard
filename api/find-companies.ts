@@ -440,11 +440,155 @@ const edgarAdapter: SourceAdapter = {
   },
 };
 
+/* ------------------------------------------------------------------ */
+/* Wikidata organization (Q43229) — added 2026-11-03. The original    */
+/* four business types are exhausted, so the button walks the broader */
+/* "organization" type next: schools, hospitals, municipalities and   */
+/* other employers, not just strict companies. Same live-discovery    */
+/* contract as the other adapters, same dedupe (same QID never counts */
+/* twice), same $0/no-key pattern. Appended AFTER the exhausted      */
+/* sources with fresh state keys, so a stored cursor that already     */
+/* sits past the old sources moves straight onto these with no       */
+/* version bump and no re-walk — see the SOURCES_VERSION comment.    */
+/* ------------------------------------------------------------------ */
+
+const wikidataSocialOrgAdapter: SourceAdapter = {
+  key: 'wikidata-social-organization',
+  label: 'Wikidata social organization',
+  async fetchPage(state, budgetMs, fetchFn): Promise<SourcePage> {
+    const combos = SOCIAL_PROPS.map((prop) => ({ prop, type: 'Q43229' }));
+    const comboIndex =
+      typeof state.comboIndex === 'number' && state.comboIndex >= 0 ? state.comboIndex : 0;
+    const offsets: number[] = Array.isArray(state.offsets) ? state.offsets : [];
+    const offset = offsets[comboIndex] ?? 0;
+    const combo = combos[comboIndex];
+    if (!combo) return { companies: [], nextState: { comboIndex, offsets }, exhausted: true };
+    const query =
+      'SELECT ?company ?companyLabel ?website WHERE { ' +
+      `?company wdt:P31 wd:${combo.type} . ` +
+      '{ ?company wdt:P17 wd:Q30 . } UNION { ?company wdt:P159 ?hq . ?hq wdt:P17 wd:Q30 . } ' +
+      `?company wdt:${combo.prop.prop} ?sid . ` +
+      `BIND(IRI(CONCAT('${combo.prop.base}', ENCODE_FOR_URI(STR(?sid)))) AS ?website) ` +
+      'SERVICE wikibase:label { bd:serviceParam wikibase:language "en" . } } ' +
+      `LIMIT ${WDQS_PAGE_ROWS} OFFSET ${offset}`;
+    const r = await fetchFn(
+      'https://query.wikidata.org/sparql?' +
+        new URLSearchParams({ query, format: 'json' }).toString(),
+      {
+        headers: {
+          'User-Agent': 'JobBoardFinder/1.0 (job search research)',
+          Accept: 'application/sparql-results+json',
+        },
+        signal: AbortSignal.timeout(budgetMs),
+      },
+    );
+    if (!r.ok) throw new Error(`WDQS HTTP ${r.status}`);
+    const data = await r.json();
+    const bindings: {
+      company?: { value?: string };
+      companyLabel?: { value?: string };
+      website?: { value?: string };
+    }[] = data?.results?.bindings ?? [];
+    const byEnt = new Map<string, { name: string; website: string }>();
+    for (const b of bindings) {
+      const ent: string = b.company?.value?.split('/').pop() ?? '';
+      if (!ent) continue;
+      const name: string = b.companyLabel?.value ?? ent;
+      const site: string = b.website?.value ?? '';
+      if (!site) continue;
+      const cur = byEnt.get(ent);
+      if (!cur || websiteScore(site) < websiteScore(cur.website)) {
+        byEnt.set(ent, { name, website: site });
+      }
+    }
+    const nextOffsets = [...offsets];
+    nextOffsets[comboIndex] = offset + WDQS_PAGE_ROWS;
+    const comboExhausted = bindings.length < WDQS_PAGE_ROWS;
+    const nextComboIndex = comboExhausted ? comboIndex + 1 : comboIndex;
+    return {
+      companies: [...byEnt.entries()].map(([qid, c]) => ({
+        name: c.name,
+        website: c.website,
+        careersUrl: '',
+        category: 'General',
+        source: 'Wikidata',
+        sourceId: qid,
+      })),
+      nextState: { comboIndex: nextComboIndex, offsets: nextOffsets },
+      exhausted: nextComboIndex >= combos.length,
+    };
+  },
+};
+
+const wikidataOrgAdapter: SourceAdapter = {
+  key: 'wikidata-organization',
+  label: 'Wikidata organization',
+  async fetchPage(state, budgetMs, fetchFn): Promise<SourcePage> {
+    const offset =
+      typeof state.offset === 'number' && state.offset >= 0 ? state.offset : 0;
+    const query =
+      'SELECT ?company ?companyLabel ?website WHERE { ' +
+      '?company wdt:P31 wd:Q43229 . ' +
+      '{ ?company wdt:P17 wd:Q30 . } UNION { ?company wdt:P159 ?hq . ?hq wdt:P17 wd:Q30 . } ' +
+      '. ?company wdt:P856 ?website . ' +
+      'SERVICE wikibase:label { bd:serviceParam wikibase:language "en" . } } ' +
+      `LIMIT ${WDQS_PAGE_ROWS} OFFSET ${offset}`;
+    const r = await fetchFn(
+      'https://query.wikidata.org/sparql?' +
+        new URLSearchParams({ query, format: 'json' }).toString(),
+      {
+        headers: { 'User-Agent': 'JobBoardFinder/1.0 (job search research)' },
+        signal: AbortSignal.timeout(budgetMs),
+      },
+    );
+    if (!r.ok) throw new Error(`WDQS HTTP ${r.status}`);
+    const data = await r.json();
+    const bindings: unknown[] = (data as { results?: { bindings?: unknown[] } })?.results
+      ?.bindings ?? [];
+    const byEnt = new Map<string, { name: string; website: string }>();
+    for (const b of bindings as {
+      company?: { value?: string };
+      companyLabel?: { value?: string };
+      website?: { value?: string };
+    }[]) {
+      const uri: string = b.company?.value ?? '';
+      const ent = uri.split('/').pop() ?? uri;
+      const name: string = b.companyLabel?.value ?? ent;
+      const site: string = b.website?.value ?? '';
+      if (!site) continue;
+      const cur = byEnt.get(ent);
+      if (!cur || websiteScore(site) < websiteScore(cur.website)) {
+        byEnt.set(ent, { name, website: site });
+      }
+    }
+    return {
+      companies: [...byEnt.entries()].map(([qid, c]) => ({
+        name: c.name,
+        website: c.website,
+        careersUrl: '',
+        category: 'General',
+        source: 'Wikidata',
+        sourceId: qid,
+      })),
+      nextState: { offset: offset + WDQS_PAGE_ROWS },
+      exhausted: bindings.length < WDQS_PAGE_ROWS,
+    };
+  },
+};
+
 /** Live sources, in the order the button walks them. */
 // Social runs first so social-only companies flow from the first press;
 // the website walk resumes from its saved cursor afterwards, and its
 // rows upgrade any stored social link to the real website (same QID).
-const SOURCES: SourceAdapter[] = [wikidataSocialAdapter, wikidataAdapter, edgarAdapter];
+// Organization adapters are appended after the exhausted sources: a
+// stored cursor at index 3 moves straight onto them.
+const SOURCES: SourceAdapter[] = [
+  wikidataSocialAdapter,
+  wikidataAdapter,
+  edgarAdapter,
+  wikidataSocialOrgAdapter,
+  wikidataOrgAdapter,
+];
 
 export interface FindCompaniesDeps {
   companiesCol: Collection<CompanyDoc>;
