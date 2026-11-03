@@ -302,10 +302,31 @@ export async function upgradeWebsite(
   if (!doc.sourceId || !doc.website || isSocialUrl(doc.website)) return 0;
   const existing = await col.findOne({ sourceId: doc.sourceId } as never);
   if (!existing || !isSocialUrl(existing.website)) return 0;
-  await col.updateOne(
-    { _id: (existing as CompanyDoc)._id } as never,
-    { $set: { website: doc.website, domain: doc.domain } } as never,
-  );
+  // Collision guard (2026-11-03: this bricked Find Companies at ~11.7k
+  // companies): the same business may already have a real-website row
+  // under a DIFFERENT source id (Wikidata duplicates). Upgrading this
+  // social row into that row's exact (domain, nameKey) pair violates
+  // the unique index, throws out of the press, and — because the
+  // cursor never advances past a throwing page — bricks every later
+  // press on the same page. Skip instead: the real-website row already
+  // covers the business.
+  const clash = await col.findOne({
+    domain: doc.domain,
+    nameKey: (existing as CompanyDoc).nameKey,
+  } as never);
+  if (clash && String((clash as CompanyDoc)._id) !== String((existing as CompanyDoc)._id)) {
+    return 0;
+  }
+  try {
+    await col.updateOne(
+      { _id: (existing as CompanyDoc)._id } as never,
+      { $set: { website: doc.website, domain: doc.domain } } as never,
+    );
+  } catch (e) {
+    // Race: another press inserted the pair first — same skip.
+    if ((e as { code?: number })?.code === 11000) return 0;
+    throw e;
+  }
   return 1;
 }
 

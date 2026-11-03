@@ -129,6 +129,26 @@ class FakeCollection {
   async updateOne(filter, update, options) {
     const doc = this.docs.find((d) => matches(d, filter));
     if (doc) {
+      // Mirror Mongo's sparse compound unique on (domain, nameKey):
+      // an update that would land on another doc's pair throws E11000,
+      // exactly like production (this caught the 2026-11-03 upgrade
+      // collision that bricked Find Companies).
+      const next = { ...doc };
+      for (const [k, v] of Object.entries(update.$set ?? {})) setDotted(next, k, v);
+      if (typeof next.nameKey === 'string') {
+        const clash = this.docs.some(
+          (d) =>
+            d !== doc &&
+            (d.domain ?? '') === (next.domain ?? '') &&
+            d.nameKey === next.nameKey &&
+            (next.domain !== undefined || d.domain === undefined),
+        );
+        if (clash) {
+          const err = new Error('E11000 duplicate key');
+          err.code = 11000;
+          throw err;
+        }
+      }
       for (const [k, v] of Object.entries(update.$set ?? {})) setDotted(doc, k, v);
       return { matchedCount: 1, modifiedCount: 1, upsertedId: null };
     }
@@ -1238,6 +1258,58 @@ async function testWebsiteUpgrade() {
   check('upgrade: real website never downgrades', real?.website === 'https://realco.com', real);
 }
 
+async function testUpgradeCollision() {
+  // 2026-11-03 regression: the same business under two source ids — a
+  // social row (Q9001) and a real-website row (Q9009) with the same
+  // name+domain — used to make the website walk throw E11000 out of
+  // the press (upgrading the social row into the real row's pair),
+  // bricking every later press on that page because the cursor never
+  // advances past a throwing page. The press must now skip the
+  // colliding upgrade and complete.
+  const runMod = freshRequire(`${OUT}/find-companies.cjs`);
+  const companiesCol = new FakeCollection();
+  const metaCol = new FakeCollection();
+  await companiesCol.insertMany([
+    {
+      name: 'The GameHub', nameKey: 'the gamehub', website: 'https://www.facebook.com/thegamehub',
+      domain: 'facebook.com', careersUrl: '', category: 'General',
+      source: 'Wikidata', sourceId: 'Q9001', addedAt: new Date().toISOString(),
+    },
+    {
+      name: 'The GameHub', nameKey: 'the gamehub', website: 'https://thegamehub.io',
+      domain: 'thegamehub.io', careersUrl: '', category: 'General',
+      source: 'Wikidata', sourceId: 'Q9009', addedAt: new Date().toISOString(),
+    },
+  ]);
+  await metaCol.updateOne(
+    { _id: 'find-companies' },
+    { $set: { version: 2, sourceIndex: 1, state: { wikidata: { typeIndex: 0, offsets: [0, 0, 0, 0] } } } },
+    { upsert: true },
+  );
+  const webBindings = [
+    { company: { value: 'http://www.wikidata.org/entity/Q9001' }, companyLabel: { value: 'The GameHub' }, website: { value: 'https://thegamehub.io' } },
+  ];
+  globalThis.fetch = routeFetch(wdqsFetchFactory([webBindings]), {}, null);
+  let out;
+  let threw = null;
+  try {
+    out = await runMod.runFindCompanies(
+      { companiesCol, metaCol, fetchFn: globalThis.fetch },
+      { limit: 2000 },
+    );
+  } catch (e) {
+    threw = e;
+  }
+  check('upgrade-collision: press completes without throwing', threw === null, threw && String(threw));
+  check('upgrade-collision: no error on result', out && !out.error, out);
+  const rows = await companiesCol.find({ name: 'The GameHub' }).toArray();
+  const social = rows.find((r) => r.sourceId === 'Q9001');
+  const real = rows.find((r) => r.sourceId === 'Q9009');
+  check('upgrade-collision: social row left untouched', social?.website === 'https://www.facebook.com/thegamehub' && social?.domain === 'facebook.com', social);
+  check('upgrade-collision: real row untouched', real?.website === 'https://thegamehub.io' && real?.domain === 'thegamehub.io', real);
+  check('upgrade-collision: still 2 rows, no dup insert', rows.length === 2, rows.length);
+}
+
 async function testMatchingFixes() {
   // The 0/3004 fix round: synonym groups replace the hard title gate,
   // location becomes three-way (ok / review / reject), and JSON-LD on
@@ -1550,6 +1622,7 @@ await testExactCounts();
 await testSocialPresence();
 await testWikidataSocial();
 await testWebsiteUpgrade();
+await testUpgradeCollision();
 await testFindJobs();
 await testFindJobsNonFrontend();
 await testTestCompany();
