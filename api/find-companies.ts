@@ -103,6 +103,11 @@ interface SourcePage {
 interface SourceAdapter {
   key: string;
   label: string;
+  /** Slow-but-alive sources set this: a failed page ends the press with
+   *  a retry-safe error and NEVER advances past the source, so "slow"
+   *  can never again be misread as "done" (2026-11-03: the OFFSET
+   *  organization walk was permanently skipped after 3 slow pages). */
+  neverSkip?: boolean;
   fetchPage: (
     state: Record<string, unknown>,
     budgetMs: number,
@@ -576,18 +581,91 @@ const wikidataOrgAdapter: SourceAdapter = {
   },
 };
 
+/** Keyset-paged organization website walk (2026-11-03): the OFFSET
+ *  organization walk was permanently skipped after 3 slow deep pages,
+ *  stranding the rest of its rows. This adapter re-walks the SAME
+ *  universe without OFFSET: it remembers the last entity IRI seen and
+ *  asks for everything after it (ORDER BY STR(?company), so the sort
+ *  and the resume filter use exactly the same comparison). Measured
+ *  live: first page 8s, mid-list page 22s — depth no longer matters.
+ *  neverSkip: a slow page ends the press with a retry-safe error
+ *  instead of ever skipping the source. Already-known rows dedupe, so
+ *  the re-walk converges on the stranded remainder. */
+const wikidataOrgKeysetAdapter: SourceAdapter = {
+  key: 'wikidata-organization-keyset',
+  label: 'Wikidata organization keyset',
+  neverSkip: true,
+  async fetchPage(state, budgetMs, fetchFn): Promise<SourcePage> {
+    const lastIri =
+      typeof state.lastIri === 'string' && state.lastIri ? state.lastIri : '';
+    const query =
+      'SELECT ?company ?companyLabel ?website WHERE { ' +
+      '?company wdt:P31 wd:Q43229 . ' +
+      '{ ?company wdt:P17 wd:Q30 . } UNION { ?company wdt:P159 ?hq . ?hq wdt:P17 wd:Q30 . } ' +
+      '. ?company wdt:P856 ?website . ' +
+      (lastIri ? `FILTER(STR(?company) > '${lastIri}') ` : '') +
+      'SERVICE wikibase:label { bd:serviceParam wikibase:language "en" . } } ' +
+      `ORDER BY STR(?company) LIMIT ${WDQS_PAGE_ROWS}`;
+    const r = await fetchFn(
+      'https://query.wikidata.org/sparql?' +
+        new URLSearchParams({ query, format: 'json' }).toString(),
+      {
+        headers: { 'User-Agent': 'JobBoardFinder/1.0 (job search research)' },
+        signal: AbortSignal.timeout(budgetMs),
+      },
+    );
+    if (!r.ok) throw new Error(`WDQS HTTP ${r.status}`);
+    const data = await r.json();
+    const bindings: unknown[] = (data as { results?: { bindings?: unknown[] } })?.results
+      ?.bindings ?? [];
+    const byEnt = new Map<string, { name: string; website: string }>();
+    let lastSeen = lastIri;
+    for (const b of bindings as {
+      company?: { value?: string };
+      companyLabel?: { value?: string };
+      website?: { value?: string };
+    }[]) {
+      const uri: string = b.company?.value ?? '';
+      if (uri) lastSeen = uri;
+      const ent = uri.split('/').pop() ?? uri;
+      const name: string = b.companyLabel?.value ?? ent;
+      const site: string = b.website?.value ?? '';
+      if (!site) continue;
+      const cur = byEnt.get(ent);
+      if (!cur || websiteScore(site) < websiteScore(cur.website)) {
+        byEnt.set(ent, { name, website: site });
+      }
+    }
+    return {
+      companies: [...byEnt.entries()].map(([qid, c]) => ({
+        name: c.name,
+        website: c.website,
+        careersUrl: '',
+        category: 'General',
+        source: 'Wikidata',
+        sourceId: qid,
+      })),
+      nextState: { lastIri: lastSeen },
+      exhausted: bindings.length < WDQS_PAGE_ROWS,
+    };
+  },
+};
+
 /** Live sources, in the order the button walks them. */
 // Social runs first so social-only companies flow from the first press;
 // the website walk resumes from its saved cursor afterwards, and its
 // rows upgrade any stored social link to the real website (same QID).
 // Organization adapters are appended after the exhausted sources: a
-// stored cursor at index 3 moves straight onto them.
+// stored cursor at index 3 moves straight onto them. The keyset
+// adapter is appended last: a stored cursor at index 5 (past the
+// skipped OFFSET organization walk) moves straight onto it.
 const SOURCES: SourceAdapter[] = [
   wikidataSocialAdapter,
   wikidataAdapter,
   edgarAdapter,
   wikidataSocialOrgAdapter,
   wikidataOrgAdapter,
+  wikidataOrgKeysetAdapter,
 ];
 
 export interface FindCompaniesDeps {
@@ -651,6 +729,13 @@ export async function runFindCompanies(
     try {
       page = await adapter.fetchPage(subState, Math.min(WDQS_TIMEOUT_MS, remaining), deps.fetchFn);
     } catch {
+      // neverSkip sources (slow but alive): a failed page just ends
+      // the press with a retry-safe error — no counting, no skipping,
+      // the next press retries exactly this page.
+      if (adapter.neverSkip) {
+        transientError = true;
+        break;
+      }
       // Transient failure: count it. After 3 consecutive failures the
       // source is SKIPPED (the button must never brick on a dead source)
       // and the press continues with the next source; before that, the
