@@ -1,7 +1,12 @@
 import { useRef, useState } from 'react';
 import { formatDateTime, wordCount } from '../domain';
 import { useStore } from '../store';
-import { extractResumeText } from '../lib/resume';
+import {
+  downloadMasterResumeDocx,
+  downloadMasterResumePdf,
+  downloadMasterResumeTxt,
+  extractResumeText,
+} from '../lib/resume';
 import { Badge, Button, EmptyState, Input, Textarea } from './ui';
 
 export function ResumesView() {
@@ -14,6 +19,7 @@ export function ResumesView() {
   const [pasteText, setPasteText] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [downloadMenuId, setDownloadMenuId] = useState<string | null>(null);
 
   async function handleFile(file: File) {
     setError('');
@@ -139,6 +145,13 @@ export function ResumesView() {
                     <Button variant="ghost" size="sm" onClick={() => setExpandedId(expanded ? null : r.id)}>
                       {expanded ? 'Hide text' : 'View text'}
                     </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setDownloadMenuId(downloadMenuId === r.id ? null : r.id)}
+                    >
+                      Download
+                    </Button>
                     {!isDefault && (
                       <Button variant="secondary" size="sm" onClick={() => setDefaultMasterResume(r.id)}>
                         Set as default
@@ -167,6 +180,40 @@ export function ResumesView() {
                     )}
                   </div>
                 </div>
+                {downloadMenuId === r.id && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        void downloadMasterResumeDocx(r);
+                        setDownloadMenuId(null);
+                      }}
+                    >
+                      Word (.docx)
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        downloadMasterResumePdf(r);
+                        setDownloadMenuId(null);
+                      }}
+                    >
+                      PDF
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        downloadMasterResumeTxt(r);
+                        setDownloadMenuId(null);
+                      }}
+                    >
+                      Text (.txt)
+                    </Button>
+                  </div>
+                )}
                 {expanded && (
                   <pre className="mt-4 max-h-96 overflow-y-auto whitespace-pre-wrap rounded-lg border border-white/[0.07] bg-zinc-950/60 p-3 font-sans text-xs leading-relaxed text-zinc-300">
                     {r.text}
