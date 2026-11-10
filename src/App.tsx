@@ -1,6 +1,7 @@
 import { Suspense, lazy, useState, type ReactNode } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { KanbanBoard } from './components/KanbanBoard';
+import { JobsView } from './components/JobsView';
 import { JobDrawer } from './components/JobDrawer';
 import { Dashboard } from './components/Dashboard';
 import { ResumesView } from './components/ResumesView';
@@ -13,7 +14,7 @@ import { Button } from './components/ui';
 // SheetJS is heavy — split it into its own chunk, loaded only when the import dialog opens.
 const Importer = lazy(() => import('./components/Importer').then((m) => ({ default: m.Importer })));
 
-type View = 'dashboard' | 'pipeline' | 'finder' | 'industries' | 'resumes' | 'settings';
+type View = 'dashboard' | 'pipeline' | 'jobs' | 'finder' | 'industries' | 'resumes' | 'settings';
 
 const NAV: { id: View; label: string; icon: ReactNode }[] = [
   {
@@ -34,6 +35,16 @@ const NAV: { id: View; label: string; icon: ReactNode }[] = [
     icon: (
       <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6">
         <path d="M2 4h4v10H2zM7 4h4v6H7zM12 4h4v3h-4z" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
+    id: 'jobs',
+    label: 'Jobs',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6">
+        <rect x="2" y="3" width="14" height="12" rx="2" />
+        <path d="M2 8h14M2 13h14" strokeLinecap="round" />
       </svg>
     ),
   },
@@ -165,6 +176,7 @@ export default function App() {
             >
               {view === 'dashboard' && <Dashboard />}
               {view === 'pipeline' && <KanbanBoard onAddJob={() => setAddOpen(true)} />}
+              {view === 'jobs' && <JobsView />}
               {view === 'finder' && <FinderView />}
               {view === 'industries' && <IndustriesView />}
               {view === 'resumes' && <ResumesView />}
@@ -175,7 +187,7 @@ export default function App() {
 
         {/* Mobile bottom nav */}
         <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-white/[0.07] bg-zinc-950/90 backdrop-blur-lg lg:hidden">
-          <div className="grid grid-cols-6">
+          <div className="grid grid-cols-7">
             {NAV.map((n) => (
               <button
                 key={n.id}
