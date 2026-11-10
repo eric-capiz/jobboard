@@ -129,13 +129,14 @@ export function downloadMasterResumeTxt(resume: MasterResume): void {
 }
 
 /** Download a master resume as a clean ATS-style PDF (same letter layout
- *  as the tailored-resume PDF). */
+ *  as the tailored-resume PDF). Sized to fit a one-page resume: 10.5pt body,
+ *  tight leading, 0.625in margins. */
 export function downloadMasterResumePdf(resume: MasterResume): void {
   const doc = new jsPDF({ unit: 'pt', format: 'letter' });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 54; // 0.75 inch
-  const lineHeight = 15;
+  const margin = 45; // 0.625 inch
+  const lineHeight = 13.5;
 
   let y = margin;
   const ensureSpace = () => {
@@ -150,7 +151,7 @@ export function downloadMasterResumePdf(resume: MasterResume): void {
   ) => {
     if (opts.gapBefore) y += opts.gapBefore;
     doc.setFont('helvetica', opts.bold ? 'bold' : 'normal');
-    doc.setFontSize(opts.size ?? 11);
+    doc.setFontSize(opts.size ?? 10.5);
     const wrapped = doc.splitTextToSize(line, pageWidth - margin * 2 - (opts.indent ?? 0)) as string[];
     for (const w of wrapped) {
       ensureSpace();
@@ -162,21 +163,21 @@ export function downloadMasterResumePdf(resume: MasterResume): void {
   for (const block of parseResumeLines(resume.text)) {
     switch (block.kind) {
       case 'title':
-        write(block.text, { size: 16, bold: true });
+        write(block.text, { size: 15, bold: true });
         break;
       case 'subtitle':
-        write(block.text, { size: 12, bold: true });
+        write(block.text, { size: 11.5, bold: true });
         y += 2;
         break;
       case 'contact':
         write(block.text, {});
-        y += 4;
+        y += 3;
         break;
       case 'heading':
-        write(block.text, { size: 12, bold: true, gapBefore: 8 });
+        write(block.text, { size: 11.5, bold: true, gapBefore: 6 });
         break;
       case 'job':
-        write(block.text, { bold: true, gapBefore: 4 });
+        write(block.text, { bold: true, gapBefore: 3 });
         break;
       case 'bullet':
         write(`•  ${block.text}`, { indent: 18 });
@@ -190,7 +191,8 @@ export function downloadMasterResumePdf(resume: MasterResume): void {
 }
 
 /** Download a master resume as a real .docx (Word) document with headings,
- *  bold job lines and bullets rebuilt from the stored text. */
+ *  bold job lines and bullets rebuilt from the stored text. Sized to fit a
+ *  one-page resume: 10.5pt body, tight spacing, 0.5in margins. */
 export async function downloadMasterResumeDocx(resume: MasterResume): Promise<void> {
   const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } = await import('docx');
   const children: DocxParagraph[] = [];
@@ -200,8 +202,8 @@ export async function downloadMasterResumeDocx(resume: MasterResume): Promise<vo
         children.push(
           new Paragraph({
             alignment: AlignmentType.CENTER,
-            spacing: { after: 60 },
-            children: [new TextRun({ text: block.text, bold: true, size: 28 })],
+            spacing: { after: 40 },
+            children: [new TextRun({ text: block.text, bold: true, size: 26 })],
           }),
         );
         break;
@@ -209,8 +211,8 @@ export async function downloadMasterResumeDocx(resume: MasterResume): Promise<vo
         children.push(
           new Paragraph({
             alignment: AlignmentType.CENTER,
-            spacing: { after: 120 },
-            children: [new TextRun({ text: block.text, bold: true, size: 24 })],
+            spacing: { after: 80 },
+            children: [new TextRun({ text: block.text, bold: true, size: 22 })],
           }),
         );
         break;
@@ -218,8 +220,8 @@ export async function downloadMasterResumeDocx(resume: MasterResume): Promise<vo
         children.push(
           new Paragraph({
             alignment: AlignmentType.CENTER,
-            spacing: { after: 240 },
-            children: [new TextRun({ text: block.text, size: 20 })],
+            spacing: { after: 180 },
+            children: [new TextRun({ text: block.text, size: 19 })],
           }),
         );
         break;
@@ -227,16 +229,16 @@ export async function downloadMasterResumeDocx(resume: MasterResume): Promise<vo
         children.push(
           new Paragraph({
             heading: HeadingLevel.HEADING_2,
-            spacing: { before: 240, after: 80 },
-            children: [new TextRun({ text: block.text, bold: true, size: 24 })],
+            spacing: { before: 180, after: 60 },
+            children: [new TextRun({ text: block.text, bold: true, size: 22 })],
           }),
         );
         break;
       case 'job':
         children.push(
           new Paragraph({
-            spacing: { before: 120, after: 40 },
-            children: [new TextRun({ text: block.text, bold: true, size: 22 })],
+            spacing: { before: 80, after: 20 },
+            children: [new TextRun({ text: block.text, bold: true, size: 21 })],
           }),
         );
         break;
@@ -244,16 +246,16 @@ export async function downloadMasterResumeDocx(resume: MasterResume): Promise<vo
         children.push(
           new Paragraph({
             bullet: { level: 0 },
-            spacing: { after: 40 },
-            children: [new TextRun({ text: block.text, size: 22 })],
+            spacing: { after: 20 },
+            children: [new TextRun({ text: block.text, size: 21 })],
           }),
         );
         break;
       default:
         children.push(
           new Paragraph({
-            spacing: { after: 60 },
-            children: [new TextRun({ text: block.text, size: 22 })],
+            spacing: { after: 40 },
+            children: [new TextRun({ text: block.text, size: 21 })],
           }),
         );
     }
