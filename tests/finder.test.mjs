@@ -2110,6 +2110,53 @@ async function testDeferredRender() {
   );
 }
 
+async function testJobCardAnchors() {
+  // Strategy C: portals whose job list is <a class="...job-card...">
+  // cards wrapping an <h3> title (Concentrix JDQ). Strategy A's
+  // splitter shatters these — it fires on the card AND on every inner
+  // element whose class mentions "job" (title, description, meta) —
+  // so the card fragment keeps the href but no heading, the heading
+  // fragment keeps the title but no link, and both are skipped.
+  const jobsMod = freshRequire(`${OUT}/find-jobs.cjs`);
+  const cardHtml = `<html><body><div class="jdq-jobs-container">
+<a class="jdq-job-card" data-jdq-job-detail-base-url="/job/?id=R1781395" href="/job/?id=R1781395"><div class="jdq-tag">Analytics</div><h3 class="jdq-job-title">BI Functional Analyst</h3><p class="jdq-job-description">Short description here.</p><div class="jdq-job-meta"><div class="jdq-meta-item"><span>Denver, Colorado, United States of America</span></div></div></a>
+<a class="jdq-job-card" href="/job/?id=R1780901"><h3 class="jdq-job-title">Customer Support Specialist</h3><p class="jdq-job-description">Support our customers.</p><div class="jdq-job-meta"><div class="jdq-meta-item"><span>Remote</span></div></div></a>
+<a class="jdq-job-card" href="/job/?id=R1779018"><h3 class="jdq-job-title">Director, IT Service Delivery Management (TCF)</h3></a>
+</div></body></html>`;
+  const out = jobsMod.parseCareersPage(cardHtml, 'https://jobs.concentrix.com/job-search/');
+  check(
+    'job-cards: all 3 JDQ cards extracted with titles + apply links',
+    out.length === 3 &&
+      out[0]?.title === 'BI Functional Analyst' &&
+      out[0]?.url === 'https://jobs.concentrix.com/job/?id=R1781395' &&
+      out[1]?.title === 'Customer Support Specialist' &&
+      out[2]?.title === 'Director, IT Service Delivery Management (TCF)',
+    out,
+  );
+  check(
+    'job-cards: Remote in the card text is read as the location',
+    out[1]?.location === 'Remote',
+    out[1],
+  );
+  // A card anchor with no heading inside is not a listing, and a nav
+  // anchor with a job-ish class is not a listing either.
+  const noHeading = `<html><body><a class="jdq-job-card" href="/job/?id=X1"><p class="jdq-job-description">No title here.</p></a><nav><a class="job-link" href="/jobs">Jobs</a></nav></body></html>`;
+  check(
+    'job-cards: heading-less card anchors and nav links are skipped',
+    jobsMod.parseCareersPage(noHeading, 'https://jobs.concentrix.com/job-search/').length === 0,
+    null,
+  );
+  // A traditional job block on the same page is still found once (the
+  // card strategy and Strategy A dedupe on title+url, never double).
+  const mixed = `<html><body><div class="job-listing"><h3>Customer Support Specialist</h3><p>Location: Remote</p><a href="/jobs/support-specialist">Apply</a></div></body></html>`;
+  const mixedOut = jobsMod.parseCareersPage(mixed, 'https://portal.example/careers');
+  check(
+    'job-cards: traditional blocks still extract exactly once',
+    mixedOut.length === 1 && mixedOut[0]?.title === 'Customer Support Specialist',
+    mixedOut,
+  );
+}
+
 async function testMatchingFixes() {
   // The 0/3004 fix round: synonym groups replace the hard title gate,
   // location becomes three-way (ok / review / reject), and JSON-LD on
@@ -2468,6 +2515,7 @@ await testFindJobsNonFrontend();
 await testRenderFallback();
 await testPortalSearch();
 await testDeferredRender();
+await testJobCardAnchors();
 await testTestCompany();
 await testJazzhr();
 await testBusinessSiteFirst();

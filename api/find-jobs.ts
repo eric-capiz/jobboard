@@ -754,6 +754,33 @@ export function parseCareersPage(html: string, pageUrl: string): Posting[] {
     if (!APPLY_HREF.test(apply) && !loc) continue;
     push(title, loc, apply);
   }
+  // Strategy C: job-card anchors — portals whose job list is a row of
+  // <a class="...job-card..."> cards wrapping an <h3> title
+  // (Concentrix JDQ, and the same shape on other card-based boards).
+  // Strategy A cannot see these: its splitter fires on every inner
+  // element whose class mentions "job" (the card, its title, its
+  // description, its meta row), shattering one card into title-less
+  // and link-less fragments — the card anchor keeps the href but no
+  // heading, the heading chunk keeps the title but no link, and both
+  // are skipped. Match the whole card anchor at once instead: the
+  // href is the apply link, the first heading inside is the title,
+  // and the card's text carries the location. The 6000-char cap is
+  // headroom for long descriptions + inline SVG icons inside a card.
+  const cardAnchorRe = /<a[^>]*href=["']([^"']+)["'][^>]*>([\s\S]{0,6000}?)<\/a>/gi;
+  let cm: RegExpExecArray | null;
+  while ((cm = cardAnchorRe.exec(clean)) !== null) {
+    const openTag = cm[0].slice(0, cm[0].indexOf('>') + 1);
+    if (!/\bclass="[^"]*(?:job|career|position|opening)/i.test(openTag)) continue;
+    const cardHeading = cm[2].match(/<h[234][^>]*>([\s\S]{0,200}?)<\/h[234]>/i);
+    if (!cardHeading) continue;
+    const cardTitle = cleanTitle(cardHeading[1]);
+    if (!titleOk(cardTitle)) continue;
+    const cardApply = resolvePageLink(cm[1], pageUrl);
+    if (!cardApply) continue;
+    const cardLoc = locationIn(cm[2]);
+    if (!APPLY_HREF.test(cardApply) && !cardLoc) continue;
+    push(cardTitle, cardLoc, cardApply);
+  }
   // Strategy B: View-details / Apply links with a title just before them.
   const viewRe = /<a[^>]*href=["']([^"']+)["'][^>]*>([\s\S]{0,80}?)<\/a>/gi;
   let vm: RegExpExecArray | null;
