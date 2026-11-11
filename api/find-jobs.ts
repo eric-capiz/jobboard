@@ -1064,20 +1064,47 @@ export interface ScreenedPostings {
   reviewLocation: number;
 }
 
-/** Resume terms a CS title must credit to count as CS work (the
- *  credited term, so 'support' covers a 'Help Desk' title and 'agent'
- *  covers a 'Support Specialist' one), and the role nouns a title
- *  must contain to count as a role at all. Page copy poses as postings
- *  otherwise: 'Careers for military service members...' and 'Call for
- *  Proposals...' carry service/member words but name no role. */
-const CS_FUNCTION_TERMS = new Set([
+/** Literal title words that name CS work. LITERAL only — the gate
+ *  must never use synonym-credited terms: the ['agent',
+ *  'representative', 'specialist'] group let any 'Specialist' title
+ *  credit 'agent', and 'agent' was in the old function set, so 'Staff
+ *  Lidar Technical Specialist' passed the gate with strengths 'Agent
+ *  (via Specialist)'. 'patient'/'guest'/'billing' join the list Eric
+ *  gave (service/support/customer/client/member/help/call): his CS
+ *  definition covers Member/Patient/Guest Service, and billing is the
+ *  core of his resume — without them 'Patient Access Representative'
+ *  and 'Billing Specialist' would be rejected. */
+const CS_FUNCTION_WORDS = new Set([
   'service',
   'support',
   'customer',
   'client',
   'member',
-  'agent',
-  'representative',
+  'patient',
+  'guest',
+  'help',
+  'call',
+  'billing',
+]);
+
+/** Words that make a generic 'specialist'/'technician' title a CS
+ *  role: the title must name who is served, or the kind of support.
+ *  'service' is deliberately absent — 'Field Service Technician'
+ *  would otherwise pass on 'service' alone, which is exactly the
+ *  failure the Nov 11 re-run exposed (its strengths were 'Service' +
+ *  'Technical (via Technician)'). 'specialist'/'technician' are the
+ *  only role words this qualifier applies to; representative, agent,
+ *  coordinator and the rest count on their own. */
+const CS_ROLE_QUALIFIERS = new Set([
+  'customer',
+  'client',
+  'member',
+  'patient',
+  'guest',
+  'support',
+  'help',
+  'call',
+  'billing',
 ]);
 
 const ROLE_WORDS = new Set([
@@ -1153,9 +1180,21 @@ export function screenPostings(
     }
     if (isCsResume) {
       const titleWords = new Set(tokenize(p.title));
-      const titleMatches = matchResumeTerms(titleWords, resumeTerms);
-      const namesCsWork = titleMatches.some((m) => CS_FUNCTION_TERMS.has(m.term));
-      const namesRole = [...titleWords].some((w) => ROLE_WORDS.has(w));
+      // Literal words only: namesCsWork must see the word itself in
+      // the title. The old check used synonym-credited terms, so a
+      // 'Specialist' title credited 'agent' and passed as CS work.
+      const namesCsWork = [...titleWords].some((w) => CS_FUNCTION_WORDS.has(w));
+      // A 'specialist'/'technician' title is only a CS role when the
+      // title also names who is served ('Customer Service Specialist'
+      // keeps passing; 'Field Service Technician' and 'Lab Safety
+      // Specialist' do not). Every other role word counts on its own.
+      const namesRole = [...titleWords].some((w) => {
+        if (!ROLE_WORDS.has(w)) return false;
+        if (w === 'specialist' || w === 'technician') {
+          return [...titleWords].some((q) => CS_ROLE_QUALIFIERS.has(q));
+        }
+        return true;
+      });
       if (!namesCsWork || !namesRole) {
         rejectedNoMatch += 1;
         continue;
