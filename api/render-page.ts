@@ -49,9 +49,8 @@ const CHROMIUM_PACK_URL =
 
 /** Hard cap on one render: navigation + JS settle, end to end. */
 const RENDER_TIMEOUT_MS = 20000;
-/** Extra settle time after the network goes idle, for boards that
- *  render a beat after their data arrives. */
-const SETTLE_MS = 1500;
+/** Cap on waiting for the rendered listings to settle (see below). */
+const SETTLE_CAP_MS = 12000;
 
 export type RenderPageFn = (url: string) => Promise<string | null>;
 
@@ -128,14 +127,32 @@ export async function renderPageHtml(url: string, timeoutMs: number = RENDER_TIM
       else void req.continue();
     });
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: Math.max(1000, remain()) });
-    // Let the board's JS settle: network idle when it comes, but
-    // pages that keep polling never go idle — proceed anyway.
-    try {
-      await page.waitForNetworkIdle({ idleTime: 500, timeout: Math.max(1000, remain()) });
-    } catch {
-      // Not idle in time — the DOM may still hold the listings.
+    // Let the board's JS settle. The signal is the rendered text
+    // itself: poll the page's visible text until it stops changing for
+    // two polls, or the cap hits. Network-idle is the wrong signal —
+    // boards keep polling analytics (never idle, so the whole budget
+    // burns) or go idle before their jobs request fires (so the
+    // listings are missed). A page whose text never stabilises (live
+    // counters, clocks) just runs to the cap and proceeds.
+    const settleStart = Date.now();
+    let lastLen = -1;
+    let stable = 0;
+    while (stable < 2 && Date.now() - settleStart < Math.min(SETTLE_CAP_MS, remain())) {
+      let len = -1;
+      try {
+        len = await page.evaluate(() => document.body?.innerText?.length ?? 0);
+      } catch {
+        break;
+      }
+      if (len === lastLen && len >= 0) stable += 1;
+      else {
+        stable = 0;
+        lastLen = len;
+      }
+      if (stable < 2 && remain() > 0) {
+        await new Promise((r) => setTimeout(r, Math.min(1000, remain())));
+      }
     }
-    if (remain() > 300) await new Promise((r) => setTimeout(r, Math.min(SETTLE_MS, remain())));
     // A redirect off the business site onto a board is not a source.
     if (isBoardUrl(page.url())) return null;
     return await page.content();

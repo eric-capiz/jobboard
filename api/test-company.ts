@@ -57,6 +57,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       postingsSeen: result.postingsSeen,
       fetchOk: result.fetchOk,
       renderUsed: result.renderUsed,
+      renderMs: result.renderMs,
       screened: result.screened,
       leads: result.leads,
     });
