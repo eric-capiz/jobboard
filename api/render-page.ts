@@ -7,7 +7,13 @@
  * roster yields nothing. This loads the SAME careers-page URL in a
  * headless Chromium and returns the rendered DOM HTML, which the
  * existing extractors in find-jobs.ts then parse exactly like static
- * HTML. The matcher, scoring, and location rules are untouched.
+ * HTML. The matcher, scoring, and location rules are untouched. After
+ * the page settles, the portal search step (render-search.ts) runs on
+ * the same page: a careers portal that shows no jobs until a search is
+ * submitted gets its own search box filled and submitted — empty
+ * first (all jobs), then a resume role term — and the returned HTML is
+ * the post-search results page. A page that already lists jobs is left
+ * alone.
  *
  * SOURCE DISCIPLINE: this module only ever opens the URL it is given
  * — the caller (find-jobs.ts) only ever passes the company's own
@@ -41,6 +47,7 @@
 import chromium from '@sparticuz/chromium-min';
 import puppeteer, { type Browser, type Page } from 'puppeteer-core';
 import { isBoardUrl } from './finder-lib.js';
+import { tryPortalSearch, waitForDomStable } from './render-search.js';
 
 /** The Chromium binary pack for x86_64, pinned to the loader version
  *  in package.json. Vercel functions run on x86_64 Linux. */
@@ -52,7 +59,7 @@ const RENDER_TIMEOUT_MS = 20000;
 /** Cap on waiting for the rendered listings to settle (see below). */
 const SETTLE_CAP_MS = 12000;
 
-export type RenderPageFn = (url: string) => Promise<string | null>;
+export type RenderPageFn = (url: string, searchTerm?: string) => Promise<string | null>;
 
 /** One browser per warm instance, shared by every render in it.
  *  A failed launch clears the promise so the next render retries. */
@@ -105,8 +112,13 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
 
 /** Load url in a real browser and return the rendered DOM HTML, or
  *  null when the page cannot be rendered (launch/download failure,
- *  navigation timeout, board redirect, kill-switch). Never throws. */
-export async function renderPageHtml(url: string, timeoutMs: number = RENDER_TIMEOUT_MS): Promise<string | null> {
+ *  navigation timeout, board redirect, kill-switch). Never throws.
+ *  After the page settles, the portal search step runs (see
+ *  render-search.ts): a search-gated careers page gets its own search
+ *  submitted — empty first, then `searchTerm` — and the HTML returned
+ *  is the post-search results page. A page that already shows listings
+ *  is left alone; a board redirect anywhere in the flow returns null. */
+export async function renderPageHtml(url: string, searchTerm: string = '', timeoutMs: number = RENDER_TIMEOUT_MS): Promise<string | null> {
   if (renderDisabled()) return null;
   const deadline = Date.now() + timeoutMs;
   const remain = (): number => deadline - Date.now();
@@ -134,27 +146,16 @@ export async function renderPageHtml(url: string, timeoutMs: number = RENDER_TIM
     // burns) or go idle before their jobs request fires (so the
     // listings are missed). A page whose text never stabilises (live
     // counters, clocks) just runs to the cap and proceeds.
-    const settleStart = Date.now();
-    let lastLen = -1;
-    let stable = 0;
-    while (stable < 2 && Date.now() - settleStart < Math.min(SETTLE_CAP_MS, remain())) {
-      let len = -1;
-      try {
-        len = await page.evaluate(() => document.body?.innerText?.length ?? 0);
-      } catch {
-        break;
-      }
-      if (len === lastLen && len >= 0) stable += 1;
-      else {
-        stable = 0;
-        lastLen = len;
-      }
-      if (stable < 2 && remain() > 0) {
-        await new Promise((r) => setTimeout(r, Math.min(1000, remain())));
-      }
-    }
+    await waitForDomStable(page, remain, SETTLE_CAP_MS, 1000);
     // A redirect off the business site onto a board is not a source.
     if (isBoardUrl(page.url())) return null;
+    // Search-portal step: the page may be an empty search shell that
+    // shows no jobs until a search is submitted (Walmart, FedEx, CVS
+    // ...). The step runs on this same page only — it never navigates
+    // anywhere the page itself doesn't take it, and a board redirect
+    // out of it returns null, like the load redirect above.
+    const searchOutcome = await tryPortalSearch(page, searchTerm, deadline);
+    if (searchOutcome === 'board-redirect') return null;
     return await page.content();
   } catch {
     return null;

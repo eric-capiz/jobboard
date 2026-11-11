@@ -631,6 +631,16 @@ export interface CompanySearchResult {
   renderTextSample: string;
 }
 
+/** The fallback keyword for a portal's search box: the resume's two
+ *  most frequent terms (e.g. 'service customer' for the demo CS
+ *  resume, 'js react' for demo-frontend). Only used when an empty
+ *  search returns nothing — the empty search (all jobs) always runs
+ *  first, inside the render. Derives from the resume, so it stays
+ *  field-correct for any resume. */
+export function portalSearchTerm(resumeText: string): string {
+  return extractResumeTerms(resumeText).slice(0, 2).join(' ');
+}
+
 /** Render options for one company search. Production callers pass the
  *  real renderer; omitting renderPage disables the fallback (tests,
  *  and callers that don't want it). `renderBudget` is a shared
@@ -1057,9 +1067,13 @@ export async function searchCompanyJobs(
     // Render fallback: the page loaded but its static HTML carries no
     // listings — a JavaScript board. Load the SAME page in a real
     // browser and extract from the rendered DOM with the same
-    // extractors. Only a careers-like URL ever renders, at most once
-    // per company, and only while the render budget and deadline
-    // last. A failed render just leaves the page at zero listings.
+    // extractors. The render also runs the portal search step on that
+    // page (render-search.ts): a search-gated portal gets its own
+    // search submitted — empty first, then a resume role term — so the
+    // returned HTML is the post-search results page. Only a careers-like
+    // URL ever renders, at most once per company, and only while the
+    // render budget and deadline last. A failed render just leaves the
+    // page at zero listings.
     if (
       pagePostings.length === 0 &&
       opts.renderPage &&
@@ -1071,7 +1085,7 @@ export async function searchCompanyJobs(
       const started = Date.now();
       let renderedHtml: string | null = null;
       try {
-        renderedHtml = await opts.renderPage(u);
+        renderedHtml = await opts.renderPage(u, portalSearchTerm(resumeText));
       } catch {
         renderedHtml = null;
       }

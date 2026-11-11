@@ -26,7 +26,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
 const OUT = '/tmp/finder-test-bundles';
 execSync(`mkdir -p ${OUT}`);
-for (const name of ['find-companies', 'find-jobs', 'finder-lib', 'test-company']) {
+for (const name of ['find-companies', 'find-jobs', 'finder-lib', 'test-company', 'render-search']) {
   execSync(
     `${ROOT}/node_modules/.bin/esbuild ${ROOT}/api/${name}.ts --bundle --platform=node --format=cjs --external:mongodb --outfile=${OUT}/${name}.cjs`,
     { stdio: 'pipe' },
@@ -1619,6 +1619,278 @@ async function testTypesSkipRetry() {
   check('types-skip-retry: cursor past source', cursorDoc?.sourceIndex === 7, cursorDoc);
 }
 
+async function testPortalSearch() {
+  // The search-interaction step: on a rendered search-portal page, find
+  // the job-search box, submit (empty first, then the resume term), and
+  // extract from the post-search results. Pure selection and the
+  // orchestration are tested with canned descriptors and a fake page —
+  // no real browser runs in this suite.
+  const searchMod = freshRequire(`${OUT}/render-search.cjs`);
+  const jobsMod = freshRequire(`${OUT}/find-jobs.cjs`);
+
+  const mkInput = (over) => ({
+    index: 0, type: 'text', name: '', id: '', placeholder: '', ariaLabel: '', formIndex: 0, visible: true, ...over,
+  });
+  const mkButton = (over) => ({
+    index: 0, text: '', ariaLabel: '', type: 'submit', formIndex: 0, visible: true, ...over,
+  });
+
+  // --- Pure selection ---
+  const portal = {
+    inputs: [
+      mkInput({ index: 0, name: 'keyword', placeholder: 'Search by Keyword', formIndex: 0 }),
+      mkInput({ index: 1, name: 'location', placeholder: 'Search by Location', formIndex: 0 }),
+    ],
+    buttons: [mkButton({ index: 0, text: 'Search', formIndex: 0 })],
+    forms: [{ action: '/jobs', method: 'get' }],
+  };
+  const sel = searchMod.selectSearchInput(portal);
+  check('portal-search: keyword input picked over location input', sel?.input?.index === 0, sel);
+  check('portal-search: same-form Search button picked', sel?.button?.index === 0, sel);
+  check('portal-search: form action carried', sel?.formAction === '/jobs', sel);
+  const locOnly = {
+    inputs: [mkInput({ index: 0, name: 'location', placeholder: 'Search by Location', formIndex: 0 })],
+    buttons: [mkButton({ index: 0, text: 'Search', formIndex: 0 })],
+    forms: [{ action: '/jobs', method: 'get' }],
+  };
+  check('portal-search: location-only input is not a keyword box', searchMod.selectSearchInput(locOnly) === null, null);
+  const hidden = {
+    inputs: [mkInput({ index: 0, name: 'keyword', placeholder: 'Search by Keyword', visible: false })],
+    buttons: [],
+    forms: [{ action: '', method: 'get' }],
+  };
+  check('portal-search: hidden keyword input ignored', searchMod.selectSearchInput(hidden) === null, null);
+  const qOnly = {
+    inputs: [mkInput({ index: 0, name: 'q', type: 'search', formIndex: -1 })],
+    buttons: [],
+    forms: [],
+  };
+  const selQ = searchMod.selectSearchInput(qOnly);
+  check('portal-search: bare q input qualifies, no button means Enter', selQ?.input?.index === 0 && selQ?.button === null, selQ);
+  check(
+    'portal-search: board form action refused',
+    searchMod.isSearchActionAllowed('https://boards.greenhouse.io/embed/job_board/js?for=x', 'https://portal.example/careers') === false,
+    null,
+  );
+  check(
+    'portal-search: same-page action allowed',
+    searchMod.isSearchActionAllowed('/jobs', 'https://portal.example/careers') === true &&
+      searchMod.isSearchActionAllowed('', 'https://portal.example/careers') === true,
+    null,
+  );
+  check('portal-search: 3 job links count as listings', searchMod.hasVisibleListings({ jobLinks: 3, resultsText: false }) === true, null);
+  check('portal-search: results count needs a job link', searchMod.hasVisibleListings({ jobLinks: 0, resultsText: true }) === false, null);
+  check('portal-search: results count + 1 link counts', searchMod.hasVisibleListings({ jobLinks: 1, resultsText: true }) === true, null);
+  check('portal-search: 2 links, no count, is not listings', searchMod.hasVisibleListings({ jobLinks: 2, resultsText: false }) === false, null);
+  const csResume =
+    'Customer service professional with member support experience. Customer Service Agent at Alorica, handling billing and service issues.';
+  check('portal-search: term is the resume top-2 terms', jobsMod.portalSearchTerm(csResume) === 'service customer', jobsMod.portalSearchTerm(csResume));
+
+  /* A fake Puppeteer page: evaluate is keyed on the in-page function's
+   * name (scanSearchForm, countJobListings, performSearch) and returns
+   * canned descriptors; anonymous text-length polls return 1000. */
+  class FakePage {
+    constructor(opts = {}) {
+      this._url = opts.url || 'https://portal.example/careers';
+      this.scanResult = opts.scanResult || { inputs: [], buttons: [], forms: [] };
+      this.countQueue = [...(opts.counts || [])];
+      this.performResult = opts.performResult || { submitted: true, method: 'click' };
+      this.onPerform = opts.onPerform || null;
+      this.calls = [];
+      this.submittedTerms = [];
+      this.pressedKeys = [];
+      this.keyboard = {
+        press: async (key) => {
+          this.pressedKeys.push(key);
+        },
+      };
+    }
+    url() {
+      return this._url;
+    }
+    setUrl(u) {
+      this._url = u;
+    }
+    async evaluate(fn, ...args) {
+      const name = fn.name || 'anon';
+      this.calls.push({ fn: name, args });
+      if (name === 'scanSearchForm') return this.scanResult;
+      if (name === 'countJobListings') {
+        return this.countQueue.length > 0
+          ? this.countQueue.shift()
+          : { jobLinks: 0, resultsText: false };
+      }
+      if (name === 'performSearch') {
+        this.submittedTerms.push(args[2]);
+        if (this.onPerform) this.onPerform(args[2], this);
+        return this.performResult;
+      }
+      return 1000;
+    }
+  }
+  const portalScan = {
+    inputs: [mkInput({ index: 0, name: 'keyword', placeholder: 'Search by Keyword', formIndex: 0 })],
+    buttons: [mkButton({ index: 0, text: 'Search', formIndex: 0 })],
+    forms: [{ action: '/jobs', method: 'get' }],
+  };
+  const runSearch = (page, term = 'customer service') =>
+    searchMod.tryPortalSearch(page, term, Date.now() + 30000);
+
+  // No form on the page: no crash, no submit.
+  const noFormPage = new FakePage({
+    scanResult: { inputs: [], buttons: [], forms: [] },
+    counts: [{ jobLinks: 0, resultsText: false }],
+  });
+  check(
+    'portal-search: no form, no crash',
+    (await runSearch(noFormPage)) === 'no-form' && noFormPage.submittedTerms.length === 0,
+    noFormPage.submittedTerms,
+  );
+  // Board-action form: refused, never submitted.
+  const boardFormPage = new FakePage({
+    scanResult: { ...portalScan, forms: [{ action: 'https://boards.greenhouse.io/embed/job_board/js?for=x', method: 'get' }] },
+    counts: [{ jobLinks: 0, resultsText: false }],
+  });
+  check(
+    'portal-search: board form action never touched',
+    (await runSearch(boardFormPage)) === 'no-form' && boardFormPage.submittedTerms.length === 0,
+    boardFormPage.submittedTerms,
+  );
+  // Empty search yields listings: one submit, term never used.
+  const emptyWins = new FakePage({
+    scanResult: portalScan,
+    counts: [{ jobLinks: 0, resultsText: false }, { jobLinks: 5, resultsText: true }],
+    onPerform: (term, page) => page.setUrl('https://portal.example/careers/results'),
+  });
+  check(
+    'portal-search: empty search finds listings',
+    (await runSearch(emptyWins)) === 'searched' &&
+      JSON.stringify(emptyWins.submittedTerms) === JSON.stringify(['']),
+    emptyWins.submittedTerms,
+  );
+  // Empty search shows nothing, term search finds listings.
+  const termWins = new FakePage({
+    scanResult: portalScan,
+    counts: [
+      { jobLinks: 0, resultsText: false },
+      { jobLinks: 0, resultsText: false },
+      { jobLinks: 4, resultsText: true },
+    ],
+    onPerform: (term, page) => page.setUrl('https://portal.example/careers/results'),
+  });
+  check(
+    'portal-search: term fallback after empty search',
+    (await runSearch(termWins)) === 'searched' &&
+      JSON.stringify(termWins.submittedTerms) === JSON.stringify(['', 'customer service']),
+    termWins.submittedTerms,
+  );
+  // Both submits, still nothing: no-results, no crash.
+  const noResults = new FakePage({
+    scanResult: portalScan,
+    counts: [
+      { jobLinks: 0, resultsText: false },
+      { jobLinks: 0, resultsText: false },
+      { jobLinks: 0, resultsText: false },
+    ],
+    onPerform: (term, page) => page.setUrl('https://portal.example/careers/results'),
+  });
+  check(
+    'portal-search: two submits, still nothing, is no-results',
+    (await runSearch(noResults)) === 'no-results' &&
+      JSON.stringify(noResults.submittedTerms) === JSON.stringify(['', 'customer service']),
+    noResults.submittedTerms,
+  );
+  // Page already lists jobs: no search at all.
+  const alreadyListed = new FakePage({
+    scanResult: portalScan,
+    counts: [{ jobLinks: 6, resultsText: true }],
+  });
+  check(
+    'portal-search: page already listing skips the search',
+    (await runSearch(alreadyListed)) === 'has-listings' && alreadyListed.submittedTerms.length === 0,
+    alreadyListed.submittedTerms,
+  );
+  // Submit fails: reported, no crash.
+  const submitFails = new FakePage({
+    scanResult: portalScan,
+    counts: [{ jobLinks: 0, resultsText: false }],
+    performResult: { submitted: false, method: 'none' },
+  });
+  check(
+    'portal-search: failed submit reported, no crash',
+    (await runSearch(submitFails)) === 'submit-failed',
+    null,
+  );
+  // No button: Enter is pressed instead of a click.
+  const enterPage = new FakePage({
+    scanResult: { ...portalScan, buttons: [] },
+    counts: [{ jobLinks: 0, resultsText: false }, { jobLinks: 5, resultsText: true }],
+    performResult: { submitted: true, method: 'enter' },
+    onPerform: (term, page) => page.setUrl('https://portal.example/careers/results'),
+  });
+  const enterOutcome = await runSearch(enterPage);
+  check(
+    'portal-search: no button falls back to Enter',
+    enterOutcome === 'searched' && enterPage.pressedKeys.includes('Enter'),
+    { outcome: enterOutcome, keys: enterPage.pressedKeys },
+  );
+  // Submit navigates onto a board: redirect reported, never parsed.
+  const boardRedirect = new FakePage({
+    scanResult: portalScan,
+    counts: [{ jobLinks: 0, resultsText: false }],
+    onPerform: (term, page) => page.setUrl('https://boards.greenhouse.io/portal/jobs'),
+  });
+  check(
+    'portal-search: board redirect after submit reported',
+    (await runSearch(boardRedirect)) === 'board-redirect',
+    null,
+  );
+  // Not enough time left: skipped, nothing touched.
+  const noTime = new FakePage({ scanResult: portalScan, counts: [{ jobLinks: 0, resultsText: false }] });
+  check(
+    'portal-search: skipped when the render budget is nearly gone',
+    (await searchMod.tryPortalSearch(noTime, 'customer service', Date.now() + 1000)) === 'skipped-time' &&
+      noTime.calls.length === 0,
+    noTime.calls,
+  );
+
+  // --- Wiring: find-jobs passes the resume term to the renderer ---
+  const companiesCol = new FakeCollection();
+  await companiesCol.insertMany([
+    { name: 'Portal Co', website: 'https://portal.example', domain: 'portal.example', nameKey: 'portal co', careersUrl: '', category: 'General', source: 'Wikidata', addedAt: '2026-10-29T00:00:00Z' },
+  ]);
+  const shellHtml = `<html><body><div id="root"></div><script src="/app.js"></script></body></html>`;
+  const searchedHtml = `<html><body>
+<div class="job-listing"><h3>Customer Support Specialist</h3><p>Location: Remote</p><a href="/jobs/support-specialist">Apply</a></div>
+</body></html>`;
+  globalThis.fetch = async () => ({ ok: true, text: async () => shellHtml });
+  const resumeText =
+    'Customer support specialist with Zendesk, chat support, and troubleshooting experience for SaaS customers';
+  const seenTerms = [];
+  const stubRender = async (url, term) => {
+    seenTerms.push(term);
+    return searchedHtml;
+  };
+  const out = await jobsMod.runFindJobs(
+    { companiesCol },
+    { resumeText, cursor: 0, limit: 15 },
+    { renderPage: stubRender },
+  );
+  check(
+    'portal-search: renderer receives the resume term',
+    seenTerms.length === 1 && seenTerms[0] === jobsMod.portalSearchTerm(resumeText),
+    seenTerms,
+  );
+  check(
+    'portal-search: post-search listings extracted and scored',
+    out.leads.length === 1 &&
+      out.leads[0]?.title === 'Customer Support Specialist' &&
+      out.leads[0]?.sourceType === 'rendered',
+    out.leads,
+  );
+  check('portal-search: render stats count the searched company', out.stats.rendered === 1, out.stats);
+}
+
 async function testMatchingFixes() {
   // The 0/3004 fix round: synonym groups replace the hard title gate,
   // location becomes three-way (ok / review / reject), and JSON-LD on
@@ -1975,6 +2247,7 @@ await testTypesSkipRetry();
 await testFindJobs();
 await testFindJobsNonFrontend();
 await testRenderFallback();
+await testPortalSearch();
 await testTestCompany();
 await testJazzhr();
 await testBusinessSiteFirst();
