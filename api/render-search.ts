@@ -15,7 +15,11 @@
  *      only risk replacing a working result.
  *   3. Submit an empty search first (all jobs). If the results page
  *      still shows no listings and a resume role term was supplied,
- *      submit again with that term.
+ *      submit again with that term. Submission uses real keystrokes
+ *      and Enter (plus a real mouse click on the submit button as a
+ *      fallback) — React-controlled portals ignore script-set values
+ *      and synthetic .click() calls, so the search must go through
+ *      the page's own event flow to register at all.
  *   4. Wait for the results to load (navigation, or a visible-text
  *      change for XHR results, then a short DOM-stable settle),
  *      bounded by the render deadline.
@@ -50,7 +54,23 @@ import { isBoardUrl } from './finder-lib.js';
 export interface SearchablePage {
   url(): string;
   evaluate(fn: (...args: any[]) => any, ...args: any[]): Promise<any>;
-  keyboard: { press(key: string): Promise<void> };
+  evaluateHandle(fn: (...args: any[]) => any, ...args: any[]): Promise<SearchableHandle>;
+  keyboard: {
+    press(key: string): Promise<void>;
+    down(key: string): Promise<void>;
+    up(key: string): Promise<void>;
+  };
+}
+
+export interface SearchableHandle {
+  asElement(): SearchableElement | null;
+  dispose(): Promise<void>;
+}
+
+export interface SearchableElement {
+  click(): Promise<void>;
+  type(text: string, options?: { delay?: number }): Promise<void>;
+  evaluate(fn: (...args: any[]) => any, ...args: any[]): Promise<any>;
 }
 
 /* ------------------------------------------------------------------ */
@@ -69,6 +89,10 @@ export interface SearchInputDescriptor {
    *  is not inside a form (React SPA search). */
   formIndex: number;
   visible: boolean;
+  /** Viewport-relative top edge (px) — picks the submit button nearest
+   *  the input, since a page can carry two search boxes (header +
+   *  hero) with a "Search" button each. */
+  top: number;
 }
 
 export interface SearchButtonDescriptor {
@@ -79,6 +103,8 @@ export interface SearchButtonDescriptor {
   type: string;
   formIndex: number;
   visible: boolean;
+  /** Viewport-relative top edge (px) — see SearchInputDescriptor. */
+  top: number;
 }
 
 export interface SearchFormInfo {
@@ -113,6 +139,7 @@ export function scanSearchForm(): SearchFormInfo {
       return true;
     }
   };
+  const topOf = (el: Element): number => Math.round(el.getBoundingClientRect().top);
   const inputs: SearchInputDescriptor[] = Array.from(document.querySelectorAll('input')).map(
     (el, index) => ({
       index,
@@ -123,6 +150,7 @@ export function scanSearchForm(): SearchFormInfo {
       ariaLabel: el.getAttribute('aria-label') || '',
       formIndex: formIndexOf(el),
       visible: isVisible(el),
+      top: topOf(el),
     }),
   );
   const buttons: SearchButtonDescriptor[] = Array.from(
@@ -134,6 +162,7 @@ export function scanSearchForm(): SearchFormInfo {
     type: (el.getAttribute('type') || '').toLowerCase(),
     formIndex: formIndexOf(el),
     visible: isVisible(el),
+    top: topOf(el),
   }));
   return {
     inputs,
@@ -161,62 +190,21 @@ export function countJobListings(): JobListingCount {
     jobLinks += 1;
   }
   const bodyText = document.body?.innerText || '';
-  const resultsText = /[\d,]+\s+(jobs?|results?|openings?|positions?)\b/i.test(bodyText);
-  return { jobLinks, resultsText };
-}
-
-/** Type a term into the chosen input and submit it — click the submit
- *  button when one was found, else focus the input and let the caller
- *  press Enter (React search boxes usually submit on Enter). The value
- *  is set through the native setter + input/change events so
- *  React-controlled inputs actually register the term. Returns whether
- *  a submit was attempted and how. */
-export function performSearch(
-  inputIndex: number,
-  buttonIndex: number | null,
-  term: string,
-): { submitted: boolean; method: 'click' | 'enter' | 'none' } {
-  const inputs = document.querySelectorAll('input');
-  const input = inputs[inputIndex] as HTMLInputElement | undefined;
-  if (!input) return { submitted: false, method: 'none' };
-  try {
-    input.scrollIntoView({ block: 'center' });
-  } catch {
-    // Scrolling is a nicety, never load-bearing.
-  }
-  if (term) {
-    try {
-      const setter = Object.getOwnPropertyDescriptor(
-        window.HTMLInputElement.prototype,
-        'value',
-      )?.set;
-      if (setter) setter.call(input, term);
-      else input.value = term;
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-      input.dispatchEvent(new Event('change', { bubbles: true }));
-    } catch {
-      try {
-        input.value = term;
-      } catch {
-        return { submitted: false, method: 'none' };
-      }
+  // A results count only counts when it is ABOVE ZERO: portals show
+  // "Search results (0 jobs available)" on the empty shell, and that
+  // line plus a nav link ("Search & Apply" -> /job-search/) would
+  // otherwise read as "listings present" and skip the search entirely
+  // — proven on Concentrix 2026-11-11, where the portal-direct render
+  // returned the shell untouched because of exactly this. "1-25 of
+  // 4,659 jobs" still counts (4,659 > 0); "0 jobs" never does.
+  let resultsText = false;
+  for (const m of bodyText.matchAll(/([\d,]+)\s+(jobs?|results?|openings?|positions?)\b/gi)) {
+    if (parseInt(m[1].replace(/,/g, ''), 10) > 0) {
+      resultsText = true;
+      break;
     }
   }
-  if (buttonIndex !== null) {
-    const buttons = document.querySelectorAll(
-      'button, input[type="submit"], input[type="button"]',
-    );
-    const btn = buttons[buttonIndex] as HTMLElement | undefined;
-    if (!btn) return { submitted: false, method: 'none' };
-    btn.click();
-    return { submitted: true, method: 'click' };
-  }
-  try {
-    input.focus();
-  } catch {
-    // Focus failure still leaves the Enter press a chance.
-  }
-  return { submitted: true, method: 'enter' };
+  return { jobLinks, resultsText };
 }
 
 /* ------------------------------------------------------------------ */
@@ -272,22 +260,54 @@ export function selectSearchInput(info: SearchFormInfo): SearchSelection | null 
     best.formIndex >= 0
       ? info.buttons.filter((b) => b.visible && b.formIndex === best!.formIndex)
       : [];
+  // A page can carry two search boxes (header + hero) with a "Search"
+  // button each — take the candidate nearest the chosen input, not the
+  // first in the DOM, so the click submits THIS box.
+  const nearest = (
+    list: SearchButtonDescriptor[],
+  ): SearchButtonDescriptor | undefined => {
+    let pick: SearchButtonDescriptor | undefined;
+    let pickDist = Number.POSITIVE_INFINITY;
+    for (const b of list) {
+      const d = Math.abs(b.top - best!.top);
+      if (d < pickDist) {
+        pick = b;
+        pickDist = d;
+      }
+    }
+    return pick;
+  };
   const byText = (list: SearchButtonDescriptor[]): SearchButtonDescriptor | undefined =>
-    list.find((b) => /search|find/i.test(`${b.text} ${b.ariaLabel}`));
+    nearest(list.filter((b) => /search|find/i.test(`${b.text} ${b.ariaLabel}`)));
   const button =
     byText(sameForm) ??
-    sameForm.find((b) => b.type === 'submit') ??
-    info.buttons.find((b) => b.visible && /search jobs|find jobs/i.test(`${b.text} ${b.ariaLabel}`)) ??
+    nearest(sameForm.filter((b) => b.type === 'submit')) ??
+    nearest(
+      info.buttons.filter(
+        (b) => b.visible && /search jobs|find jobs/i.test(`${b.text} ${b.ariaLabel}`),
+      ),
+    ) ??
+    // A bare "Search" button (Walmart, Phenom): the portal's own
+    // submit, labelled with nothing more specific.
+    nearest(
+      info.buttons.filter((b) => b.visible && /\bsearch\b/i.test(`${b.text} ${b.ariaLabel}`)),
+    ) ??
     null;
   const formAction = best.formIndex >= 0 ? info.forms[best.formIndex]?.action ?? '' : '';
   return { input: best, button, formAction };
 }
 
-/** The page already displays listings: 3+ job links, or a results
- *  count backed by at least one job link (a bare "1,000+ jobs"
- *  marketing line with no links is not listings). */
+/** The page already displays a results list: a results-count line
+ *  ("Showing 1-25 of 4,659 jobs") backed by at least one job link.
+ *  Bare job links alone are NOT listings — a homepage's trending-role
+ *  cards and career-area links (Walmart: 25 of them) look like jobs
+ *  to a link counter, but the extractor finds nothing on them, so
+ *  skipping the search on their say-so strands the company at zero.
+ *  The extractor is the authority on whether listings were found; a
+ *  redundant search on a page that already lists jobs costs only
+ *  seconds, while a skipped search costs the whole company. */
 export function hasVisibleListings(count: JobListingCount): boolean {
-  return count.jobLinks >= 3 || (count.resultsText && count.jobLinks >= 1);
+  return count.resultsText && count.jobLinks >= 1;
 }
 
 /** A form action is safe to submit when it stays on a non-board URL:
@@ -360,35 +380,144 @@ async function listingsNow(page: SearchablePage): Promise<boolean> {
   }
 }
 
-/** After a submit, wait for the results to arrive: a navigation, or a
- *  visible-text change (XHR results), then a short settle. `startUrl`
- *  / `startLen` are captured BEFORE the submit — a client-side router
- *  can navigate during the submit itself, and capturing after would
- *  miss the change and burn the whole cap. Bounded by the remaining
- *  render budget; never throws. */
-async function waitForSearchResults(
+/** Wait up to capMs for the page to change after a submit: a
+ *  navigation, or a visible-text change (XHR results). Returns whether
+ *  anything changed. Bounded by the remaining render budget. */
+async function waitForChange(
   page: SearchablePage,
   remainMs: () => number,
   startUrl: string,
   startLen: number,
-): Promise<void> {
-  const cap = Math.min(8000, Math.max(0, remainMs()));
+  capMs: number,
+): Promise<boolean> {
   const t0 = Date.now();
-  while (Date.now() - t0 < cap && remainMs() > 0) {
+  while (Date.now() - t0 < Math.min(capMs, Math.max(0, remainMs())) && remainMs() > 0) {
     await sleep(Math.min(400, Math.max(0, remainMs())));
-    if (page.url() !== startUrl) break;
+    if (page.url() !== startUrl) return true;
     const len = await textLength(page);
-    if (len < 0) break;
-    if (startLen >= 0 && Math.abs(len - startLen) > 200) break;
+    if (len < 0) return false;
+    if (startLen >= 0 && Math.abs(len - startLen) > 200) return true;
   }
-  await waitForDomStable(page, remainMs, 4000, 500);
+  return false;
+}
+
+/** Submit by typing into the box and pressing Enter — the way a person
+ *  searches, and the only way React-controlled portals register the
+ *  term. Setting the input's value from script and calling .click()
+ *  on the button does NOT work there (proven on Walmart: both submits
+ *  silently did nothing, while real keystrokes + Enter navigated to
+ *  the results page). Real keystrokes go through the portal's own
+ *  event flow, so its state actually updates. Never throws — false
+ *  when the submit could not even be attempted. */
+async function submitViaEnter(
+  page: SearchablePage,
+  sel: SearchSelection,
+  term: string,
+): Promise<boolean> {
+  let handle: SearchableHandle | null = null;
+  try {
+    handle = await page.evaluateHandle(
+      (idx: number) => document.querySelectorAll('input')[idx],
+      sel.input.index,
+    );
+  } catch {
+    handle = null;
+  }
+  const el = handle?.asElement() ?? null;
+  if (el) {
+    try {
+      // A real mouse click focuses the input (and opens any search
+      // overlay the box lives behind). A failed click falls through
+      // to the focus below — typing may still work.
+      await el.click();
+    } catch {
+      try {
+        await el.evaluate((node) => (node as HTMLInputElement).focus());
+      } catch {
+        // Focus failure still leaves the Enter press a chance.
+      }
+    }
+    if (term) {
+      try {
+        // Clear any residue through the keyboard, not the DOM value —
+        // a script-set value leaves React state stale, and the next
+        // keystroke would then fight it. Best-effort: the typed term
+        // still appends when the clear itself fails.
+        await page.keyboard.down('Control');
+        await page.keyboard.press('a');
+        await page.keyboard.up('Control');
+        await page.keyboard.press('Backspace');
+      } catch {
+        // Clearing is best-effort; the typed term still appends.
+      }
+      try {
+        await el.type(term, { delay: 20 });
+      } catch {
+        return false;
+      }
+    }
+  } else {
+    try {
+      await page.evaluate((idx: number) => {
+        const input = document.querySelectorAll('input')[idx] as
+          | HTMLInputElement
+          | undefined;
+        input?.focus();
+      }, sel.input.index);
+    } catch {
+      // Focus failure still leaves the Enter press a chance.
+    }
+  }
+  try {
+    await page.keyboard.press('Enter');
+    return true;
+  } catch {
+    return false;
+  } finally {
+    try {
+      await handle?.dispose();
+    } catch {
+      // Disposal is housekeeping, never load-bearing.
+    }
+  }
+}
+
+/** Click a submit button through a real mouse click (trusted event),
+ *  not .click() — React portals ignore synthetic clicks the same way
+ *  they ignore script-set values. */
+async function clickButton(page: SearchablePage, buttonIndex: number): Promise<boolean> {
+  let handle: SearchableHandle | null = null;
+  try {
+    handle = await page.evaluateHandle(
+      (idx: number) =>
+        document.querySelectorAll('button, input[type="submit"], input[type="button"]')[idx],
+      buttonIndex,
+    );
+  } catch {
+    return false;
+  }
+  const el = handle?.asElement() ?? null;
+  if (!el) return false;
+  try {
+    await el.click();
+    return true;
+  } catch {
+    return false;
+  } finally {
+    try {
+      await handle?.dispose();
+    } catch {
+      // Disposal is housekeeping, never load-bearing.
+    }
+  }
 }
 
 type AttemptResult = 'no-form' | 'failed' | 'settled' | 'board';
 
 /** One search attempt on the CURRENT page: re-scan (a previous submit
- *  may have navigated), pick the box, refuse board actions, submit,
- *  wait for results. */
+ *  may have navigated), pick the box, refuse board actions, submit by
+ *  typing + Enter, and — only if that changes nothing and a submit
+ *  button was found — click the button. Then a short settle. */
 async function attemptSearch(
   page: SearchablePage,
   term: string,
@@ -403,28 +532,21 @@ async function attemptSearch(
   const sel = selectSearchInput(info);
   if (!sel) return 'no-form';
   if (sel.formAction && !isSearchActionAllowed(sel.formAction, page.url())) return 'no-form';
+  // Baselines are captured BEFORE the submit — a client-side router
+  // can navigate during the submit itself, and capturing after would
+  // miss the change and burn the whole wait cap.
   const startUrl = page.url();
   const startLen = await textLength(page);
-  let res: { submitted: boolean; method: string };
-  try {
-    res = (await page.evaluate(
-      performSearch,
-      sel.input.index,
-      sel.button ? sel.button.index : null,
-      term,
-    )) as { submitted: boolean; method: string };
-  } catch {
-    return 'failed';
-  }
-  if (!res.submitted) return 'failed';
-  if (res.method === 'enter') {
-    try {
-      await page.keyboard.press('Enter');
-    } catch {
-      // A failed Enter still leaves the form's own submit a chance.
+  if (!(await submitViaEnter(page, sel, term))) return 'failed';
+  let changed = await waitForChange(page, remainMs, startUrl, startLen, 2500);
+  if (!changed && sel.button) {
+    const midUrl = page.url();
+    const midLen = await textLength(page);
+    if (await clickButton(page, sel.button.index)) {
+      changed = await waitForChange(page, remainMs, midUrl, midLen, 8000);
     }
   }
-  await waitForSearchResults(page, remainMs, startUrl, startLen);
+  await waitForDomStable(page, remainMs, 4000, 500);
   if (isBoardUrl(page.url())) return 'board';
   return 'settled';
 }

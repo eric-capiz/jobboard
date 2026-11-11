@@ -19,8 +19,9 @@
  * — the caller (find-jobs.ts) only ever passes the company's own
  * careers-page URL, and only after the plain-HTML pass found nothing
  * there. No board domain or ATS API is ever opened as a source: if the
- * page redirects onto a board domain, the render returns null and the
- * page counts as no listings. The only board contact remains the
+ * page redirects onto a board domain, the render returns an empty-HTML
+ * result (so the caller still sees what ended it) and the page counts
+ * as no listings. The only board contact remains the
  * apply link on a listing found on the business page.
  *
  * WHERE IT RUNS: inside the same Vercel serverless function, via
@@ -47,7 +48,11 @@
 import chromium from '@sparticuz/chromium-min';
 import puppeteer, { type Browser, type Page } from 'puppeteer-core';
 import { isBoardUrl } from './finder-lib.js';
-import { tryPortalSearch, waitForDomStable } from './render-search.js';
+import {
+  tryPortalSearch,
+  waitForDomStable,
+  type PortalSearchOutcome,
+} from './render-search.js';
 
 /** The Chromium binary pack for x86_64, pinned to the loader version
  *  in package.json. Vercel functions run on x86_64 Linux. */
@@ -59,7 +64,29 @@ const RENDER_TIMEOUT_MS = 20000;
 /** Cap on waiting for the rendered listings to settle (see below). */
 const SETTLE_CAP_MS = 12000;
 
-export type RenderPageFn = (url: string, searchTerm?: string) => Promise<string | null>;
+export interface RenderPageResult {
+  /** The rendered DOM HTML — the post-search results page when the
+   *  portal search ran. Empty when the render ended on a board domain
+   *  (no source to extract from). */
+  html: string;
+  /** The portal-search outcome, or null when the search step never
+   *  ran (render failed before it, or the load itself redirected
+   *  onto a board). This is what makes the search step observable:
+   *  the caller can tell "search ran and found nothing" apart from
+   *  "the search never ran". */
+  searchOutcome: PortalSearchOutcome | null;
+  /** Milliseconds spent inside the portal search step (0 when it
+   *  never ran). */
+  searchMs: number;
+  /** The page URL after load + search — the results page when the
+   *  search navigated. '' when no page was ever loaded. */
+  renderedUrl: string;
+}
+
+export type RenderPageFn = (
+  url: string,
+  searchTerm?: string,
+) => Promise<RenderPageResult | null>;
 
 /** One browser per warm instance, shared by every render in it.
  *  A failed launch clears the promise so the next render retries. */
@@ -112,13 +139,17 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
 
 /** Load url in a real browser and return the rendered DOM HTML, or
  *  null when the page cannot be rendered (launch/download failure,
- *  navigation timeout, board redirect, kill-switch). Never throws.
+ *  navigation timeout, kill-switch). Never throws.
  *  After the page settles, the portal search step runs (see
  *  render-search.ts): a search-gated careers page gets its own search
  *  submitted — empty first, then `searchTerm` — and the HTML returned
  *  is the post-search results page. A page that already shows listings
- *  is left alone; a board redirect anywhere in the flow returns null. */
-export async function renderPageHtml(url: string, searchTerm: string = '', timeoutMs: number = RENDER_TIMEOUT_MS): Promise<string | null> {
+ *  is left alone; a board redirect anywhere in the flow returns an
+ *  empty-HTML result (not null) so the caller still sees the outcome
+ *  that ended the render. The search outcome, its milliseconds, and
+ *  the final URL ride on the result so the step is observable from
+ *  the API response instead of silent. */
+export async function renderPageHtml(url: string, searchTerm: string = '', timeoutMs: number = RENDER_TIMEOUT_MS): Promise<RenderPageResult | null> {
   if (renderDisabled()) return null;
   const deadline = Date.now() + timeoutMs;
   const remain = (): number => deadline - Date.now();
@@ -148,15 +179,21 @@ export async function renderPageHtml(url: string, searchTerm: string = '', timeo
     // counters, clocks) just runs to the cap and proceeds.
     await waitForDomStable(page, remain, SETTLE_CAP_MS, 1000);
     // A redirect off the business site onto a board is not a source.
-    if (isBoardUrl(page.url())) return null;
+    if (isBoardUrl(page.url())) {
+      return { html: '', searchOutcome: null, searchMs: 0, renderedUrl: page.url() };
+    }
     // Search-portal step: the page may be an empty search shell that
     // shows no jobs until a search is submitted (Walmart, FedEx, CVS
     // ...). The step runs on this same page only — it never navigates
     // anywhere the page itself doesn't take it, and a board redirect
-    // out of it returns null, like the load redirect above.
+    // out of it returns an empty result, like the load redirect above.
+    const searchStart = Date.now();
     const searchOutcome = await tryPortalSearch(page, searchTerm, deadline);
-    if (searchOutcome === 'board-redirect') return null;
-    return await page.content();
+    const searchMs = Date.now() - searchStart;
+    if (searchOutcome === 'board-redirect') {
+      return { html: '', searchOutcome, searchMs, renderedUrl: page.url() };
+    }
+    return { html: await page.content(), searchOutcome, searchMs, renderedUrl: page.url() };
   } catch {
     return null;
   } finally {

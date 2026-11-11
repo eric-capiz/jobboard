@@ -587,7 +587,7 @@ async function testRenderFallback() {
   const renderedUrls = [];
   const stubRender = async (url) => {
     renderedUrls.push(url);
-    return renderedHtml;
+    return { html: renderedHtml, searchOutcome: 'searched', searchMs: 250, renderedUrl: url };
   };
   const out = await jobsMod.runFindJobs(
     { companiesCol },
@@ -644,6 +644,23 @@ async function testRenderFallback() {
     one.renderTextSample,
   );
   check(
+    'render: result surfaces the search outcome + ms + final URL',
+    one.searchOutcome === 'searched' && one.searchMs === 250 && one.renderedUrl === 'https://jsboard.example/careers',
+    { searchOutcome: one.searchOutcome, searchMs: one.searchMs, renderedUrl: one.renderedUrl },
+  );
+  // A render that fails before the search step leaves the outcome
+  // null, not a stale value from another company.
+  const failOne = await jobsMod.searchCompanyJobs(
+    { name: 'JsBoard Co', website: 'https://jsboard.example', careersUrl: '', isUSCompany: true },
+    resumeText,
+    { renderPage: async () => null },
+  );
+  check(
+    'render: failed render leaves searchOutcome null + zero ms + empty URL',
+    failOne.searchOutcome === null && failOne.searchMs === 0 && failOne.renderedUrl === '',
+    { searchOutcome: failOne.searchOutcome, searchMs: failOne.searchMs, renderedUrl: failOne.renderedUrl },
+  );
+  check(
     'render: no render means an empty text sample',
     (
       await jobsMod.searchCompanyJobs(
@@ -684,6 +701,11 @@ async function testTestCompany() {
   check('test-company: source is the given careers page', res.body?.sourcePage === 'https://pageco.example/careers', res.body);
   check('test-company: 1 matching lead, score 63', res.body?.leads?.length === 1 && res.body?.leads[0]?.matchScore === 63, res.body?.leads);
   check('test-company: postings seen 2', res.body?.postingsSeen === 2, res.body);
+  check(
+    'test-company: response carries the search-outcome fields (null when no render ran)',
+    res.body?.searchOutcome === null && res.body?.searchMs === 0 && res.body?.renderedUrl === '',
+    { searchOutcome: res.body?.searchOutcome, searchMs: res.body?.searchMs, renderedUrl: res.body?.renderedUrl },
+  );
   // Widget on the careers page, found from the homepage nav
   // (Goldschmitt flow): the widget is part of the business page.
   const widgetJs = `<div id="resumator-job-job_20261027144142_FGDHFERUIMWO9F2B" class="resumator-job resumator-jobs-text"><div class="resumator-job-title resumator-jobs-text">Frontend Developer</div><div class="resumator-job-info resumator-jobs-text"><span class="resumator-job-location resumator-job-heading resumator-jobs-text">Location: </span>Remote<span class="resumator-job-department resumator-job-heading resumator-jobs-text">Department: </span>Timeguard Solutions</div><div class="resumator-job-view-details resumator-jobs-text"><a class="resumator-job-link resumator-jobs-text" target="_blank" href="https://testco.applytojob.com/apply/MQD6Cg04z9/Frontend-Developer?source=Our Career Page Widget">+ View details</a></div></div>`;
@@ -1629,10 +1651,10 @@ async function testPortalSearch() {
   const jobsMod = freshRequire(`${OUT}/find-jobs.cjs`);
 
   const mkInput = (over) => ({
-    index: 0, type: 'text', name: '', id: '', placeholder: '', ariaLabel: '', formIndex: 0, visible: true, ...over,
+    index: 0, type: 'text', name: '', id: '', placeholder: '', ariaLabel: '', formIndex: 0, visible: true, top: 0, ...over,
   });
   const mkButton = (over) => ({
-    index: 0, text: '', ariaLabel: '', type: 'submit', formIndex: 0, visible: true, ...over,
+    index: 0, text: '', ariaLabel: '', type: 'submit', formIndex: 0, visible: true, top: 0, ...over,
   });
 
   // --- Pure selection ---
@@ -1678,31 +1700,107 @@ async function testPortalSearch() {
       searchMod.isSearchActionAllowed('', 'https://portal.example/careers') === true,
     null,
   );
-  check('portal-search: 3 job links count as listings', searchMod.hasVisibleListings({ jobLinks: 3, resultsText: false }) === true, null);
+  // A bare "Search" button (Walmart, Phenom) is the portal's own
+  // submit, and the one nearest the chosen input wins when a page
+  // carries two search boxes (header + hero).
+  const twoBoxes = {
+    inputs: [mkInput({ index: 0, name: 'keyword', placeholder: 'Search by Keyword', formIndex: -1, top: 2000 })],
+    buttons: [
+      mkButton({ index: 0, text: '', ariaLabel: 'Search', type: 'button', formIndex: -1, top: 40 }),
+      mkButton({ index: 1, text: '', ariaLabel: 'Search', type: 'button', formIndex: -1, top: 1990 }),
+    ],
+    forms: [],
+  };
+  const selTwo = searchMod.selectSearchInput(twoBoxes);
+  check('portal-search: nearest Search button wins, not the first in the DOM', selTwo?.button?.index === 1, selTwo);
+  check('portal-search: 3 job links alone are NOT listings (trending-role cards)', searchMod.hasVisibleListings({ jobLinks: 3, resultsText: false }) === false, null);
+  check('portal-search: 25 job links, no count, are NOT listings (Walmart homepage)', searchMod.hasVisibleListings({ jobLinks: 25, resultsText: false }) === false, null);
   check('portal-search: results count needs a job link', searchMod.hasVisibleListings({ jobLinks: 0, resultsText: true }) === false, null);
   check('portal-search: results count + 1 link counts', searchMod.hasVisibleListings({ jobLinks: 1, resultsText: true }) === true, null);
   check('portal-search: 2 links, no count, is not listings', searchMod.hasVisibleListings({ jobLinks: 2, resultsText: false }) === false, null);
+  // The REAL countJobListings against a stubbed document: a "0 jobs"
+  // shell is NOT listings, even with job-looking nav links — the
+  // Concentrix portal-direct bug (2026-11-11), where "Search results
+  // (0 jobs available)" + "Search & Apply" links read as listings and
+  // the search never ran.
+  const realCount = (bodyText, anchors) => {
+    const prevDocument = globalThis.document;
+    globalThis.document = {
+      body: { innerText: bodyText },
+      querySelectorAll: (sel) =>
+        sel === 'a'
+          ? anchors.map((a) => ({
+              getAttribute: (name) => (name === 'href' ? a.href : ''),
+              innerText: a.text,
+              getBoundingClientRect: () => ({ width: 100, height: 20 }),
+            }))
+          : [],
+    };
+    try {
+      return searchMod.countJobListings();
+    } finally {
+      if (prevDocument === undefined) delete globalThis.document;
+      else globalThis.document = prevDocument;
+    }
+  };
+  const shellCount = realCount('Search results (0 jobs available) No jobs match your search.', [
+    { href: 'https://jobs.concentrix.com/job-search/', text: 'Search & Apply' },
+    { href: 'https://jobs.concentrix.com/job-search/', text: 'Search & Apply' },
+  ]);
+  check(
+    'portal-search: "0 jobs available" shell is NOT listings (Concentrix)',
+    shellCount.resultsText === false && shellCount.jobLinks === 2 && searchMod.hasVisibleListings(shellCount) === false,
+    shellCount,
+  );
+  const foundCount = realCount('Showing 1-25 of 4,659 jobs', [
+    { href: '/jobs/customer-support-specialist', text: 'Customer Support Specialist' },
+  ]);
+  check(
+    'portal-search: "1-25 of 4,659 jobs" + a job link IS listings',
+    foundCount.resultsText === true && foundCount.jobLinks === 1 && searchMod.hasVisibleListings(foundCount) === true,
+    foundCount,
+  );
+  check(
+    'portal-search: "Showing 0 results" is NOT a results line',
+    realCount('Showing 0 results for your search.', []).resultsText === false,
+    null,
+  );
   const csResume =
     'Customer service professional with member support experience. Customer Service Agent at Alorica, handling billing and service issues.';
   check('portal-search: term is the resume top-2 terms', jobsMod.portalSearchTerm(csResume) === 'service customer', jobsMod.portalSearchTerm(csResume));
 
   /* A fake Puppeteer page: evaluate is keyed on the in-page function's
-   * name (scanSearchForm, countJobListings, performSearch) and returns
-   * canned descriptors; anonymous text-length polls return 1000. */
+   * name (scanSearchForm, countJobListings) and returns canned
+   * descriptors; anonymous text-length polls return 1000.
+   * evaluateHandle returns a stub element handle — input vs button is
+   * told apart from the getter function's source. Enter presses and
+   * button clicks fire the test's onEnter / onButtonClick hooks, which
+   * simulate the portal navigating to its results page. */
   class FakePage {
     constructor(opts = {}) {
       this._url = opts.url || 'https://portal.example/careers';
       this.scanResult = opts.scanResult || { inputs: [], buttons: [], forms: [] };
       this.countQueue = [...(opts.counts || [])];
-      this.performResult = opts.performResult || { submitted: true, method: 'click' };
-      this.onPerform = opts.onPerform || null;
+      this.onEnter = opts.onEnter || null;
+      this.onButtonClick = opts.onButtonClick || null;
+      this.failEnter = !!opts.failEnter;
       this.calls = [];
-      this.submittedTerms = [];
+      this.typedTerms = [];
       this.pressedKeys = [];
+      this.buttonClicks = 0;
+      this.inputClicks = 0;
+      this.currentTerm = '';
+      const self = this;
       this.keyboard = {
         press: async (key) => {
-          this.pressedKeys.push(key);
+          self.pressedKeys.push(key);
+          if (key === 'Enter') {
+            if (self.failEnter) throw new Error('Enter failed');
+            if (self.onEnter) self.onEnter(self.currentTerm, self);
+          }
         },
+        down: async () => {},
+        up: async () => {},
       };
     }
     url() {
@@ -1720,12 +1818,30 @@ async function testPortalSearch() {
           ? this.countQueue.shift()
           : { jobLinks: 0, resultsText: false };
       }
-      if (name === 'performSearch') {
-        this.submittedTerms.push(args[2]);
-        if (this.onPerform) this.onPerform(args[2], this);
-        return this.performResult;
-      }
       return 1000;
+    }
+    async evaluateHandle(fn, ...args) {
+      const isButton = String(fn).includes('button');
+      this.calls.push({ fn: 'evaluateHandle:' + (isButton ? 'button' : 'input'), args });
+      const self = this;
+      return {
+        asElement: () => ({
+          click: async () => {
+            if (isButton) {
+              self.buttonClicks += 1;
+              if (self.onButtonClick) self.onButtonClick(self.currentTerm, self);
+            } else {
+              self.inputClicks += 1;
+            }
+          },
+          type: async (text) => {
+            self.typedTerms.push(text);
+            self.currentTerm = text;
+          },
+          evaluate: async () => {},
+        }),
+        dispose: async () => {},
+      };
     }
   }
   const portalScan = {
@@ -1743,8 +1859,8 @@ async function testPortalSearch() {
   });
   check(
     'portal-search: no form, no crash',
-    (await runSearch(noFormPage)) === 'no-form' && noFormPage.submittedTerms.length === 0,
-    noFormPage.submittedTerms,
+    (await runSearch(noFormPage)) === 'no-form' && noFormPage.typedTerms.length === 0 && noFormPage.pressedKeys.length === 0,
+    noFormPage.typedTerms,
   );
   // Board-action form: refused, never submitted.
   const boardFormPage = new FakePage({
@@ -1753,22 +1869,24 @@ async function testPortalSearch() {
   });
   check(
     'portal-search: board form action never touched',
-    (await runSearch(boardFormPage)) === 'no-form' && boardFormPage.submittedTerms.length === 0,
-    boardFormPage.submittedTerms,
+    (await runSearch(boardFormPage)) === 'no-form' && boardFormPage.typedTerms.length === 0 && boardFormPage.pressedKeys.length === 0,
+    boardFormPage.typedTerms,
   );
-  // Empty search yields listings: one submit, term never used.
+  // Empty search yields listings: Enter alone submits, no term typed.
   const emptyWins = new FakePage({
     scanResult: portalScan,
     counts: [{ jobLinks: 0, resultsText: false }, { jobLinks: 5, resultsText: true }],
-    onPerform: (term, page) => page.setUrl('https://portal.example/careers/results'),
+    onEnter: (term, page) => page.setUrl('https://portal.example/careers/results'),
   });
   check(
-    'portal-search: empty search finds listings',
+    'portal-search: empty search finds listings via Enter',
     (await runSearch(emptyWins)) === 'searched' &&
-      JSON.stringify(emptyWins.submittedTerms) === JSON.stringify(['']),
-    emptyWins.submittedTerms,
+      emptyWins.typedTerms.length === 0 &&
+      emptyWins.pressedKeys.filter((k) => k === 'Enter').length === 1,
+    { typed: emptyWins.typedTerms, keys: emptyWins.pressedKeys },
   );
-  // Empty search shows nothing, term search finds listings.
+  // Empty search shows nothing, term search finds listings: the term
+  // is typed with real keystrokes, then Enter.
   const termWins = new FakePage({
     scanResult: portalScan,
     counts: [
@@ -1776,13 +1894,14 @@ async function testPortalSearch() {
       { jobLinks: 0, resultsText: false },
       { jobLinks: 4, resultsText: true },
     ],
-    onPerform: (term, page) => page.setUrl('https://portal.example/careers/results'),
+    onEnter: (term, page) => page.setUrl('https://portal.example/careers/results'),
   });
   check(
-    'portal-search: term fallback after empty search',
+    'portal-search: term fallback typed, then Enter',
     (await runSearch(termWins)) === 'searched' &&
-      JSON.stringify(termWins.submittedTerms) === JSON.stringify(['', 'customer service']),
-    termWins.submittedTerms,
+      JSON.stringify(termWins.typedTerms) === JSON.stringify(['customer service']) &&
+      termWins.pressedKeys.filter((k) => k === 'Enter').length === 2,
+    { typed: termWins.typedTerms, keys: termWins.pressedKeys },
   );
   // Both submits, still nothing: no-results, no crash.
   const noResults = new FakePage({
@@ -1792,13 +1911,14 @@ async function testPortalSearch() {
       { jobLinks: 0, resultsText: false },
       { jobLinks: 0, resultsText: false },
     ],
-    onPerform: (term, page) => page.setUrl('https://portal.example/careers/results'),
+    onEnter: (term, page) => page.setUrl('https://portal.example/careers/results'),
   });
   check(
     'portal-search: two submits, still nothing, is no-results',
     (await runSearch(noResults)) === 'no-results' &&
-      JSON.stringify(noResults.submittedTerms) === JSON.stringify(['', 'customer service']),
-    noResults.submittedTerms,
+      JSON.stringify(noResults.typedTerms) === JSON.stringify(['customer service']) &&
+      noResults.pressedKeys.filter((k) => k === 'Enter').length === 2,
+    { typed: noResults.typedTerms, keys: noResults.pressedKeys },
   );
   // Page already lists jobs: no search at all.
   const alreadyListed = new FakePage({
@@ -1807,38 +1927,54 @@ async function testPortalSearch() {
   });
   check(
     'portal-search: page already listing skips the search',
-    (await runSearch(alreadyListed)) === 'has-listings' && alreadyListed.submittedTerms.length === 0,
-    alreadyListed.submittedTerms,
+    (await runSearch(alreadyListed)) === 'has-listings' && alreadyListed.typedTerms.length === 0 && alreadyListed.pressedKeys.length === 0,
+    alreadyListed.typedTerms,
   );
   // Submit fails: reported, no crash.
   const submitFails = new FakePage({
     scanResult: portalScan,
     counts: [{ jobLinks: 0, resultsText: false }],
-    performResult: { submitted: false, method: 'none' },
+    failEnter: true,
   });
   check(
     'portal-search: failed submit reported, no crash',
     (await runSearch(submitFails)) === 'submit-failed',
     null,
   );
-  // No button: Enter is pressed instead of a click.
+  // No button: Enter alone submits, no click anywhere.
   const enterPage = new FakePage({
     scanResult: { ...portalScan, buttons: [] },
     counts: [{ jobLinks: 0, resultsText: false }, { jobLinks: 5, resultsText: true }],
-    performResult: { submitted: true, method: 'enter' },
-    onPerform: (term, page) => page.setUrl('https://portal.example/careers/results'),
+    onEnter: (term, page) => page.setUrl('https://portal.example/careers/results'),
   });
   const enterOutcome = await runSearch(enterPage);
   check(
-    'portal-search: no button falls back to Enter',
-    enterOutcome === 'searched' && enterPage.pressedKeys.includes('Enter'),
-    { outcome: enterOutcome, keys: enterPage.pressedKeys },
+    'portal-search: no button, Enter alone submits',
+    enterOutcome === 'searched' &&
+      enterPage.pressedKeys.includes('Enter') &&
+      enterPage.buttonClicks === 0,
+    { outcome: enterOutcome, keys: enterPage.pressedKeys, clicks: enterPage.buttonClicks },
+  );
+  // Enter changes nothing, the submit button does: the click fallback.
+  const clickFallback = new FakePage({
+    scanResult: portalScan,
+    counts: [{ jobLinks: 0, resultsText: false }, { jobLinks: 5, resultsText: true }],
+    onEnter: null,
+    onButtonClick: (term, page) => page.setUrl('https://portal.example/careers/results'),
+  });
+  const clickOutcome = await runSearch(clickFallback);
+  check(
+    'portal-search: silent Enter falls back to the button click',
+    clickOutcome === 'searched' &&
+      clickFallback.pressedKeys.includes('Enter') &&
+      clickFallback.buttonClicks === 1,
+    { outcome: clickOutcome, keys: clickFallback.pressedKeys, clicks: clickFallback.buttonClicks },
   );
   // Submit navigates onto a board: redirect reported, never parsed.
   const boardRedirect = new FakePage({
     scanResult: portalScan,
     counts: [{ jobLinks: 0, resultsText: false }],
-    onPerform: (term, page) => page.setUrl('https://boards.greenhouse.io/portal/jobs'),
+    onEnter: (term, page) => page.setUrl('https://boards.greenhouse.io/portal/jobs'),
   });
   check(
     'portal-search: board redirect after submit reported',
@@ -1869,7 +2005,7 @@ async function testPortalSearch() {
   const seenTerms = [];
   const stubRender = async (url, term) => {
     seenTerms.push(term);
-    return searchedHtml;
+    return { html: searchedHtml, searchOutcome: 'searched', searchMs: 50, renderedUrl: url };
   };
   const out = await jobsMod.runFindJobs(
     { companiesCol },
@@ -1889,6 +2025,89 @@ async function testPortalSearch() {
     out.leads,
   );
   check('portal-search: render stats count the searched company', out.stats.rendered === 1, out.stats);
+}
+
+async function testDeferredRender() {
+  // Deferred rendering: the plain-HTML walk finishes FIRST and the
+  // single per-company render goes to the most promising zero-yielding
+  // candidate — a search/results URL — not the first zero-yielding
+  // page the walk hits (Concentrix: /united-states/ is an FAQ page
+  // with no search box; /job-search/ is the portal).
+  const jobsMod = freshRequire(`${OUT}/find-jobs.cjs`);
+  check(
+    'deferred-render: search/results URL outscores the FAQ page',
+    jobsMod.renderTargetScore('https://jobs.concentrix.com/job-search/', 'https://careers.concentrix.com/united-states/') === 5 &&
+      jobsMod.renderTargetScore('https://careers.concentrix.com/united-states/', 'https://careers.concentrix.com/united-states/') === 2,
+    null,
+  );
+  check(
+    'deferred-render: /careers still beats /jobs on a tie (walk order)',
+    jobsMod.renderTargetScore('https://jsboard.example/careers', '') === 2 &&
+      jobsMod.renderTargetScore('https://jsboard.example/jobs', '') === 2,
+    null,
+  );
+  check(
+    'deferred-render: user-given careers link beats a guessed sibling',
+    jobsMod.renderTargetScore('https://jobs.cvshealth.com/', 'https://jobs.cvshealth.com/') === 2 &&
+      jobsMod.renderTargetScore('https://jobs.cvshealth.com/careers', 'https://jobs.cvshealth.com/') === 2,
+    null,
+  );
+  const faqHtml = `<html><body><h1>Life at Concentrix</h1><nav><a href="https://jobs.concentrix.com/job-search/">Search &amp; Apply</a></nav><p>No jobs on this page.</p></body></html>`;
+  const portalShell = `<html><body><div id="root"></div><p>Search results (0 jobs available)</p></body></html>`;
+  const searchedHtml = `<html><body>
+<div class="job-listing"><h3>Customer Support Specialist</h3><p>Location: Remote</p><a href="/job/customer-support-specialist">Apply</a></div>
+</body></html>`;
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u === 'https://careers.concentrix.com/united-states/') return { ok: true, text: async () => faqHtml };
+    if (u === 'https://jobs.concentrix.com/job-search/') return { ok: true, text: async () => portalShell };
+    return { ok: true, text: async () => '<html><body>No careers here.</body></html>' };
+  };
+  const resumeText =
+    'Customer support specialist with Zendesk, chat support, and troubleshooting experience for SaaS customers';
+  const renderedUrls = [];
+  const stubRender = async (url) => {
+    renderedUrls.push(url);
+    return { html: searchedHtml, searchOutcome: 'searched', searchMs: 4200, renderedUrl: `${url}?searchQuery=service+customer` };
+  };
+  const out = await jobsMod.searchCompanyJobs(
+    { name: 'Concentrix', website: 'https://careers.concentrix.com', careersUrl: 'https://careers.concentrix.com/united-states/', isUSCompany: true },
+    resumeText,
+    { renderPage: stubRender },
+  );
+  check(
+    'deferred-render: the ONE render goes to /job-search/, not the FAQ page',
+    renderedUrls.length === 1 && renderedUrls[0] === 'https://jobs.concentrix.com/job-search/',
+    renderedUrls,
+  );
+  check(
+    'deferred-render: the walk still tried the FAQ page first',
+    out.triedUrls[0] === 'https://careers.concentrix.com/united-states/' &&
+      out.triedUrls.includes('https://jobs.concentrix.com/job-search/'),
+    out.triedUrls,
+  );
+  check(
+    'deferred-render: post-search listings extracted, source is the rendered page',
+    out.leads.length === 1 && out.sourcePage === 'https://jobs.concentrix.com/job-search/' && out.renderUsed === true,
+    out,
+  );
+  check(
+    'deferred-render: outcome + ms + final URL surface on the result',
+    out.searchOutcome === 'searched' && out.searchMs === 4200 && out.renderedUrl === 'https://jobs.concentrix.com/job-search/?searchQuery=service+customer',
+    { searchOutcome: out.searchOutcome, searchMs: out.searchMs, renderedUrl: out.renderedUrl },
+  );
+  // A portal-direct call (careersUrl IS the /job-search/ page) renders
+  // that page itself — no detour through a sibling.
+  const direct = await jobsMod.searchCompanyJobs(
+    { name: 'Concentrix', website: '', careersUrl: 'https://jobs.concentrix.com/job-search/', isUSCompany: true },
+    resumeText,
+    { renderPage: stubRender },
+  );
+  check(
+    'deferred-render: portal-direct renders the portal URL itself',
+    renderedUrls[renderedUrls.length - 1] === 'https://jobs.concentrix.com/job-search/' && direct.leads.length === 1,
+    renderedUrls,
+  );
 }
 
 async function testMatchingFixes() {
@@ -2248,6 +2467,7 @@ await testFindJobs();
 await testFindJobsNonFrontend();
 await testRenderFallback();
 await testPortalSearch();
+await testDeferredRender();
 await testTestCompany();
 await testJazzhr();
 await testBusinessSiteFirst();

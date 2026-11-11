@@ -24,7 +24,8 @@ import {
   type VercelRequest,
   type VercelResponse,
 } from './finder-lib.js';
-import { renderPageHtml, type RenderPageFn } from './render-page.js';
+import { renderPageHtml, type RenderPageFn, type RenderPageResult } from './render-page.js';
+import type { PortalSearchOutcome } from './render-search.js';
 import type { Collection } from 'mongodb';
 
 const FETCH_TIMEOUT_MS = 6000;
@@ -625,6 +626,17 @@ export interface CompanySearchResult {
   renderUsed: boolean;
   /** Milliseconds spent rendering for this company (0 when unused). */
   renderMs: number;
+  /** The portal-search outcome from the render fallback — what the
+   *  search step actually did, so a zero-listing render can be told
+   *  apart from a render that never searched. Null when no render ran
+   *  or the render failed before the search step. */
+  searchOutcome: PortalSearchOutcome | null;
+  /** Milliseconds spent inside the portal search step (0 when it never
+   *  ran). */
+  searchMs: number;
+  /** The final URL the render ended on — the results page when the
+   *  search navigated. '' when no render ran. */
+  renderedUrl: string;
   /** Visible text the render saw ('' when no render ran). A challenge
    *  page, an empty search state, or job titles the extractors
    *  missed — the diagnosis for a zero-listing render. */
@@ -991,6 +1003,31 @@ async function collectPagePostings(html: string, pageUrl: string, rendered: bool
   return pagePostings;
 }
 
+/** Score a zero-yielding candidate as the ONE page worth rendering.
+ *  The render budget is one page per company, so it must go to the
+ *  page most likely to be the job list — not the first zero-yielding
+ *  candidate the walk happens to hit. A search/results URL wins
+ *  outright (Concentrix: /united-states/ is an FAQ/culture page with
+ *  no search box, while /job-search/ is the portal — rendering the
+ *  first and spending the budget strands the company at zero). A
+ *  plain /search page is next, then any /jobs or /careers path, then
+ *  the careers link the user gave (worth more than a guessed sibling
+ *  path). Equal scores break toward the earliest candidate in walk
+ *  order, so /careers still beats /jobs when both are guesses. */
+export function renderTargetScore(u: string, careersUrl: string): number {
+  let score = 0;
+  try {
+    const path = new URL(u).pathname.toLowerCase();
+    if (/job-search|search-results|\/results(\/|$)/.test(path)) score += 5;
+    else if (/search/.test(path)) score += 4;
+    else if (/jobs?|careers?/.test(path)) score += 2;
+  } catch {
+    // Unparseable URL — scores only the careers-link bonus below.
+  }
+  if (careersUrl && u === careersUrl) score += 2;
+  return score;
+}
+
 /** A URL worth rendering: the careers link the user gave, or a path
  *  that names careers/jobs. The bare homepage never renders — a JS
  *  homepage would only reveal nav links, and its /careers and /jobs
@@ -1053,6 +1090,19 @@ export async function searchCompanyJobs(
   let renderUsed = false;
   let renderMs = 0;
   let renderTextSample = '';
+  let searchOutcome: PortalSearchOutcome | null = null;
+  let searchMs = 0;
+  let renderedUrl = '';
+  // Deferred rendering: the plain-HTML walk runs FIRST and the render
+  // fires only after it, on the single most promising zero-yielding
+  // candidate (renderTargetScore). Rendering the first zero-yielding
+  // candidate mid-walk spends the one-per-company budget on whatever
+  // the walk hits first — often an FAQ/culture page with no search
+  // box — before the page that actually carries the portal (a
+  // /job-search/ link on that same FAQ page) is ever discovered. The
+  // walk also finds plain-HTML postings on later candidates without
+  // spending any render budget at all.
+  const zeroYieldTargets: string[] = [];
   for (let i = 0; i < candidates.length; i++) {
     const u = candidates[i];
     triedUrls.push(u);
@@ -1063,39 +1113,7 @@ export async function searchCompanyJobs(
     } catch {
       continue;
     }
-    let pagePostings = await collectPagePostings(html, u, false);
-    // Render fallback: the page loaded but its static HTML carries no
-    // listings — a JavaScript board. Load the SAME page in a real
-    // browser and extract from the rendered DOM with the same
-    // extractors. The render also runs the portal search step on that
-    // page (render-search.ts): a search-gated portal gets its own
-    // search submitted — empty first, then a resume role term — so the
-    // returned HTML is the post-search results page. Only a careers-like
-    // URL ever renders, at most once per company, and only while the
-    // render budget and deadline last. A failed render just leaves the
-    // page at zero listings.
-    if (
-      pagePostings.length === 0 &&
-      opts.renderPage &&
-      renderBudget.used < renderBudget.max &&
-      Date.now() < renderDeadlineMs &&
-      isCareersLikeUrl(u, careersUrl)
-    ) {
-      renderBudget.used += 1;
-      const started = Date.now();
-      let renderedHtml: string | null = null;
-      try {
-        renderedHtml = await opts.renderPage(u, portalSearchTerm(resumeText));
-      } catch {
-        renderedHtml = null;
-      }
-      renderMs += Date.now() - started;
-      if (renderedHtml) {
-        renderTextSample = sampleRenderedText(renderedHtml);
-        pagePostings = await collectPagePostings(renderedHtml, u, true);
-        if (pagePostings.length > 0) renderUsed = true;
-      }
-    }
+    const pagePostings = await collectPagePostings(html, u, false);
     if (pagePostings.length > 0) {
       const screened = screenPostings(company.name, pagePostings, resumeText, company.isUSCompany ?? false);
       return {
@@ -1111,14 +1129,85 @@ export async function searchCompanyJobs(
         },
         renderUsed,
         renderMs,
+        searchOutcome,
+        searchMs,
+        renderedUrl,
         renderTextSample,
       };
     }
+    if (isCareersLikeUrl(u, careersUrl)) zeroYieldTargets.push(u);
     let at = i + 1;
     for (const link of careersLinksOnPage(html, u)) {
       if (!isBoardUrl(link) && candidates.length < 8 && !candidates.includes(link) && !triedUrls.includes(link)) {
         candidates.splice(at, 0, link);
         at++;
+      }
+    }
+  }
+  // The walk found nothing in plain HTML. One render, on the best
+  // target, while budget and deadline last. A failed render just
+  // leaves the company at zero listings — the outcome fields still
+  // say what happened.
+  if (
+    zeroYieldTargets.length > 0 &&
+    opts.renderPage &&
+    renderBudget.used < renderBudget.max &&
+    Date.now() < renderDeadlineMs
+  ) {
+    let target = zeroYieldTargets[0];
+    let bestScore = renderTargetScore(target, careersUrl);
+    for (const t of zeroYieldTargets.slice(1)) {
+      const s = renderTargetScore(t, careersUrl);
+      if (s > bestScore) {
+        target = t;
+        bestScore = s;
+      }
+    }
+    renderBudget.used += 1;
+    const started = Date.now();
+    let rendered: RenderPageResult | null = null;
+    try {
+      rendered = await opts.renderPage(target, portalSearchTerm(resumeText));
+    } catch {
+      rendered = null;
+    }
+    renderMs += Date.now() - started;
+    if (rendered) {
+      searchOutcome = rendered.searchOutcome;
+      searchMs = rendered.searchMs;
+      renderedUrl = rendered.renderedUrl;
+      if (rendered.html) {
+        renderTextSample = sampleRenderedText(rendered.html);
+        // Resolve the rendered page's links against the URL the
+        // render actually ended on — a search can navigate the page
+        // to a results URL, and relative links belong to that page.
+        const pagePostings = await collectPagePostings(
+          rendered.html,
+          rendered.renderedUrl || target,
+          true,
+        );
+        if (pagePostings.length > 0) {
+          renderUsed = true;
+          const screened = screenPostings(company.name, pagePostings, resumeText, company.isUSCompany ?? false);
+          return {
+            leads: screened.leads,
+            postingsSeen: pagePostings.length,
+            sourcePage: target,
+            triedUrls,
+            fetchOk: true,
+            screened: {
+              rejectedNoMatch: screened.rejectedNoMatch,
+              rejectedLocation: screened.rejectedLocation,
+              reviewLocation: screened.reviewLocation,
+            },
+            renderUsed,
+            renderMs,
+            searchOutcome,
+            searchMs,
+            renderedUrl,
+            renderTextSample,
+          };
+        }
       }
     }
   }
@@ -1131,6 +1220,9 @@ export async function searchCompanyJobs(
     screened: { rejectedNoMatch: 0, rejectedLocation: 0, reviewLocation: 0 },
     renderUsed,
     renderMs,
+    searchOutcome,
+    searchMs,
+    renderedUrl,
     renderTextSample,
   };
 }

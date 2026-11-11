@@ -58,6 +58,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       fetchOk: result.fetchOk,
       renderUsed: result.renderUsed,
       renderMs: result.renderMs,
+      // What the portal search step did, so a zero-listing render can
+      // be told apart from a render that never searched.
+      searchOutcome: result.searchOutcome,
+      searchMs: result.searchMs,
+      renderedUrl: result.renderedUrl,
       renderTextSample: result.renderTextSample,
       screened: result.screened,
       leads: result.leads,
