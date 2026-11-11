@@ -1,8 +1,11 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import type { Job } from '../domain';
 import { useStore } from '../store';
 import { Badge, Button, EmptyState } from './ui';
 import { downloadTailoredResumePdf } from '../lib/resume';
+
+/* Jobs per table page. Each table keeps its own page. */
+const PAGE_SIZE = 10;
 
 /* Jobs dashboard — one table per uploaded master resume.
  *
@@ -41,6 +44,11 @@ function JobsTable({
     () => [...jobs].sort((a, b) => b.matchScore - a.matchScore || b.createdAt.localeCompare(a.createdAt)),
     [jobs],
   );
+  const [page, setPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  // Clamp if the list shrank under the current page (jobs removed).
+  const safePage = Math.min(page, totalPages);
+  const paged = sorted.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
   return (
     <div className="overflow-x-auto rounded-2xl border border-white/10 bg-zinc-900/60">
       <table className="w-full min-w-[720px] text-left text-sm">
@@ -57,7 +65,7 @@ function JobsTable({
           </tr>
         </thead>
         <tbody className="divide-y divide-white/[0.06]">
-          {sorted.map((job) => (
+          {paged.map((job) => (
             <tr
               key={job.id}
               onClick={() => onSelect(job.id)}
@@ -112,6 +120,31 @@ function JobsTable({
           ))}
         </tbody>
       </table>
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between border-t border-white/10 px-4 py-3">
+          <span className="text-xs text-zinc-500">
+            Page {safePage} of {totalPages}
+          </span>
+          <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={safePage <= 1}
+              onClick={() => setPage(safePage - 1)}
+            >
+              Previous
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={safePage >= totalPages}
+              onClick={() => setPage(safePage + 1)}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
