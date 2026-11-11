@@ -125,6 +125,14 @@ export function domainOf(website: string): string {
   }
 }
 
+/** Board domains are never a source: a URL on one is skipped outright,
+ *  whether the user pasted it or a page links to it. Shared by the
+ *  HTML reader and the render fallback (which also refuses to parse a
+ *  page that redirected onto a board). */
+export function isBoardUrl(url: string): boolean {
+  return /greenhouse\.io|lever\.co|ashbyhq\.com|jazz\.co|applytojob\.com/i.test(url);
+}
+
 /** Composite dedupe key: normalized name + website domain. */
 export function companyPairKey(name: string, website: string): string {
   return `${nameKey(name)}|${domainOf(website)}`;

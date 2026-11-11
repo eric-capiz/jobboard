@@ -16,6 +16,12 @@ import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
 
+// The render fallback needs a real browser — never in this suite: the
+// stubbed fetch has no real pages behind it, and a launch would try to
+// download Chromium. Tests covering the fallback inject a stub renderer
+// through runFindJobs opts instead.
+process.env.JOBBOARD_NO_RENDER = '1';
+
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
 const OUT = '/tmp/finder-test-bundles';
@@ -553,6 +559,74 @@ async function testFindJobsNonFrontend() {
   // 'customers' into one term, so the signature tightens from 8 terms
   // to 7 and the same 3 matches score higher (50 + 50*3/7 = 71).
   check('find-jobs non-frontend: support lead scores 71', out.leads[0]?.matchScore === 71, out.leads[0]);
+}
+
+async function testRenderFallback() {
+  // The render fallback: a careers page whose static HTML is a bare
+  // JS shell (zero listings) gets rendered in a real browser; the
+  // rendered DOM is parsed with the same extractors. The renderer is
+  // a stub here — the real browser never runs in this suite.
+  const jobsMod = freshRequire(`${OUT}/find-jobs.cjs`);
+  const companiesCol = new FakeCollection();
+  await companiesCol.insertMany([
+    { name: 'JsBoard Co', website: 'https://jsboard.example', domain: 'jsboard.example', nameKey: 'jsboard co', careersUrl: '', category: 'General', source: 'Wikidata', addedAt: '2026-10-29T00:00:00Z' },
+    { name: 'Static Co', website: 'https://staticco.example', domain: 'staticco.example', nameKey: 'static co', careersUrl: '', category: 'General', source: 'Wikidata', addedAt: '2026-10-29T00:00:00Z' },
+  ]);
+  const resumeText =
+    'Customer support specialist with Zendesk, chat support, and troubleshooting experience for SaaS customers';
+  const shellHtml = `<html><body><div id="root"></div><script src="/app.js"></script></body></html>`;
+  const renderedHtml = `<html><body>
+<div class="job-listing"><h3>Customer Support Specialist</h3><p>Location: Remote</p><a href="/jobs/support-specialist">Apply</a></div>
+</body></html>`;
+  const staticHtml = renderedHtml;
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u === 'https://staticco.example/careers') return { ok: true, text: async () => staticHtml };
+    return { ok: true, text: async () => shellHtml };
+  };
+  const renderedUrls = [];
+  const stubRender = async (url) => {
+    renderedUrls.push(url);
+    return renderedHtml;
+  };
+  const out = await jobsMod.runFindJobs(
+    { companiesCol },
+    { resumeText, cursor: 0, limit: 15 },
+    { renderPage: stubRender },
+  );
+  check(
+    'render: JS-shell careers page yields a lead through the fallback',
+    out.leads.length === 2 && out.stats.postingsSeen === 2,
+    out,
+  );
+  check(
+    'render: rendered lead is stamped sourceType rendered, static lead stays html',
+    out.leads.some((l) => l.company === 'JsBoard Co' && l.sourceType === 'rendered') &&
+      out.leads.some((l) => l.company === 'Static Co' && l.sourceType === 'html'),
+    out.leads,
+  );
+  check('render: stats.rendered counts the rendered company', out.stats.rendered === 1, out.stats);
+  check(
+    'render: only the careers URL renders, never the homepage',
+    renderedUrls.length === 1 && renderedUrls[0] === 'https://jsboard.example/careers',
+    renderedUrls,
+  );
+  // A failed render leaves the company at zero listings, unchanged.
+  const failOut = await jobsMod.runFindJobs(
+    { companiesCol },
+    { resumeText, cursor: 0, limit: 15 },
+    { renderPage: async () => null },
+  );
+  check(
+    'render: failed render leaves noBoard/noListings counts unchanged',
+    failOut.stats.noBoard === 1 && failOut.stats.noListings === 1 && failOut.stats.postingsSeen === 1,
+    failOut.stats,
+  );
+  check(
+    'render: no renderer passed means no render at all',
+    (await jobsMod.runFindJobs({ companiesCol }, { resumeText, cursor: 0, limit: 15 })).stats.noBoard === 1,
+    failOut.stats,
+  );
 }
 
 async function testTestCompany() {
@@ -1565,6 +1639,39 @@ async function testMatchingFixes() {
     lv('Hybrid, Austin TX', '').verdict === 'reject',
     lv('Hybrid, Austin TX', ''),
   );
+  // Nov 10 CS sweep blind spot: Niche's 'Sr. Product Analyst (Brazil
+  // & Argentina ONLY)', location 'Remote', passed as 'Remote (US
+  // company)' for a U.S. company. An explicit non-US-only restriction
+  // in the title/description must reject, even with a blank location
+  // or a bare-'Remote' line and a U.S. company.
+  check(
+    'location: Brazil & Argentina ONLY in title rejects for US company',
+    lv('Remote', 'Sr. Product Analyst (Brazil & Argentina ONLY)', true).verdict === 'reject',
+    lv('Remote', 'Sr. Product Analyst (Brazil & Argentina ONLY)', true),
+  );
+  check(
+    'location: Brazil-only hiring in description rejects, blank location',
+    lv(
+      '',
+      'We are currently recruiting for this role in Argentina and Brazil only. We will not be considering US based candidates at this time.',
+      true,
+    ).verdict === 'reject',
+    lv(
+      '',
+      'We are currently recruiting for this role in Argentina and Brazil only. We will not be considering US based candidates at this time.',
+      true,
+    ),
+  );
+  check(
+    'location: blank location + US company still passes without a restriction',
+    lv('', 'Customer Service Representative', true).verdict === 'ok',
+    lv('', 'Customer Service Representative', true),
+  );
+  check(
+    'location: Remote, US line still wins over a stray place name in the description',
+    lv('Remote, US', 'Our team works with colleagues in Brazil.').verdict === 'ok',
+    lv('Remote, US', 'Our team works with colleagues in Brazil.'),
+  );
 
   // Helper: run test-company against one canned careers page.
   async function runPage(html) {
@@ -1810,10 +1917,13 @@ async function testMatchingFixes() {
     { companiesCol },
     { resumeText: resume, cursor: 0, limit: 15 },
   );
+  // Nov 10 location rule (Eric): a bare-'Remote' posting from a U.S.
+  // company passes instead of going to review, so reviewLocation is 0
+  // here — the Frontend Developer lead is ok, not review-only.
   check(
     'stats: funnel counts',
     statsOut.stats.rejectedNoMatch === 1 &&
-      statsOut.stats.reviewLocation === 1 &&
+      statsOut.stats.reviewLocation === 0 &&
       statsOut.stats.noListings === 1 &&
       statsOut.stats.unreachable === 0,
     statsOut.stats,
@@ -1837,6 +1947,7 @@ await testTypesKeysetPaging();
 await testTypesSkipRetry();
 await testFindJobs();
 await testFindJobsNonFrontend();
+await testRenderFallback();
 await testTestCompany();
 await testJazzhr();
 await testBusinessSiteFirst();

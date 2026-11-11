@@ -19,16 +19,25 @@
 import {
   authorized,
   getCompaniesCollection,
+  isBoardUrl,
   type CompanyDoc,
   type VercelRequest,
   type VercelResponse,
 } from './finder-lib.js';
+import { renderPageHtml, type RenderPageFn } from './render-page.js';
 import type { Collection } from 'mongodb';
 
 const FETCH_TIMEOUT_MS = 6000;
 const SOFT_DEADLINE_MS = 50000;
 const CONCURRENCY = 5;
 const MAX_LIMIT = 25;
+/** At most 2 renders per chunk invocation: a render is slow (cold
+ *  ~30s, warm ~5-10s), and one slow company must never eat a chunk.
+ *  The sweep client re-calls with a fresh budget for the next chunk. */
+const MAX_RENDERS_PER_CALL = 2;
+/** Renders may only START in the first 30s of a chunk: a render
+ *  started later could still be running when maxDuration (60s) hits. */
+const RENDER_WINDOW_MS = 30000;
 
 /* ------------------------------------------------------------------ */
 /* Page-fetch helpers                                                    */
@@ -86,12 +95,6 @@ function stripTags(text: string): string {
 function jazzhrWidgetSlug(pageHtml: string): string | null {
   const m = pageHtml.match(/app\.jazz\.co\/widgets\/basic\/create\/([a-z0-9\-_]+)/);
   return m ? m[1] : null;
-}
-
-/** Board domains are never a source: a URL on one is skipped outright,
- *  whether the user pasted it or a page links to it. */
-function isBoardUrl(url: string): boolean {
-  return /greenhouse\.io|lever\.co|ashbyhq\.com|jazz\.co|applytojob\.com/i.test(url);
 }
 
 /** The Greenhouse job board embed script on a business careers page
@@ -618,6 +621,22 @@ export interface CompanySearchResult {
    *  no resume match, on location, and how many survived only as
    *  review-only (uncertain location). */
   screened: { rejectedNoMatch: number; rejectedLocation: number; reviewLocation: number };
+  /** True when listings came from the browser render fallback. */
+  renderUsed: boolean;
+  /** Milliseconds spent rendering for this company (0 when unused). */
+  renderMs: number;
+}
+
+/** Render options for one company search. Production callers pass the
+ *  real renderer; omitting renderPage disables the fallback (tests,
+ *  and callers that don't want it). `renderBudget` is a shared
+ *  per-invocation cap (mutated as renders are used); when omitted each
+ *  company gets a budget of 1. `renderDeadlineMs` is the last epoch at
+ *  which a render may start; when omitted it defaults to 30s out. */
+export interface SearchCompanyOpts {
+  renderPage?: RenderPageFn | null;
+  renderBudget?: { used: number; max: number };
+  renderDeadlineMs?: number;
 }
 
 const GENERIC_TITLE_TEXT = /^(home|about|about us|careers|jobs|job|contact|contact us|login|sign in|join our team|work with us|open positions|current openings|open roles|all roles|see all jobs|view all jobs|view jobs|see jobs|browse jobs|search jobs|browse all jobs|view openings|see openings|view open positions|all jobs|all positions|explore careers|explore jobs|learn more|apply now|view details|view job|see details)$/i;
@@ -879,9 +898,102 @@ function careersLinksOnPage(html: string, pageUrl: string): string[] {
   return out.slice(0, 3);
 }
 
+/** Every way one page displays jobs, unioned: listings in the page's
+ *  own HTML, plus its embedded widget, iframe, or job board embed. A
+ *  page can carry more than one (House Rx lists a few Webflow roles
+ *  AND embeds its Greenhouse board), and taking only the first source
+ *  would hide the rest. All of these are the page's own display — no
+ *  board is ever visited as a separate source, and a board link found
+ *  on the page is never followed. `rendered` is true when the HTML
+ *  came from the browser fallback: page listings are then stamped
+ *  'rendered' so provenance shows the render path produced them. */
+async function collectPagePostings(html: string, pageUrl: string, rendered: boolean): Promise<Posting[]> {
+  const pagePostings: Posting[] = [];
+  const seenKeys = new Set<string>();
+  const addPostings = (ps: Posting[], source: string) => {
+    for (const p of ps) {
+      const k = `${p.title}\n${p.url}`;
+      if (!seenKeys.has(k)) {
+        seenKeys.add(k);
+        pagePostings.push({ ...p, source });
+      }
+    }
+  };
+  addPostings(parseCareersPage(html, pageUrl), rendered ? 'rendered' : 'html');
+  const widgetSlug = jazzhrWidgetSlug(html);
+  if (widgetSlug) {
+    try {
+      addPostings(
+        parseJazzhrWidget(
+          await fetchText(`https://app.jazz.co/widgets/basic/create/${widgetSlug}`),
+        ),
+        'jazzhr',
+      );
+    } catch {
+      // Widget unreadable — the page's other sources still count.
+    }
+  }
+  const iframeUrl = isolvedIframeUrl(html);
+  if (iframeUrl) {
+    try {
+      addPostings(parseIsolvedIframe(await fetchText(iframeUrl), iframeUrl), 'isolved');
+    } catch {
+      // Iframe unreadable — the page's other sources still count.
+    }
+  }
+  const ghSlug = greenhouseEmbedSlug(html);
+  if (ghSlug) {
+    try {
+      addPostings(
+        parseGreenhouseJobs(
+          await fetchText(
+            `https://boards-api.greenhouse.io/v1/boards/${ghSlug}/jobs?content=true`,
+          ),
+        ),
+        'greenhouse',
+      );
+    } catch {
+      // Embed unreadable — the page's other sources still count.
+    }
+  }
+  // JSON-LD last: a block whose title is already visible adds no NEW
+  // posting — but its description/location are the only description
+  // the visible listing will ever get (the HTML parser reads titles
+  // + links only, so visible postings carry description ''). Merge
+  // the structured fields into the visible posting instead of
+  // dropping the block: without this, matching is title-only and a
+  // real CS description can never lift a score past 60.
+  const byTitle = new Map(pagePostings.map((p) => [p.title.toLowerCase(), p]));
+  for (const jp of parseJsonLdPostings(html, pageUrl)) {
+    const vis = byTitle.get(jp.title.toLowerCase());
+    if (vis) {
+      if (!vis.description && jp.description) vis.description = jp.description;
+      if (!vis.location && jp.location) vis.location = jp.location;
+      if (!vis.postedDate && jp.postedDate) vis.postedDate = jp.postedDate;
+    } else {
+      addPostings([jp], 'jsonld');
+    }
+  }
+  return pagePostings;
+}
+
+/** A URL worth rendering: the careers link the user gave, or a path
+ *  that names careers/jobs. The bare homepage never renders — a JS
+ *  homepage would only reveal nav links, and its /careers and /jobs
+ *  guesses are tried (and rendered) as candidates anyway. */
+function isCareersLikeUrl(u: string, careersUrl: string): boolean {
+  if (careersUrl && u === careersUrl) return true;
+  try {
+    return /career|job/i.test(new URL(u).pathname);
+  } catch {
+    return false;
+  }
+}
+
 export async function searchCompanyJobs(
   company: CompanySearchInput,
   resumeText: string,
+  opts: SearchCompanyOpts = {},
 ): Promise<CompanySearchResult> {
   const careersUrl = company.careersUrl || '';
   const website = company.website || '';
@@ -899,7 +1011,11 @@ export async function searchCompanyJobs(
       if (!candidates.includes(u)) candidates.push(u);
     }
   }
+  const renderBudget = opts.renderBudget ?? { used: 0, max: 1 };
+  const renderDeadlineMs = opts.renderDeadlineMs ?? Date.now() + RENDER_WINDOW_MS;
   let anyFetchOk = false;
+  let renderUsed = false;
+  let renderMs = 0;
   for (let i = 0; i < candidates.length; i++) {
     const u = candidates[i];
     triedUrls.push(u);
@@ -910,77 +1026,32 @@ export async function searchCompanyJobs(
     } catch {
       continue;
     }
-    // Every way this page itself displays jobs, unioned: listings in
-    // the page's own HTML, plus its embedded widget, iframe, or job
-    // board embed. A page can carry more than one (House Rx lists a
-    // few Webflow roles AND embeds its Greenhouse board), and taking
-    // only the first source would hide the rest. All of these are the
-    // page's own display — no board is ever visited as a separate
-    // source, and a board link found on the page is never followed.
-    const pagePostings: Posting[] = [];
-    const seenKeys = new Set<string>();
-    const addPostings = (ps: Posting[], source: string) => {
-      for (const p of ps) {
-        const k = `${p.title}\n${p.url}`;
-        if (!seenKeys.has(k)) {
-          seenKeys.add(k);
-          pagePostings.push({ ...p, source });
-        }
-      }
-    };
-    addPostings(parseCareersPage(html, u), 'html');
-    const widgetSlug = jazzhrWidgetSlug(html);
-    if (widgetSlug) {
+    let pagePostings = await collectPagePostings(html, u, false);
+    // Render fallback: the page loaded but its static HTML carries no
+    // listings — a JavaScript board. Load the SAME page in a real
+    // browser and extract from the rendered DOM with the same
+    // extractors. Only a careers-like URL ever renders, at most once
+    // per company, and only while the render budget and deadline
+    // last. A failed render just leaves the page at zero listings.
+    if (
+      pagePostings.length === 0 &&
+      opts.renderPage &&
+      renderBudget.used < renderBudget.max &&
+      Date.now() < renderDeadlineMs &&
+      isCareersLikeUrl(u, careersUrl)
+    ) {
+      renderBudget.used += 1;
+      const started = Date.now();
+      let renderedHtml: string | null = null;
       try {
-        addPostings(
-          parseJazzhrWidget(
-            await fetchText(`https://app.jazz.co/widgets/basic/create/${widgetSlug}`),
-          ),
-          'jazzhr',
-        );
+        renderedHtml = await opts.renderPage(u);
       } catch {
-        // Widget unreadable — the page's other sources still count.
+        renderedHtml = null;
       }
-    }
-    const iframeUrl = isolvedIframeUrl(html);
-    if (iframeUrl) {
-      try {
-        addPostings(parseIsolvedIframe(await fetchText(iframeUrl), iframeUrl), 'isolved');
-      } catch {
-        // Iframe unreadable — the page's other sources still count.
-      }
-    }
-    const ghSlug = greenhouseEmbedSlug(html);
-    if (ghSlug) {
-      try {
-        addPostings(
-          parseGreenhouseJobs(
-            await fetchText(
-              `https://boards-api.greenhouse.io/v1/boards/${ghSlug}/jobs?content=true`,
-            ),
-          ),
-          'greenhouse',
-        );
-      } catch {
-        // Embed unreadable — the page's other sources still count.
-      }
-    }
-    // JSON-LD last: a block whose title is already visible adds no NEW
-    // posting — but its description/location are the only description
-    // the visible listing will ever get (the HTML parser reads titles
-    // + links only, so visible postings carry description ''). Merge
-    // the structured fields into the visible posting instead of
-    // dropping the block: without this, matching is title-only and a
-    // real CS description can never lift a score past 60.
-    const byTitle = new Map(pagePostings.map((p) => [p.title.toLowerCase(), p]));
-    for (const jp of parseJsonLdPostings(html, u)) {
-      const vis = byTitle.get(jp.title.toLowerCase());
-      if (vis) {
-        if (!vis.description && jp.description) vis.description = jp.description;
-        if (!vis.location && jp.location) vis.location = jp.location;
-        if (!vis.postedDate && jp.postedDate) vis.postedDate = jp.postedDate;
-      } else {
-        addPostings([jp], 'jsonld');
+      renderMs += Date.now() - started;
+      if (renderedHtml) {
+        pagePostings = await collectPagePostings(renderedHtml, u, true);
+        if (pagePostings.length > 0) renderUsed = true;
       }
     }
     if (pagePostings.length > 0) {
@@ -996,6 +1067,8 @@ export async function searchCompanyJobs(
           rejectedLocation: screened.rejectedLocation,
           reviewLocation: screened.reviewLocation,
         },
+        renderUsed,
+        renderMs,
       };
     }
     let at = i + 1;
@@ -1013,6 +1086,8 @@ export async function searchCompanyJobs(
     triedUrls,
     fetchOk: anyFetchOk,
     screened: { rejectedNoMatch: 0, rejectedLocation: 0, reviewLocation: 0 },
+    renderUsed,
+    renderMs,
   };
 }
 
@@ -1292,12 +1367,17 @@ export interface FindJobsResult {
     rejectedLocation: number;
     /** Leads kept as review-only (uncertain location). */
     reviewLocation: number;
+    /** Companies whose listings came from the render fallback. */
+    rendered: number;
+    /** Total milliseconds spent rendering in this chunk. */
+    renderMs: number;
   };
 }
 
 export async function runFindJobs(
   deps: FindJobsDeps,
   body: { resumeText?: string; cursor?: number; limit?: number },
+  opts: { renderPage?: RenderPageFn | null } = {},
 ): Promise<FindJobsResult> {
   const resumeText = typeof body.resumeText === 'string' ? body.resumeText : '';
   const cursorRaw = Number(body.cursor ?? 0);
@@ -1326,6 +1406,13 @@ export async function runFindJobs(
   let rejectedNoMatch = 0;
   let rejectedLocation = 0;
   let reviewLocation = 0;
+  let rendered = 0;
+  let renderMs = 0;
+  // One render budget shared by the whole chunk, and one start
+  // deadline: renders only begin in the first 30s so a slow page can
+  // never push the invocation past its 60s maxDuration.
+  const renderBudget = { used: 0, max: MAX_RENDERS_PER_CALL };
+  const renderDeadlineMs = startedAt + RENDER_WINDOW_MS;
 
   async function processCompany(company: CompanyDoc): Promise<FinderLead[]> {
     // Every roster company is a U.S. company by construction: Find
@@ -1337,6 +1424,7 @@ export async function runFindJobs(
     const result = await searchCompanyJobs(
       { name: company.name, website: company.website || '', careersUrl: company.careersUrl || '', isUSCompany: company.source !== 'Manual' },
       resumeText,
+      { renderPage: opts.renderPage ?? null, renderBudget, renderDeadlineMs },
     );
     postingsSeen += result.postingsSeen;
     if (!result.sourcePage) {
@@ -1347,6 +1435,8 @@ export async function runFindJobs(
     rejectedNoMatch += result.screened.rejectedNoMatch;
     rejectedLocation += result.screened.rejectedLocation;
     reviewLocation += result.screened.reviewLocation;
+    if (result.renderUsed) rendered += 1;
+    renderMs += result.renderMs;
     return result.leads;
   }
 
@@ -1392,6 +1482,8 @@ export async function runFindJobs(
       rejectedNoMatch,
       rejectedLocation,
       reviewLocation,
+      rendered,
+      renderMs,
     },
   };
 }
@@ -1399,6 +1491,12 @@ export async function runFindJobs(
 /* ------------------------------------------------------------------ */
 /* Handler                                                             */
 /* ------------------------------------------------------------------ */
+
+/* The render fallback needs the full Hobby allowance: a cold render
+ * (binary download + launch + page JS) can take ~30s, so the function
+ * runs with maxDuration 60 (the Hobby cap). The 50s soft deadline
+ * inside runFindJobs still bounds normal chunk work. */
+export const config = { maxDuration: 60 };
 
 async function handlerInner(req: VercelRequest, res: VercelResponse): Promise<void> {
   if (req.method !== 'POST') {
@@ -1413,6 +1511,7 @@ async function handlerInner(req: VercelRequest, res: VercelResponse): Promise<vo
   const result = await runFindJobs(
     { companiesCol: await getCompaniesCollection() },
     { resumeText: body.resumeText, cursor: body.cursor, limit: body.limit },
+    { renderPage: renderPageHtml },
   );
   res.status(200).json(result);
 }

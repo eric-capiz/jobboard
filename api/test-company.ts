@@ -17,6 +17,11 @@
 
 import { authorized, type VercelRequest, type VercelResponse } from './finder-lib.js';
 import { searchCompanyJobs } from './find-jobs.js';
+import { renderPageHtml } from './render-page.js';
+
+/* Same 60s allowance as Find Jobs: a single-company test with a
+ * JS-rendered careers page can spend ~30s on a cold render. */
+export const config = { maxDuration: 60 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   try {
@@ -42,13 +47,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         .json({ error: 'A company name and a website or careers link are required.' });
       return;
     }
-    const result = await searchCompanyJobs({ name, website, careersUrl }, resumeText);
+    const result = await searchCompanyJobs({ name, website, careersUrl }, resumeText, {
+      renderPage: renderPageHtml,
+    });
     res.status(200).json({
       company: name,
       sourcePage: result.sourcePage,
       triedUrls: result.triedUrls,
       postingsSeen: result.postingsSeen,
       fetchOk: result.fetchOk,
+      renderUsed: result.renderUsed,
       screened: result.screened,
       leads: result.leads,
     });
