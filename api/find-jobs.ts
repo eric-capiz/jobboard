@@ -437,16 +437,26 @@ export type LocationDisposition = 'ok' | 'review' | 'reject';
  *  override a location line that says hybrid, on-site, an excluded
  *  place, or a state restriction. A posting whose location line says
  *  nothing at all is never silently discarded when it matches skills:
- *  it goes to review. */
+ *  for a U.S. company it passes (a missing location is not a failure),
+ *  for any other company it goes to review. */
 export function locationVerdict(
   loc: string,
   bodyText: string,
+  isUSCompany: boolean = false,
 ): { verdict: LocationDisposition; flag: string } {
   const body = (bodyText ?? '').toLowerCase();
   const raw = (loc ?? '').toLowerCase();
   if (!raw) {
     if (/\bremote\b/.test(body) && hasUsEvidence(body)) {
       return { verdict: 'ok', flag: 'Remote (US, confirmed in posting)' };
+    }
+    // No location stated. For a U.S. company that is not a failure —
+    // the job is in scope and Eric can check the location himself.
+    if (isUSCompany) {
+      return {
+        verdict: 'ok',
+        flag: /\bremote\b/.test(body) ? 'Remote (US company)' : 'no location listed — US company',
+      };
     }
     if (/\bremote\b/.test(body)) {
       return { verdict: 'review', flag: 'Remote (no country stated — verify)' };
@@ -477,10 +487,15 @@ export function locationVerdict(
   }
   if (states.length > 0) return { verdict: 'reject', flag: `state-restricted remote: ${[...new Set(states)].join(', ')}` };
   // Bare 'Remote': the location line proves remote but not US
-  // eligibility. The job's own text can confirm it; otherwise the
-  // posting goes to manual review — 'Remote' alone never auto-adds.
+  // eligibility. The job's own text can confirm it, and a U.S.
+  // company confirms it by itself; otherwise the posting goes to
+  // manual review — 'Remote' alone never auto-adds for a company
+  // that is not known to be U.S.
   if (hasUsEvidence(body)) {
     return { verdict: 'ok', flag: 'Remote (US, confirmed in posting)' };
+  }
+  if (isUSCompany) {
+    return { verdict: 'ok', flag: 'Remote (US company)' };
   }
   return { verdict: 'review', flag: 'Remote (no country stated — verify)' };
 }
@@ -519,6 +534,11 @@ export interface CompanySearchInput {
   name: string;
   website: string;
   careersUrl: string;
+  /** True when the company is known to be a U.S. company. The Finder
+   *  roster is U.S.-only by construction (Wikidata country/HQ = US,
+   *  SEC EDGAR, U.S. seed list), so Find Jobs passes true; a manually
+   *  typed company (Test a company) leaves it unset. */
+  isUSCompany?: boolean;
 }
 
 export interface CompanySearchResult {
@@ -889,7 +909,7 @@ export async function searchCompanyJobs(
       'jsonld',
     );
     if (pagePostings.length > 0) {
-      const screened = screenPostings(company.name, pagePostings, resumeText);
+      const screened = screenPostings(company.name, pagePostings, resumeText, company.isUSCompany ?? false);
       return {
         leads: screened.leads,
         postingsSeen: pagePostings.length,
@@ -978,7 +998,12 @@ export interface ScreenedPostings {
  *  needs real overlap, so the score — not the floor — is the precision
  *  gate. Location is classified before scoring: hard rejects drop out,
  *  uncertain locations become review-only leads. */
-function screenPostings(company: string, postings: Posting[], resumeText: string): ScreenedPostings {
+function screenPostings(
+  company: string,
+  postings: Posting[],
+  resumeText: string,
+  isUSCompany: boolean = false,
+): ScreenedPostings {
   const resumeTerms = extractResumeTerms(resumeText);
   const resumeSet = new Set(resumeTerms);
   const resumeYears = extractYears(resumeText);
@@ -994,7 +1019,7 @@ function screenPostings(company: string, postings: Posting[], resumeText: string
       rejectedNoMatch += 1;
       continue;
     }
-    const loc = locationVerdict(p.location, `${p.title} ${p.description}`);
+    const loc = locationVerdict(p.location, `${p.title} ${p.description}`, isUSCompany);
     if (loc.verdict === 'reject') {
       rejectedLocation += 1;
       continue;
@@ -1122,8 +1147,14 @@ export async function runFindJobs(
   let reviewLocation = 0;
 
   async function processCompany(company: CompanyDoc): Promise<FinderLead[]> {
+    // Every roster company is a U.S. company by construction: Find
+    // Companies only admits Wikidata rows with country or HQ in the
+    // United States (P17 = Q30), SEC EDGAR registrants, and the U.S.
+    // seed list. The one exception is a manually added company
+    // (source 'Manual') — its country is not known, so it keeps the
+    // old review behavior for unstated locations.
     const result = await searchCompanyJobs(
-      { name: company.name, website: company.website || '', careersUrl: company.careersUrl || '' },
+      { name: company.name, website: company.website || '', careersUrl: company.careersUrl || '', isUSCompany: company.source !== 'Manual' },
       resumeText,
     );
     postingsSeen += result.postingsSeen;
