@@ -260,34 +260,55 @@ function tokenize(text: string): string[] {
     .filter((t) => t.length >= 2 && !/^\d+$/.test(t) && !STOPWORDS.has(t));
 }
 
-/** The resume's signature terms: its most frequent tokens, capped at
- *  40 (ties broken alphabetically for determinism). A term only counts
- *  when it actually appears in the resume text — nothing is credited
- *  that the resume doesn't claim. */
-function extractResumeTerms(resumeText: string): string[] {
+/** The resume's signature terms: every token it uses, most frequent
+ *  first (ties broken alphabetically for determinism). A term only
+ *  counts when it actually appears in the resume text — nothing is
+ *  credited that the resume doesn't claim. There used to be a top-40
+ *  cap; it starved customer-service matching, because a CS resume
+ *  repeats employer words (verizon, drug, alorica) while its function
+ *  words appear once (support, representative, center) — the cap kept
+ *  the noise and dropped the vocabulary real job titles use, so a
+ *  'Customer Support Representative' title could only ever match one
+ *  term and stuck at 55, below auto-add. Frequency still orders the
+ *  list; the cap is gone. */
+export function extractResumeTerms(resumeText: string): string[] {
   const counts = new Map<string, number>();
   for (const t of tokenize(resumeText)) counts.set(t, (counts.get(t) ?? 0) + 1);
   return [...counts.entries()]
     .sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))
-    .slice(0, 40)
     .map(([t]) => t);
 }
 
 /* Synonym groups for matching — approved aliases only. Two words are
  *  deliberately NOT groups: 'development' (it matches 'Business
- *  Development' roles that are not developer roles) and 'client' (it
- *  matches 'Client Success' / 'Client Services' roles). 'software' is
- *  deliberately NOT a group either: 'Software Sales' is not a developer
- *  role, and 'Software Engineer' already matches through the
- *  engineer → developer alias. Groups expand MATCHING only — the resume
- *  text itself is never changed, and overlap counts each original
- *  resume term once, however many group mates a posting uses. */
+ *  Development' roles that are not developer roles) and 'software'
+ *  ('Software Sales' is not a developer role, and 'Software Engineer'
+ *  already matches through the engineer → developer alias). Groups
+ *  expand MATCHING only — the resume text itself is never changed.
+ *  One posting word credits at most one resume term (see
+ *  matchResumeTerms), so a group can no longer inflate a score: the
+ *  word 'member' credits the member term only, never customer + client
+ *  + member together. That is what makes the customer-service groups
+ *  safe: 'customer'/'client'/'member' are the same function under
+ *  different employers' wording, and 'service'/'support'/'help' and
+ *  'agent'/'representative'/'specialist' likewise — without them a
+ *  'Client Support Specialist' title matches a single resume word and
+ *  never reaches auto-add, which is exactly the failure the Nov 10 CS
+ *  sweep exposed. 'client' used to be deliberately excluded (it matches
+ *  'Client Success' roles); for a CS resume those ARE the roles, and
+ *  for other resumes the group is inert unless the resume claims one
+ *  of its words. */
 const SYNONYM_GROUPS: string[][] = [
   ['developer', 'engineer', 'programmer'],
   ['frontend', 'web', 'ui'],
   ['javascript', 'js'],
   ['typescript', 'ts'],
   ['react', 'reactjs'],
+  ['service', 'support', 'help'],
+  ['customer', 'client', 'member'],
+  ['agent', 'representative', 'specialist'],
+  ['technical', 'technician'],
+  ['satisfaction', 'success'],
 ];
 
 /** Group mates of a word (itself included when it is in no group). */
@@ -318,27 +339,38 @@ interface TermMatch {
 }
 
 /** Which resume terms a posting's words match, by exact word or by
- *  synonym group. Each resume term appears at most once. */
+ *  synonym group. Crediting runs posting-word-first: each distinct
+ *  posting word credits AT MOST ONE resume term — its exact term when
+ *  it has one, otherwise the first uncredited group mate that is a
+ *  resume term. The old term-first loop let one posting word credit
+ *  several resume terms at once ('member' credited customer + client +
+ *  member), so a two-word title could score 70 while a real
+ *  three-word CS title scored 55. Each resume term still appears at
+ *  most once, and results come back in resume-term order so the
+ *  strengths list is stable. */
 function matchResumeTerms(postingWords: Set<string>, resumeTerms: string[]): TermMatch[] {
-  const matches: TermMatch[] = [];
-  for (const term of resumeTerms) {
-    if (postingWords.has(term)) {
-      matches.push({ term, via: term, exact: true, ambiguousOnly: false });
+  const resumeSet = new Set(resumeTerms);
+  const credited = new Map<string, TermMatch>();
+  for (const w of postingWords) {
+    if (resumeSet.has(w)) {
+      if (!credited.has(w)) {
+        credited.set(w, { term: w, via: w, exact: true, ambiguousOnly: false });
+      }
       continue;
     }
-    for (const mate of groupMates(term)) {
-      if (mate !== term && postingWords.has(mate)) {
-        matches.push({
-          term,
-          via: mate,
+    for (const mate of groupMates(w)) {
+      if (mate !== w && resumeSet.has(mate) && !credited.has(mate)) {
+        credited.set(mate, {
+          term: mate,
+          via: w,
           exact: false,
-          ambiguousOnly: AMBIGUOUS_GROUP_WORDS.has(mate),
+          ambiguousOnly: AMBIGUOUS_GROUP_WORDS.has(w),
         });
         break;
       }
     }
   }
-  return matches;
+  return resumeTerms.filter((t) => credited.has(t)).map((t) => credited.get(t)!);
 }
 
 /* Full US state names → abbreviations, longest first so 'west
@@ -427,6 +459,27 @@ function hasUsEvidence(text: string): boolean {
   return US_EVIDENCE_RES.some((re) => re.test(text));
 }
 
+/* An explicit non-US-only hiring restriction in the posting's own
+ * text (title + description). Catches postings whose location line is
+ * blank or bare 'Remote' but which state they hire in an excluded
+ * place only, or that US candidates won't be considered — e.g. the
+ * Nov 10 CS sweep's Niche roles: 'Sr. Product Analyst (Brazil &
+ * Argentina ONLY)', location 'Remote', which passed as 'Remote (US
+ * company)'. The location line's own US evidence still wins over
+ * this check (see locationVerdict), so a stray place name in a
+ * 'Remote, US' posting's description does not reject it. */
+const EXCLUDED_PLACES_RE = EXCLUDED_PLACES.join('|');
+const NON_US_ONLY_RES = [
+  new RegExp(`\\b(${EXCLUDED_PLACES_RE})\\b[^.]{0,60}\\bonly\\b`, 'i'),
+  new RegExp(`\\bonly\\b[^.]{0,60}\\b(${EXCLUDED_PLACES_RE})\\b`, 'i'),
+  /\bwill not be considering (?:us|u\.s\.|united states)[- ]based candidates\b/i,
+  /\bnot considering (?:us|u\.s\.|united states)[- ]based candidates\b/i,
+];
+
+function hasNonUsOnlyRestriction(text: string): boolean {
+  return NON_US_ONLY_RES.some((re) => re.test(text));
+}
+
 export type LocationDisposition = 'ok' | 'review' | 'reject';
 
 /** Three-way location verdict. 'ok' auto-saves normally; 'review'
@@ -447,6 +500,11 @@ export function locationVerdict(
   const body = (bodyText ?? '').toLowerCase();
   const raw = (loc ?? '').toLowerCase();
   if (!raw) {
+    // An explicit non-US-only restriction beats the blank-location
+    // pass: the posting itself says US candidates are out.
+    if (hasNonUsOnlyRestriction(body)) {
+      return { verdict: 'reject', flag: 'non-US only (stated in posting)' };
+    }
     if (/\bremote\b/.test(body) && hasUsEvidence(body)) {
       return { verdict: 'ok', flag: 'Remote (US, confirmed in posting)' };
     }
@@ -481,6 +539,12 @@ export function locationVerdict(
     l.includes('nationwide')
   ) {
     return { verdict: 'ok', flag: 'Remote (US)' };
+  }
+  // Bare 'Remote' with no US in the location line: an explicit
+  // non-US-only restriction in the posting itself rejects it, before
+  // the U.S.-company pass below can let it through.
+  if (hasNonUsOnlyRestriction(body)) {
+    return { verdict: 'reject', flag: 'non-US only (stated in posting)' };
   }
   if (states.length > 0 && states.every((s) => s === 'tx')) {
     return { verdict: 'ok', flag: 'Remote (TX only)' };
@@ -901,13 +965,24 @@ export async function searchCompanyJobs(
         // Embed unreadable — the page's other sources still count.
       }
     }
-    // JSON-LD last: it duplicates the visible listings, so a block
-    // whose title is already on the page adds nothing.
-    const visibleTitles = new Set(pagePostings.map((p) => p.title.toLowerCase()));
-    addPostings(
-      parseJsonLdPostings(html, u).filter((p) => !visibleTitles.has(p.title.toLowerCase())),
-      'jsonld',
-    );
+    // JSON-LD last: a block whose title is already visible adds no NEW
+    // posting — but its description/location are the only description
+    // the visible listing will ever get (the HTML parser reads titles
+    // + links only, so visible postings carry description ''). Merge
+    // the structured fields into the visible posting instead of
+    // dropping the block: without this, matching is title-only and a
+    // real CS description can never lift a score past 60.
+    const byTitle = new Map(pagePostings.map((p) => [p.title.toLowerCase(), p]));
+    for (const jp of parseJsonLdPostings(html, u)) {
+      const vis = byTitle.get(jp.title.toLowerCase());
+      if (vis) {
+        if (!vis.description && jp.description) vis.description = jp.description;
+        if (!vis.location && jp.location) vis.location = jp.location;
+        if (!vis.postedDate && jp.postedDate) vis.postedDate = jp.postedDate;
+      } else {
+        addPostings([jp], 'jsonld');
+      }
+    }
     if (pagePostings.length > 0) {
       const screened = screenPostings(company.name, pagePostings, resumeText, company.isUSCompany ?? false);
       return {
@@ -989,16 +1064,69 @@ export interface ScreenedPostings {
   reviewLocation: number;
 }
 
-/** Score postings against the resume. The old hard title gate is gone:
- *  a posting is scored when at least one resume term matches (exact or
- *  synonym) in its title or description — the floor, not a gate. The
- *  score formula is unchanged: 50 + 50 × overlap, where overlap is the
- *  ratio of matched resume terms to min(terms, 10), capped at 100. A
- *  single match lands in the mid-50s (near miss); auto-add at 60+ still
- *  needs real overlap, so the score — not the floor — is the precision
- *  gate. Location is classified before scoring: hard rejects drop out,
- *  uncertain locations become review-only leads. */
-function screenPostings(
+/** Resume terms a CS title must credit to count as CS work (the
+ *  credited term, so 'support' covers a 'Help Desk' title and 'agent'
+ *  covers a 'Support Specialist' one), and the role nouns a title
+ *  must contain to count as a role at all. Page copy poses as postings
+ *  otherwise: 'Careers for military service members...' and 'Call for
+ *  Proposals...' carry service/member words but name no role. */
+const CS_FUNCTION_TERMS = new Set([
+  'service',
+  'support',
+  'customer',
+  'client',
+  'member',
+  'agent',
+  'representative',
+]);
+
+const ROLE_WORDS = new Set([
+  'representative',
+  'agent',
+  'specialist',
+  'manager',
+  'coordinator',
+  'associate',
+  'technician',
+  'analyst',
+  'clerk',
+  'supervisor',
+  'assistant',
+  'advisor',
+  'consultant',
+  'engineer',
+  'developer',
+  'designer',
+  'director',
+  'lead',
+  'intern',
+  'trainer',
+  'advocate',
+  'liaison',
+  'officer',
+  'aide',
+  'worker',
+  'counselor',
+  'operator',
+  'attendant',
+  'nurse',
+  'teacher',
+]);
+
+/** Score postings against the resume. A posting is scored when at
+ *  least one resume term matches (exact or synonym) in its title or
+ *  description — the floor, not a gate. The score formula is unchanged:
+ *  50 + 50 × overlap, where overlap is the ratio of matched resume
+ *  terms to min(terms, 10), capped at 100. A single match lands in the
+ *  mid-50s (near miss); auto-add at 60+ still needs real overlap, so
+ *  the score — not the floor — is the precision gate. Location is
+ *  classified before scoring: hard rejects drop out, uncertain
+ *  locations become review-only leads. Customer-service resumes get
+ *  one more check (see the title gate inside): the title itself must
+ *  name CS work and a role, because description-only matches let a
+ *  faculty posting's JD ('phone... policy... service') score 85 while
+ *  real CS titles sat at 55. */
+export function screenPostings(
   company: string,
   postings: Posting[],
   resumeText: string,
@@ -1012,12 +1140,26 @@ function screenPostings(
   let rejectedLocation = 0;
   let reviewLocation = 0;
   const cap = (t: string): string => t.charAt(0).toUpperCase() + t.slice(1);
+  // A customer-service resume claims both 'customer' and 'service';
+  // a frontend resume claims neither, so this gate only ever applies
+  // to CS resumes and can never touch another field's matching.
+  const isCsResume = resumeSet.has('customer') && resumeSet.has('service');
   for (const p of postings) {
     const postingWords = new Set(tokenize(`${p.title} ${p.description}`));
     const matches = matchResumeTerms(postingWords, resumeTerms);
     if (matches.length === 0 || !matches.some((m) => !m.ambiguousOnly)) {
       rejectedNoMatch += 1;
       continue;
+    }
+    if (isCsResume) {
+      const titleWords = new Set(tokenize(p.title));
+      const titleMatches = matchResumeTerms(titleWords, resumeTerms);
+      const namesCsWork = titleMatches.some((m) => CS_FUNCTION_TERMS.has(m.term));
+      const namesRole = [...titleWords].some((w) => ROLE_WORDS.has(w));
+      if (!namesCsWork || !namesRole) {
+        rejectedNoMatch += 1;
+        continue;
+      }
     }
     const loc = locationVerdict(p.location, `${p.title} ${p.description}`, isUSCompany);
     if (loc.verdict === 'reject') {
