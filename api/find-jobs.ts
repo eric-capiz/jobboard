@@ -625,6 +625,10 @@ export interface CompanySearchResult {
   renderUsed: boolean;
   /** Milliseconds spent rendering for this company (0 when unused). */
   renderMs: number;
+  /** Visible text the render saw ('' when no render ran). A challenge
+   *  page, an empty search state, or job titles the extractors
+   *  missed — the diagnosis for a zero-listing render. */
+  renderTextSample: string;
 }
 
 /** Render options for one company search. Production callers pass the
@@ -990,6 +994,28 @@ function isCareersLikeUrl(u: string, careersUrl: string): boolean {
   }
 }
 
+/** Visible text of a rendered careers page, for diagnosing what the
+ *  browser actually saw: a bot challenge, an empty search state, or
+ *  job titles the extractors missed. Body only, scripts and styles
+ *  stripped, collapsed to a short sample — the page's own public
+ *  text, never anything private. */
+export function sampleRenderedText(html: string): string {
+  const body = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i)?.[1] ?? html;
+  return body
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;|&#160;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 300);
+}
+
 export async function searchCompanyJobs(
   company: CompanySearchInput,
   resumeText: string,
@@ -1016,6 +1042,7 @@ export async function searchCompanyJobs(
   let anyFetchOk = false;
   let renderUsed = false;
   let renderMs = 0;
+  let renderTextSample = '';
   for (let i = 0; i < candidates.length; i++) {
     const u = candidates[i];
     triedUrls.push(u);
@@ -1050,6 +1077,7 @@ export async function searchCompanyJobs(
       }
       renderMs += Date.now() - started;
       if (renderedHtml) {
+        renderTextSample = sampleRenderedText(renderedHtml);
         pagePostings = await collectPagePostings(renderedHtml, u, true);
         if (pagePostings.length > 0) renderUsed = true;
       }
@@ -1069,6 +1097,7 @@ export async function searchCompanyJobs(
         },
         renderUsed,
         renderMs,
+        renderTextSample,
       };
     }
     let at = i + 1;
@@ -1088,6 +1117,7 @@ export async function searchCompanyJobs(
     screened: { rejectedNoMatch: 0, rejectedLocation: 0, reviewLocation: 0 },
     renderUsed,
     renderMs,
+    renderTextSample,
   };
 }
 

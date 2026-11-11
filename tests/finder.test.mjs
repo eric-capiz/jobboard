@@ -627,6 +627,33 @@ async function testRenderFallback() {
     (await jobsMod.runFindJobs({ companiesCol }, { resumeText, cursor: 0, limit: 15 })).stats.noBoard === 1,
     failOut.stats,
   );
+  // The result carries the visible text the render saw, for
+  // diagnosing a zero-listing render (bot challenge, empty search
+  // state, or titles the extractors missed).
+  const one = await jobsMod.searchCompanyJobs(
+    { name: 'JsBoard Co', website: 'https://jsboard.example', careersUrl: '', isUSCompany: true },
+    resumeText,
+    { renderPage: stubRender },
+  );
+  check(
+    'render: result carries the visible text the render saw',
+    one.renderTextSample.includes('Customer Support Specialist') &&
+      one.renderTextSample.length > 0 &&
+      one.renderTextSample.length <= 300 &&
+      !one.renderTextSample.includes('<'),
+    one.renderTextSample,
+  );
+  check(
+    'render: no render means an empty text sample',
+    (
+      await jobsMod.searchCompanyJobs(
+        { name: 'Static Co', website: 'https://staticco.example', careersUrl: '', isUSCompany: true },
+        resumeText,
+        { renderPage: stubRender },
+      )
+    ).renderTextSample === '',
+    null,
+  );
 }
 
 async function testTestCompany() {

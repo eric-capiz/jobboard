@@ -58,6 +58,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       fetchOk: result.fetchOk,
       renderUsed: result.renderUsed,
       renderMs: result.renderMs,
+      renderTextSample: result.renderTextSample,
       screened: result.screened,
       leads: result.leads,
     });
