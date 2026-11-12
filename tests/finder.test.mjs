@@ -2286,6 +2286,7 @@ async function testPortalSearch() {
     counts: [
       { jobLinks: 0, resultsText: false },
       { jobLinks: 0, resultsText: false },
+      { jobLinks: 0, resultsText: false },
       { jobLinks: 5, resultsText: true },
     ],
     onEnter: (term, page) => page.setUrl('https://portal.example/careers/results'),
@@ -2294,6 +2295,9 @@ async function testPortalSearch() {
     },
     gateScan: countryPickerScan,
     onGateClick: (label, page) => {
+      // A real pick navigates away (or the picker closes): the option
+      // is gone on the next scan, and the box is what appears.
+      page.gateScan = { controls: [] };
       page.scanResult = portalScan;
     },
   });
@@ -2392,6 +2396,7 @@ async function testPortalSearch() {
     counts: [
       { jobLinks: 0, resultsText: false },
       { jobLinks: 0, resultsText: false },
+      { jobLinks: 0, resultsText: false },
       { jobLinks: 5, resultsText: true },
     ],
     onEnter: (term, page) => page.setUrl('https://portal.example/careers/results'),
@@ -2410,6 +2415,7 @@ async function testPortalSearch() {
       ],
     },
     onSelectPick: (label, page) => {
+      page.gateScan = { controls: [] };
       page.scanResult = portalScan;
     },
   });
@@ -2432,6 +2438,7 @@ async function testPortalSearch() {
     counts: [
       { jobLinks: 0, resultsText: false },
       { jobLinks: 0, resultsText: false },
+      { jobLinks: 0, resultsText: false },
       { jobLinks: 5, resultsText: true },
     ],
     onEnter: (term, page) => page.setUrl('https://portal.example/careers/results'),
@@ -2450,6 +2457,7 @@ async function testPortalSearch() {
       ],
     },
     onSelectPick: (label, page) => {
+      page.gateScan = { controls: [] };
       page.scanResult = portalScan;
     },
   });
@@ -2486,6 +2494,7 @@ async function testPortalSearch() {
     counts: [
       { jobLinks: 0, resultsText: false },
       { jobLinks: 0, resultsText: false },
+      { jobLinks: 0, resultsText: false },
       { jobLinks: 5, resultsText: true },
     ],
     onEnter: (term, page) => page.setUrl('https://portal.example/careers/results'),
@@ -2494,7 +2503,10 @@ async function testPortalSearch() {
     },
     onGateClick: (label, page) => {
       if (page.gateClicks === 1) page.gateScan = langOptionsScan;
-      else page.scanResult = portalScan;
+      else {
+        page.gateScan = { controls: [] };
+        page.scanResult = portalScan;
+      }
     },
   });
   const langOutcome = await searchMod.tryPortalSearch(langPage, 'customer service', Date.now() + 30000);
@@ -2533,6 +2545,57 @@ async function testPortalSearch() {
       boardLinkPage.gateClicks === 0 &&
       boardLinkPage.buttonClicks === 1,
     { gateClicks: boardLinkPage.gateClicks, buttonClicks: boardLinkPage.buttonClicks },
+  );
+  // A pick that NAVIGATES to a listings page ends the search at
+  // once: no submit on the destination page (an empty submit would
+  // reset the context the pick just established — Foundever round
+  // 12: the global /search/ page returned Budapest roles).
+  const navListingsPage = new FakePage({
+    scanResult: { inputs: [], buttons: [], forms: [] },
+    counts: [
+      { jobLinks: 0, resultsText: false },
+      { jobLinks: 5, resultsText: true },
+    ],
+    gateScan: {
+      controls: [mkGateButton({ index: 0, label: 'United States (USA)', containerRole: 'dialog' })],
+    },
+    onGateClick: (label, page) => {
+      page.setUrl('https://portal.example/careers/us-results');
+    },
+  });
+  check(
+    'portal-search: navigating pick to a listings page ends the search with no submit',
+    (await searchMod.tryPortalSearch(navListingsPage, 'customer service', Date.now() + 30000)) === 'searched' &&
+      navListingsPage.gateClicks === 1 &&
+      navListingsPage.typedTerms.length === 0 &&
+      navListingsPage.pressedKeys.filter((k) => k === 'Enter').length === 0,
+    { gateClicks: navListingsPage.gateClicks, typed: navListingsPage.typedTerms, keys: navListingsPage.pressedKeys },
+  );
+  // A pick that navigates to an EMPTY page still never submits:
+  // the search ends no-form (the render loop retries the next
+  // target), and no empty submit replaces the destination.
+  const navEmptyPage = new FakePage({
+    scanResult: { inputs: [], buttons: [], forms: [] },
+    counts: [
+      { jobLinks: 0, resultsText: false },
+      { jobLinks: 0, resultsText: false },
+      { jobLinks: 0, resultsText: false },
+    ],
+    gateScan: {
+      controls: [mkGateButton({ index: 0, label: 'United States (USA)', containerRole: 'dialog' })],
+    },
+    onGateClick: (label, page) => {
+      page.setUrl('https://portal.example/careers/us-results');
+      page.scanResult = portalScan;
+    },
+  });
+  check(
+    'portal-search: navigating pick to an empty page ends no-form with no submit',
+    (await searchMod.tryPortalSearch(navEmptyPage, 'customer service', Date.now() + 30000)) === 'no-form' &&
+      navEmptyPage.gateClicks === 1 &&
+      navEmptyPage.typedTerms.length === 0 &&
+      navEmptyPage.pressedKeys.filter((k) => k === 'Enter').length === 0,
+    { gateClicks: navEmptyPage.gateClicks, typed: navEmptyPage.typedTerms, keys: navEmptyPage.pressedKeys },
   );
   // Empty search yields listings: Enter alone submits, no term typed.
   const emptyWins = new FakePage({

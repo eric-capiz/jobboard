@@ -1058,13 +1058,32 @@ export function selectGateAction(
   return null;
 }
 
-type GateResult = 'picked' | 'opened' | 'board' | null;
+type GateResult = 'picked' | 'navigated' | 'opened' | 'board' | null;
+
+/** Whether the rendered page already shows job cards (links),
+ *  regardless of whether a results-count line was recognized. The
+ *  count text can sit in a format the detector does not know, or
+ *  lag behind the cards — the links themselves are the signal. Used
+ *  only after a gate action: at the search step's entry a bare job
+ *  link is a teaser, not the list, and must not short-circuit the
+ *  search (Teleperformance's homepage carries one featured role
+ *  while the portal holds hundreds). Never throws. */
+async function jobLinksNow(page: SearchablePage): Promise<boolean> {
+  try {
+    return ((await page.evaluate(countJobListings)) as JobListingCount).jobLinks >= 1;
+  } catch {
+    return false;
+  }
+}
 
 /** Drive through ONE gate: scan, pick the action, perform it, wait
  *  for the page to change and settle. Returns what happened so the
  *  caller can re-scan (a pick may have revealed listings or the
- *  search box; an opener may have revealed the options). Null when
- *  there is no gate to drive or no budget left. Never throws. */
+ *  search box; an opener may have revealed the options). 'navigated'
+ *  is a pick that changed the page URL — the pick chose its
+ *  destination page, and the caller must not submit a search there
+ *  (an empty submit resets the context the pick just established).
+ *  Null when there is no gate to drive or no budget left. Never throws. */
 async function resolveGateOnce(
   page: SearchablePage,
   remainMs: () => number,
@@ -1126,7 +1145,14 @@ async function resolveGateOnce(
   await waitForChange(page, remainMs, startUrl, startLen, 2500);
   await waitForDomStable(page, remainMs, 2000, 500);
   if (isBoardUrl(page.url())) return 'board';
-  return action.target === 'open' ? 'opened' : 'picked';
+  if (action.target === 'open') return 'opened';
+  // A pick that navigated chose its destination page (the country
+  // pick lands on /go/Search-Jobs-US/) — the caller must not submit
+  // a search there, or the empty submit replaces the destination
+  // with the portal's context-free search (Foundever round 12: the
+  // global /search/ page returned Budapest roles).
+  if (page.url() !== startUrl) return 'navigated';
+  return 'picked';
 }
 
 /** One search attempt on the CURRENT page: re-scan (a previous submit
@@ -1194,19 +1220,48 @@ export async function tryPortalSearch(
     // each step: one toggle, then up to three gate actions (an
     // opener click, then the option pick, then the next gate — a
     // page can stack a country picker in front of a department
-    // filter). A gate action that reveals listings ends the search
-    // at once; one that reveals the box lets the retry below submit
-    // it; a page with no gate at all still reports no-form, and a
-    // failed toggle still reports no-form. The old country-only
-    // rescue is subsumed here: the gate resolver matches "United
-    // States (USA)" where the exact-label finder saw nothing, and
-    // its action gate is 2.5s, not 6s, so a search step that started
-    // late in the render can still drive through a gate.
+    // filter). Gates are tried FIRST in every round: a gate
+    // establishes the page's context (country, region, department),
+    // and a search submit on the gate's destination page would
+    // reset it — Foundever round 12: the empty submit after the US
+    // pick landed on the global /search/ page and returned Budapest
+    // roles, while round 13 (no submit) returned the exact US roles
+    // Eric found by hand. A navigating pick is therefore terminal
+    // for the search step: settle, harvest what the destination
+    // shows (listings, or bare job cards under a count format the
+    // detector does not know), or stop — the render loop retries
+    // the next target, which is the right fallback. A non-navigating
+    // pick or an opener keeps the loop going: more gates may be
+    // stacked, or the revealed box gets its submit below. A page
+    // with no gate at all still reports no-form, and a failed toggle
+    // still reports no-form.
     const toggled = await clickSearchToggle(page, remainMs, onToggle);
     if (toggled === 'board') return 'board-redirect';
     let gateOpened = toggled === 'toggled';
     let ranSearch = false;
     for (let round = 0; round < 4; round++) {
+      const gated = await resolveGateOnce(page, remainMs, searchTerm, gateOpened, onCountry, onGate);
+      if (gated === 'board') return 'board-redirect';
+      if (gated === 'navigated') {
+        // The pick chose its destination page. Let it settle, then
+        // harvest what it shows — never submit there.
+        gateOpened = true;
+        await waitForDomStable(page, remainMs, 3000, 500);
+        if (await listingsNow(page)) return 'searched';
+        if (await jobLinksNow(page)) return 'searched';
+        return 'no-form';
+      }
+      if (gated) {
+        // A non-navigating pick or an opener: let the page settle,
+        // then check for listings before anything else — cards may
+        // be visible under a count format the detector does not
+        // know, and a submit over them would only replace the page.
+        gateOpened = true;
+        await waitForDomStable(page, remainMs, 3000, 500);
+        if (await listingsNow(page)) return 'searched';
+        if (await jobLinksNow(page)) return 'searched';
+        continue;
+      }
       const attempt = await attemptSearch(page, '', remainMs);
       if (attempt === 'board') return 'board-redirect';
       if (attempt === 'failed') return 'submit-failed';
@@ -1214,15 +1269,16 @@ export async function tryPortalSearch(
         ranSearch = true;
         break;
       }
-      const gated = await resolveGateOnce(page, remainMs, searchTerm, gateOpened, onCountry, onGate);
-      if (gated === 'board') return 'board-redirect';
-      if (!gated) return 'no-form';
-      gateOpened = true;
-      if (gated === 'picked' && (await listingsNow(page))) return 'searched';
+      // No box and no gate: nothing more to try on this page.
+      return 'no-form';
     }
     if (!ranSearch) {
-      // The last gate action may have revealed the box — one final
-      // scan before concluding no-form.
+      // The loop ran out of rounds on gates alone (stacked gates,
+      // each revealing the next) — one final scan before concluding
+      // no-form.
+      await waitForDomStable(page, remainMs, 3000, 500);
+      if (await listingsNow(page)) return 'searched';
+      if (await jobLinksNow(page)) return 'searched';
       const attempt = await attemptSearch(page, '', remainMs);
       if (attempt === 'board') return 'board-redirect';
       if (attempt === 'failed') return 'submit-failed';
