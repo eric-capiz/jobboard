@@ -885,6 +885,41 @@ export function locationFromJobSlug(rawUrl: string): string {
   return `${first}, ${st}`;
 }
 
+/** De-slugify a job-detail URL into a role title: the role segment is
+ *  the last slug-like segment that is not a bare id and not a generic
+ *  path word. iCIMS: /jobs/80868/customer-service-expert/job ->
+ *  'Customer Service Expert'. Segments are split on hyphens; empty
+ *  tokens (from '---') and pure-number tokens are dropped; each word
+ *  is title-cased. Returns '' when no role-like segment exists (a
+ *  bare id, a list page). */
+export function titleFromJobSlug(rawUrl: string): string {
+  let u: URL;
+  try {
+    u = new URL(rawUrl);
+  } catch {
+    return '';
+  }
+  const segs = u.pathname.toLowerCase().replace(/\/+$/, '').split('/').filter(Boolean);
+  const SKIP = new Set([
+    'job', 'jobs', 'jobsearch', 'career', 'careers', 'apply', 'application',
+    'details', 'detail', 'position', 'positions', 'opening', 'openings',
+    'posting', 'postings', 'vacancy', 'vacancies', 'role', 'roles', 'view',
+    'search', 'results', 'browse', 'list', 'en-us', 'en',
+  ]);
+  for (let i = segs.length - 1; i >= 0; i--) {
+    const seg = segs[i];
+    if (/^\d+$/.test(seg)) continue;
+    if (SKIP.has(seg)) continue;
+    const words = seg
+      .split('-')
+      .map((w) => w.replace(/[^a-z0-9]/g, ''))
+      .filter((w) => w && !/^\d+$/.test(w));
+    if (words.length < 2) continue;
+    return words.map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  }
+  return '';
+}
+
 const APPLY_HREF = /job|apply|position|opening|detail|career|posting|vacancy|role/i;
 
 /** A parsed HTML listing counts as a REAL posting only when it looks
@@ -966,6 +1001,20 @@ export function isJobDetailUrl(rawUrl: string): boolean {
   const segs = u.pathname.toLowerCase().replace(/\/+$/, '').split('/').filter(Boolean);
   if (segs.length === 0) return false; // portal root: a list, not a job
   const last = segs[segs.length - 1];
+  // iCIMS detail URLs end in a literal '/job' after the role slug:
+  // /jobs/<id>/<role-slug>/job — the trailing 'job' is part of the
+  // detail path, not a list page (TP's opportunities page, 2026-11-12
+  // probe: 4 such links, all real roles). The numeric id + a 2+-word
+  // role slug prove it; a bare /jobs/<id>/job with no slug, or a
+  // list page ending in /job, still falls through to the veto below.
+  if (
+    last === 'job' &&
+    segs.length >= 3 &&
+    /^\d+$/.test(segs[segs.length - 3]) &&
+    segs[segs.length - 2].split('-').filter(Boolean).length >= 2
+  ) {
+    return true;
+  }
   if (LIST_PATH_WORDS.test(last)) return false;
   // A category slug: the last segment starts with a job-marker word
   // ('job-', 'career-', 'jobs-', 'careers-') and the rest is a
@@ -1032,6 +1081,7 @@ export function parseCareersPage(html: string, pageUrl: string): Posting[] {
     .replace(/<style[\s\S]*?<\/style>/gi, '');
   const postings: Posting[] = [];
   const seen = new Set<string>();
+  const seenUrls = new Set<string>(); // URLs already pushed, so Strategy F can skip them.
   const push = (title: string, location: string, url: string | null) => {
     if (!titleOk(title) || !url) return;
     if (!isRealPosting(title, url)) return;
@@ -1041,6 +1091,7 @@ export function parseCareersPage(html: string, pageUrl: string): Posting[] {
     const key = `${title}\n${url}`;
     if (seen.has(key)) return;
     seen.add(key);
+    seenUrls.add(url);
     // A card with no readable location still carries one in its
     // Phenom slug — read it there rather than passing the role on
     // as blank-location (Sitel's Retention role, 2026-11-12).
@@ -1179,6 +1230,27 @@ export function parseCareersPage(html: string, pageUrl: string): Posting[] {
     const uuidLoc = locationIn(um[2]);
     if (!APPLY_HREF.test(uuidApply) && !uuidLoc) continue;
     push(uuidTitle, uuidLoc, uuidApply);
+  }
+  // Strategy F: apply-link cards — the anchor IS the CTA ("APPLY NOW",
+  // "Apply", "View job") and the role title lives only in the URL slug
+  // (iCIMS: /jobs/<id>/<role-slug>/job — the card's title is a <div>
+  // no strategy reads, so A–E all miss it; the live probe of TP's
+  // opportunities page shows 4 such links and 0 parsed postings,
+  // 2026-11-12). The slug is the title. Skip URLs an earlier strategy
+  // already pushed, and skip slugs that are not role-like (a bare id,
+  // a process page with no role segment).
+  const CTA_TEXT = /^(apply\s*now|apply|view\s*job|view\s*details?|see\s*details?|see\s*job|view\s*opening|view\s*role)\b/i;
+  const applyAnchorRe = /<a[^>]*href=["']([^"']+)["'][^>]*>([\s\S]{0,200}?)<\/a>/gi;
+  let fm: RegExpExecArray | null;
+  while ((fm = applyAnchorRe.exec(clean)) !== null) {
+    const ctaText = cleanTitle(fm[2]);
+    if (!CTA_TEXT.test(ctaText)) continue;
+    const applyUrl = resolvePageLink(fm[1], pageUrl);
+    if (!applyUrl || seenUrls.has(applyUrl)) continue;
+    if (!isJobDetailUrl(applyUrl)) continue;
+    const slugTitle = titleFromJobSlug(applyUrl);
+    if (!titleOk(slugTitle)) continue;
+    push(slugTitle, '', applyUrl);
   }
   // Strategy B: View-details / Apply links with a title just before them.
   const viewRe = /<a[^>]*href=["']([^"']+)["'][^>]*>([\s\S]{0,80}?)<\/a>/gi;
@@ -2389,6 +2461,13 @@ const ROLE_WORDS = new Set([
   'attendant',
   'nurse',
   'teacher',
+  // 'expert' IS the role at iCIMS-style boards: Teleperformance titles
+  // its reps 'Customer Service Expert' / 'Customer Expert' — without
+  // it the gate rejects a real CS role outright (2026-11-12 probe).
+  // The gate still requires a literal CS word, and the score still
+  // holds the 60 line (a bare 'Customer Expert' matches one resume
+  // term and scores 55, a near-miss).
+  'expert',
 ]);
 
 /** Score postings against the resume. A posting is scored when at

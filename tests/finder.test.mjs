@@ -5500,6 +5500,92 @@ async function testRound18() {
   );
 }
 
+async function testRound18b() {
+  // Batch 18b (2026-11-12, live probe vs 4181351a): TP's opportunities
+  // page renders 'has-listings' but the extractor parsed 0 — its job
+  // list is iCIMS apply-link cards (anchor text "APPLY NOW", title
+  // only in the URL slug). Strategy F derives the title from the slug,
+  // and isJobDetailUrl now reads the iCIMS /jobs/<id>/<slug>/job shape
+  // (the trailing '/job' tripped the list-path veto). 'expert' joins
+  // the role words: TP titles its reps 'Customer Service Expert'.
+  const jobsMod = freshRequire(`${OUT}/find-jobs.cjs`);
+  const resumeText =
+    'Customer service representative with phone support experience, technical support, troubleshooting, billing questions, and help desk work for members';
+  const icimsHtml = `<html><body>
+<div class="card"><a class="w-100 h-100" href="https://careerseng-teleperformance.icims.com/jobs/80062/application-process/job?mode=job">APPLY NOW</a></div>
+<div class="card"><a class="w-100 h-100" href="https://careerseng-teleperformance.icims.com/jobs/88263/customer-expert---nbs-fraud/job?mode=job">APPLY NOW</a></div>
+<div class="card"><a class="w-100 h-100" href="https://careerseng-teleperformance.icims.com/jobs/80868/customer-service-expert/job?mode=job">APPLY NOW</a></div>
+<div class="card"><a class="w-100 h-100" href="https://careerseng-teleperformance.icims.com/jobs/92916/zaf-hr-business-partner-gq-pe-%281227%29/job?mode=job">APPLY NOW</a></div>
+</body></html>`;
+  const parsed = jobsMod.parseCareersPage(
+    icimsHtml,
+    'https://www.tp.com/en-us/careers/job-opportunities/?page=0',
+  );
+  check(
+    'round18b: Strategy F parses all 4 iCIMS apply-link cards with slug-derived titles',
+    parsed.length === 4 &&
+      parsed.some((p) => p.title === 'Customer Service Expert') &&
+      parsed.some((p) => p.title === 'Customer Expert Nbs Fraud') &&
+      parsed.some((p) => p.title === 'Application Process') &&
+      parsed.some((p) => p.title === 'Zaf Hr Business Partner Gq Pe'),
+    parsed.map((p) => p.title),
+  );
+  const screened = jobsMod.screenPostings('Teleperformance', parsed, resumeText, true);
+  check(
+    'round18b: the TP list yields Customer Service Expert at 60 (Customer Expert is a 55 near-miss, the other two reject)',
+    screened.leads.length === 2 &&
+      screened.leads.some((l) => l.title === 'Customer Service Expert' && l.matchScore === 60) &&
+      screened.leads.some((l) => l.title === 'Customer Expert Nbs Fraud' && l.matchScore === 55) &&
+      screened.rejectedNoMatch === 2,
+    { leads: screened.leads.map((l) => [l.title, l.matchScore]), rejectedNoMatch: screened.rejectedNoMatch },
+  );
+  check(
+    'round18b: titleFromJobSlug reads the iCIMS role slug and returns empty for a bare id or a category slug',
+    jobsMod.titleFromJobSlug('https://careerseng-teleperformance.icims.com/jobs/80868/customer-service-expert/job') ===
+      'Customer Service Expert' &&
+      jobsMod.titleFromJobSlug('https://example.com/jobs/12345/') === '' &&
+      jobsMod.titleFromJobSlug('https://example.com/en-us/careers/jamaica/') === '' &&
+      jobsMod.titleFromJobSlug('https://example.com/jobs/123/job') === '',
+    null,
+  );
+  check(
+    'round18b: isJobDetailUrl reads /jobs/<id>/<slug>/job as a detail but still vetoes a bare /jobs/<id>/job and a list page',
+    jobsMod.isJobDetailUrl('https://careerseng-teleperformance.icims.com/jobs/80868/customer-service-expert/job?mode=job') === true &&
+      jobsMod.isJobDetailUrl('https://example.com/jobs/123/job') === false &&
+      jobsMod.isJobDetailUrl('https://example.com/jobs/job') === false &&
+      jobsMod.isJobDetailUrl('https://example.com/search-jobs&p=2') === false,
+    null,
+  );
+  // Strategy F negatives: a CTA link that is not a job detail, and a
+  // CTA link whose slug is a bare id, parse to nothing.
+  const negHtml = `<html><body>
+<div><a href="https://example.com/about/apply">APPLY NOW</a></div>
+<div><a href="https://example.com/jobs/12345/">APPLY NOW</a></div>
+</body></html>`;
+  check(
+    'round18b: Strategy F ignores a CTA link to a non-detail URL and one to a bare-id URL',
+    jobsMod.parseCareersPage(negHtml, 'https://example.com/careers').length === 0,
+    jobsMod.parseCareersPage(negHtml, 'https://example.com/careers'),
+  );
+  // The 'expert' gate: a CS word + expert is a role; an expert title
+  // with no CS word is not CS work.
+  const gateParsed = jobsMod.parseCareersPage(
+    `<html><body>
+<div class="job-listing"><h3>Customer Service Expert</h3><a href="/jobs/customer-service-expert">Apply</a></div>
+<div class="job-listing"><h3>Fraud Expert</h3><a href="/jobs/fraud-expert">Apply</a></div>
+</body></html>`,
+    'https://example.com/careers',
+  );
+  const gateScreened = jobsMod.screenPostings('Gate Co', gateParsed, resumeText, true);
+  check(
+    'round18b: "Customer Service Expert" passes the CS gate, "Fraud Expert" does not',
+    gateScreened.leads.length === 1 &&
+      gateScreened.leads[0].title === 'Customer Service Expert' &&
+      gateScreened.rejectedNoMatch === 1,
+    { leads: gateScreened.leads.map((l) => l.title), rejectedNoMatch: gateScreened.rejectedNoMatch },
+  );
+}
+
 async function testPaginationAndSearchScan() {
   // Pagination: a real list page that links "Next" is followed with
   // plain fetches (TalentBrew: 8/page over 38 pages; Concentrix JDQ:
@@ -5623,6 +5709,7 @@ await testRound9();
 await testRound11();
 await testRound17();
 await testRound18();
+await testRound18b();
 await testPaginationAndSearchScan();
 await testTestCompany();
 await testJazzhr();

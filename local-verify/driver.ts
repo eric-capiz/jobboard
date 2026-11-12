@@ -96,6 +96,9 @@
  *      against tp-jobs.html and checks the markup outline end to
  *      end (the 4 job anchors, the extractor's parsed count, the
  *      results-count line).
+ *   T2. tp-icims.html — plain-HTML iCIMS list (round 18b): 4 APPLY NOW
+ *      cards, titles only in the slugs. Strategy F must parse all 4;
+ *      the screen yields Customer Service Expert at 60.
  *
  * Run: esbuild local-verify/driver.ts --bundle --platform=node
  *        --format=cjs --external:mongodb --outfile=/tmp/local-driver.cjs
@@ -503,6 +506,18 @@ async function main(): Promise<void> {
   );
   check('P: probe outline parsed count agrees with the extractor (4)', pMarkup?.parsedPostings === 4, pMarkup?.parsedPostings);
   check('P: probe outline carries the results-count line', (pMarkup?.countLines ?? []).some((l) => /of 4/.test(l)), pMarkup?.countLines);
+
+  // ---- Fixture T2: Teleperformance iCIMS apply-link cards (round 18b) ----
+  // Plain-HTML list mirroring the live probe (4 APPLY NOW anchors,
+  // titles only in the iCIMS slugs). Strategy F must parse all 4;
+  // the screen must yield Customer Service Expert at 60.
+  const t2 = await runCase('MockTpIcims', `${BASE}/tp-icims.html`);
+  const t2Leads = t2.leads ?? [];
+  summarize('T2', t2);
+  check('T2: 4 postings seen (all 4 iCIMS cards parsed)', t2.postingsSeen === 4, t2.postingsSeen);
+  check('T2: Customer Service Expert leads at 60', t2Leads.some((l) => l.title === 'Customer Service Expert' && l.matchScore === 60), t2Leads);
+  check('T2: Customer Expert is a 55 near-miss, not an auto-add lead', t2Leads.some((l) => l.title === 'Customer Expert Nbs Fraud' && l.matchScore === 55), t2Leads);
+  check('T2: no render needed (plain HTML list)', t2.renderUsed === false, t2.renderUsed);
 
   // eslint-disable-next-line no-console
   console.log(failures === 0 ? 'LOCAL-RENDER-ALL-PASS' : `LOCAL-RENDER-${failures}-FAILURES`);
