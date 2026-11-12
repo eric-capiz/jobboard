@@ -66,7 +66,18 @@ const CHROMIUM_PACK_URL =
 /** Hard cap on one render: navigation + JS settle, end to end. */
 const RENDER_TIMEOUT_MS = 20000;
 /** Cap on waiting for the rendered listings to settle (see below). */
-const SETTLE_CAP_MS = 12000;
+const SETTLE_CAP_MS = 8000;
+/** The portal search step gets its own minimum window: the load +
+ *  cookie + settle phases can eat the whole 20s render budget
+ *  before the search step starts, and tryPortalSearch then returns
+ *  'skipped-time' without ever running (Foundever, 2026-11-12
+ *  canary: 15.6s burned before the search, 0 postings). The search
+ *  deadline is therefore at least this long after the search starts.
+ *  The absolute cap bounds the total: a render that started slow
+ *  still ends within 30s of its start, inside one 60s function
+ *  invocation and the find-jobs 30s render window. */
+const SEARCH_MIN_MS = 9000;
+const RENDER_ABSOLUTE_CAP_MS = 30000;
 
 /** Whether a page's rendered HTML still carries a cookie-consent
  *  banner — OneTrust's banner text is unmistakable, and it is the
@@ -248,7 +259,8 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
  *  the API response instead of silent. */
 export async function renderPageHtml(url: string, searchTerm: string = '', timeoutMs: number = RENDER_TIMEOUT_MS): Promise<RenderPageResult | null> {
   if (renderDisabled()) return null;
-  const deadline = Date.now() + timeoutMs;
+  const renderStart = Date.now();
+  const deadline = renderStart + timeoutMs;
   const remain = (): number => deadline - Date.now();
   let browser: Browser | null = null;
   let page: Page | null = null;
@@ -384,16 +396,18 @@ export async function renderPageHtml(url: string, searchTerm: string = '', timeo
     // once, then check again — a reload can re-show the banner
     // (consent not persisted) and a second dialog can sit behind the
     // first. A click hides the banner itself even without a second
-    // reload, so the post-reload passes only click. Settles after a
-    // reload are short (3s): the render budget is 20s and the search
-    // step needs ≥6s left, so a long settle starves the search —
-    // exactly Foundever's skipped-time outcome (2026-11-12).
+    // reload, so the post-reload passes only click. Settles are
+    // short (1s after a click, 2s after a reload): the render budget
+    // is 20s and the search step now keeps its own 9s minimum
+    // whatever the settle burns, but a long settle still delays the
+    // search — the old 2s/3s settles were part of Foundever's
+    // skipped-time starvation (2026-11-12).
     const dismissBanner = async (pg: Page): Promise<boolean> => {
       let clicked = false;
       for (let pass = 0; pass < 2 && remain() > 3000; pass++) {
         if (!(await tryCookieAccept(pg)).clicked) break;
         clicked = true;
-        await waitForDomStable(pg, remain, 2000, 500);
+        await waitForDomStable(pg, remain, 1000, 500);
       }
       if (!clicked) return false;
       // Reload ONLY when the banner is still visibly up after the
@@ -418,10 +432,10 @@ export async function renderPageHtml(url: string, searchTerm: string = '', timeo
       } catch {
         // Keep the current page — it may already show content.
       }
-      await waitForDomStable(pg, remain, 3000, 500);
+      await waitForDomStable(pg, remain, 2000, 500);
       for (let pass = 0; pass < 2 && remain() > 3000; pass++) {
         if (!(await tryCookieAccept(pg)).clicked) break;
-        await waitForDomStable(pg, remain, 2000, 500);
+        await waitForDomStable(pg, remain, 1000, 500);
       }
       return true;
     };
@@ -498,7 +512,15 @@ export async function renderPageHtml(url: string, searchTerm: string = '', timeo
     let searchToggleClicked: string | null = null;
     let searchCountryClicked: string | null = null;
     let searchGateClicked: string | null = null;
-    const searchOutcome = await tryPortalSearch(page, searchTerm, deadline, (label) => {
+    // The search runs on its own clock: at least SEARCH_MIN_MS from
+    // now, even when the load + settle phases already ate the 20s
+    // budget — otherwise the step returns 'skipped-time' without
+    // running (Foundever). Capped at the render's absolute cap.
+    const searchDeadline = Math.min(
+      Math.max(deadline, Date.now() + SEARCH_MIN_MS),
+      renderStart + RENDER_ABSOLUTE_CAP_MS,
+    );
+    const searchOutcome = await tryPortalSearch(page, searchTerm, searchDeadline, (label) => {
       searchToggleClicked = label;
     }, (label) => {
       searchCountryClicked = label;

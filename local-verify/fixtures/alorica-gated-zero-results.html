@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>MockAlorica — Search Results (0 roles)</title></head>
+<body>
+<header>
+  <p><a href="/">Powered by Alorica</a></p>
+  <p>
+    <button type="button">English</button>
+    <button type="button">French</button>
+    <button type="button">Spanish</button>
+  </p>
+</header>
+<h1>Search Results</h1>
+<p>0 OPEN ROLES</p>
+<form id="job-search-form" action="/alorica-gated-zero-results.html" method="get">
+  <label id="search-label" for="job-search">Search jobs</label>
+  <input id="job-search" name="search" type="text" role="combobox" aria-describedby="search-desc" aria-labelledby="search-label" placeholder="Search jobs" autocomplete="off">
+  <span id="search-desc" style="display:none">This is a search field with an auto-suggest feature attached</span>
+  <button type="submit">Search</button>
+</form>
+<p>
+  <button type="button" id="us-filter" onclick="document.getElementById('job-search-form').action='/alorica-results.html'">United States</button>
+  <button type="button">Work Type</button>
+  <button type="button">Clear</button>
+</p>
+<p>Results 0 – 0 of 0</p>
+</body>
+</html>

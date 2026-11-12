@@ -43,6 +43,32 @@
  *      correct.
  *   J. ws.html — WordPress homepage (site search + "Apply Now" link)
  *      -> ws-jobs.html (3 non-CS roles); 0 leads is correct.
+ *   S. results-us-slug.html — the Sitel US-results page, but the
+ *      Retention card carries NO location span: its location lives
+ *      only in its Phenom slug (Wise, VA). The reader must read it
+ *      from the slug and reject the role, while the 3 remote leads
+ *      still pass (round 17, 2026-11-12 canary).
+ *   L. slow-portal.html — slow-settle gate page: a cookie banner
+ *      injected late (~3s) + a ticker that keeps growing for ~12s,
+ *      so load + settle eat the nominal 8s budget before the search
+ *      gate runs (the live Foundever skipped-time shape). The
+ *      search-minimum guarantee must still run the search.
+ *   D1. alorica-gated.html — bling-ai shell whose form submits to a
+ *      zero-results page until the "United States" filter is picked;
+ *      the search step must re-submit AFTER the gate.
+ *   K. omni-corporate-careers.html — corporate careers page with
+ *      only the header site search + nav links ("Meet Our Leadership
+ *      Team", "Join Our Talent Network"); the gate resolver must NOT
+ *      click leadership as an opener, and the render must reach the
+ *      join portal (careersUrl) instead.
+ *   I2. nexrep-js.html — marketing careers page linking to the
+ *      Paylocity-shaped JS shell; the render must target the
+ *      /recruiting/jobs/All/ list URL first (0 leads is correct).
+ *   T. tp-flaky.html — a stub renderer that dies fast twice on the
+ *      entry target, then serves the US results on the next target:
+ *      fast deaths must be free, the same-target retry must fire,
+ *      and the loop must reach the later target inside a max-2
+ *      budget (Teleperformance's RST shape).
  *
  * Run: esbuild local-verify/driver.ts --bundle --platform=node
  *        --format=cjs --external:mongodb --outfile=/tmp/local-driver.cjs
@@ -52,8 +78,8 @@
  */
 
 import { readFileSync } from 'node:fs';
-import { searchCompanyJobs } from '../api/find-jobs.js';
-import { renderPageHtml } from '../api/render-page.js';
+import { searchCompanyJobs, portalSearchTerm } from '../api/find-jobs.js';
+import { renderPageHtml, type RenderPageResult } from '../api/render-page.js';
 
 const RESUME = readFileSync(
   '/home/hatch/workspace/jobboard/sweep-2026-11-11-cs-v4/resume.txt',
@@ -252,6 +278,96 @@ async function main(): Promise<void> {
   summarize('J', j);
   check('J: 3 postings seen', j.postingsSeen === 3, j.postingsSeen);
   check('J: 0 leads is correct (Data Entry/Warehouse/Marketing are not CS)', (j.leads ?? []).length === 0, j.leads);
+
+  // ---- Fixture S: Sitel slug-only Retention card ----
+  // The US-results page where the Retention card has NO location
+  // span: its location lives only in its Phenom slug. Plain-HTML
+  // walk must read 'Wise, VA' from the slug and reject it — the
+  // live canary read it blank and counted a 4th lead.
+  const s = await runCase('MockSitelSlug', `${BASE}/results-us-slug.html`);
+  const sLeads = s.leads ?? [];
+  summarize('S', s);
+  check('S: exactly 3 leads (Retention rejected from its slug)', sLeads.length === 3, sLeads);
+  check('S: Retention location-rejected with the slug-read location Wise, VA', (s.screened?.rejected ?? []).some((r) => r.title === 'Retention Customer Service Associate' && r.location === 'Wise, VA' && r.reason === 'location'), s.screened?.rejected);
+  check('S: no render used (plain HTML had the cards)', s.renderUsed === false, s.renderUsed);
+
+  // ---- Fixture L: Foundever slow-settle gate page ----
+  // Direct renderPageHtml with a nominal 8s timeout: the load +
+  // settles eat it before the search gate runs, so without the
+  // search-minimum guarantee this ends skipped-time. With it, the
+  // search gets its own window past the timeout and lands on the
+  // US results page.
+  const lStart = Date.now();
+  const l = await renderPageHtml(`${BASE}/slow-portal.html`, portalSearchTerm(RESUME), 8000);
+  const lElapsed = Date.now() - lStart;
+  const lHtml = l?.html ?? '';
+  // eslint-disable-next-line no-console
+  console.log(`L render: outcome=${l?.searchOutcome} renderedUrl=${l?.renderedUrl} elapsedMs=${lElapsed}`);
+  check('L: search outcome is searched (not skipped-time)', l?.searchOutcome === 'searched', l?.searchOutcome);
+  check('L: landed on the slow US results page', typeof l?.renderedUrl === 'string' && l.renderedUrl.includes('slow-results.html'), l?.renderedUrl);
+  check('L: results page carries the Remote CSR role', lHtml.includes('Remote Customer Service Representative'), lHtml.slice(0, 200));
+  check('L: elapsed time exceeds the nominal 8s timeout (the search ran past it)', lElapsed > 8000, lElapsed);
+
+  // ---- Fixture D1: Alorica gated search (re-submit after the gate) ----
+  const d1 = await runCase('MockAloricaGated', `${BASE}/alorica-gated.html`);
+  const d1Leads = d1.leads ?? [];
+  summarize('D1', d1);
+  check('D1: search outcome is searched (the gate pick did not strand the search at 0 roles)', d1.searchOutcome === 'searched', d1.searchOutcome);
+  check('D1: 4 postings seen', d1.postingsSeen === 4, d1.postingsSeen);
+  check('D1: Customer Service Representative lead at 65', d1Leads.some((l) => l.title === 'Customer Service Representative' && l.matchScore === 65), d1Leads);
+  check('D1: Bilingual Customer Service Representative lead at 65', d1Leads.some((l) => l.title === 'Bilingual Customer Service Representative' && l.matchScore === 65), d1Leads);
+  check('D1: Customer Support Specialist lead at 65', d1Leads.some((l) => l.title === 'Customer Support Specialist' && l.matchScore === 65), d1Leads);
+  check('D1: exactly 3 leads (Warehouse Associate is no-match)', d1Leads.length === 3, d1Leads);
+  check('D1: gate log shows the "United States" pick (the re-submit ran after it)', (d1.renderAttempts ?? []).some((x) => x.searchGateClicked === 'United States'), d1.renderAttempts);
+
+  // ---- Fixture K: Omni corporate careers page (no wrong gate pick) ----
+  const k = await runCase('MockOmniCorp', `${BASE}/omni-corporate-careers.html`, `${BASE}/omni-join.html`);
+  const kLeads = k.leads ?? [];
+  summarize('K', k);
+  check('K: search outcome is searched', k.searchOutcome === 'searched', k.searchOutcome);
+  check('K: landed on the search results page (via the join portal)', typeof k.renderedUrl === 'string' && k.renderedUrl.includes('omni-search.html'), k.renderedUrl);
+  check('K: 3 US leads (Retention is Virginia on-site)', kLeads.length === 3 && kLeads.some((l) => l.title === 'Remote Customer Service Representative' && l.matchScore === 70), kLeads);
+  check('K: gate log never shows "Meet Our Leadership Team" (nav links are not openers)', !(k.renderAttempts ?? []).some((x) => x.searchGateClicked === 'Meet Our Leadership Team'), k.renderAttempts);
+
+  // ---- Fixture I2: NexRep JS portal (Paylocity-shaped list URL) ----
+  const i2 = await runCase('MockNexRepJS', `${BASE}/nexrep-js.html`);
+  summarize('I2', i2);
+  check('I2: 4 postings seen (JS shell surfaced by the render)', i2.postingsSeen === 4, i2.postingsSeen);
+  check('I2: 0 leads is correct (Quality/Resource/Real Time/Payroll are not CS)', (i2.leads ?? []).length === 0, i2.leads);
+  check('I2: the Paylocity-shaped list URL is the first render target', (i2.renderTargets ?? [])[0]?.url.includes('/recruiting/jobs/All/') === true, i2.renderTargets);
+  check('I2: source page is the Paylocity-shaped list URL', typeof i2.sourcePage === 'string' && i2.sourcePage.includes('/recruiting/jobs/All/'), i2.sourcePage);
+  check('I2: render was used', i2.renderUsed === true, i2.renderUsed);
+
+  // ---- Fixture T: Teleperformance flaky render (fast deaths are free) ----
+  // A stub renderer that dies fast twice on the entry target, then
+  // serves the US results on the next target: the loop must retry
+  // the same target once for free and still reach the later target
+  // inside a max-2 budget.
+  const resultsUsHtml = readFileSync(
+    '/home/hatch/workspace/jobboard/local-verify/fixtures/results-us.html',
+    'utf-8',
+  );
+  let tCalls = 0;
+  const tTargets: string[] = [];
+  const stubFlaky = async (url: string, _searchTerm: string): Promise<RenderPageResult | null> => {
+    tCalls += 1;
+    tTargets.push(url);
+    if (tCalls <= 2) {
+      return { html: '', searchOutcome: null, searchMs: 0, renderedUrl: '', renderError: 'render-failed' };
+    }
+    return { html: resultsUsHtml, searchOutcome: 'has-listings', searchMs: 300, renderedUrl: url };
+  };
+  const t = (await searchCompanyJobs(
+    { name: 'MockTPFlaky', website: `${BASE}/tp-flaky.html`, careersUrl: '' },
+    RESUME,
+    { renderPage: stubFlaky, renderBudget: { used: 0, max: 2 } },
+  )) as unknown as CaseResult;
+  const tLeads = t.leads ?? [];
+  summarize('T', t);
+  check('T: exactly 3 render calls (2 free fast deaths + 1 charged success)', tCalls === 3, { calls: tCalls, targets: tTargets });
+  check('T: first two calls hit the same target (the free same-target retry)', tTargets[0] === tTargets[1] && tTargets[0] === `${BASE}/tp-flaky.html`, tTargets);
+  check('T: third call reached the next target (tp-flaky-b.html)', (tTargets[2] ?? '').includes('tp-flaky-b.html'), tTargets);
+  check('T: 3 leads from the served results', tLeads.length === 3, tLeads);
 
   // eslint-disable-next-line no-console
   console.log(failures === 0 ? 'LOCAL-RENDER-ALL-PASS' : `LOCAL-RENDER-${failures}-FAILURES`);

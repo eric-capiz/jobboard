@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>NexRep — Jobs (Paylocity)</title></head>
+<body>
+<div id="app"></div>
+<script>
+  // Paylocity-shaped JS shell: the roles only exist after the
+  // portal's own JS runs, so the plain-HTML walk sees an empty shell
+  // and the render must surface them. The links are built with
+  // setAttribute (no literal href="..." detail links in the static
+  // HTML), so the shell's plain-HTML content score stays 0 and the
+  // retarget rests on the path-based ATS-list rule, not on content.
+  var roles = [
+    ['Quality Specialist', '/job/Quality-Specialist-Remote/5001/'],
+    ['Resource Specialist', '/job/Resource-Specialist-Remote/5002/'],
+    ['Real Time Analyst', '/job/Real-Time-Analyst-Remote/5003/'],
+    ['Payroll Administrator', '/job/Payroll-Administrator-Remote/5004/']
+  ];
+  var list = document.createElement('div');
+  // The class names are built dynamically so the literals 'job-list'
+  // / 'job-card' never appear in the static HTML: the walk must score
+  // this shell 0 on content and retarget it on the path rule alone.
+  list.className = 'job' + '-list';
+  var count = document.createElement('p');
+  count.textContent = 'Results 1 – 4 of 4';
+  document.getElementById('app').appendChild(count);
+  roles.forEach(function (r) {
+    var card = document.createElement('div');
+    card.className = 'job' + '-card';
+    var a = document.createElement('a');
+    a.setAttribute('href', r[1]);
+    a.textContent = r[0];
+    var loc = document.createElement('span');
+    loc.className = 'location';
+    loc.textContent = 'Remote, US';
+    card.appendChild(a);
+    card.appendChild(loc);
+    list.appendChild(card);
+  });
+  document.getElementById('app').appendChild(list);
+</script>
+</body>
+</html>

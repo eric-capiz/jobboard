@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>MockAlorica — Careers (gated search)</title></head>
+<body>
+<header>
+  <p><a href="/">Powered by Alorica</a></p>
+  <p>
+    <button type="button">English</button>
+    <button type="button">French</button>
+    <button type="button">Spanish</button>
+  </p>
+  <p><button type="button">Continue With Your Existing Application ↗</button></p>
+</header>
+<h1>Find your next role</h1>
+<p>NOW HIRING • 12 OPEN ROLES</p>
+<!-- Live Alorica shape (2026-11-12 canary): the search form submits
+     to a zero-results page UNTIL the "United States" filter button
+     is picked — the pick re-points the form at the results page.
+     Both submits before the pick return 0 roles, so the search step
+     must re-submit AFTER the gate, or the portal reads as empty. -->
+<form id="job-search-form" action="/alorica-gated-zero-results.html" method="get">
+  <label id="search-label" for="job-search">Search jobs</label>
+  <input id="job-search" name="search" type="text" role="combobox" aria-describedby="search-desc" aria-labelledby="search-label" placeholder="Search jobs" autocomplete="off">
+  <span id="search-desc" style="display:none">This is a search field with an auto-suggest feature attached</span>
+  <button type="submit">Search</button>
+</form>
+<p>
+  <button type="button" id="us-filter" onclick="document.getElementById('job-search-form').action='/alorica-results.html'">United States</button>
+  <button type="button">Work Type</button>
+  <button type="button">Clear</button>
+</p>
+</body>
+</html>

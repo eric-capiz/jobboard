@@ -797,16 +797,92 @@ function locationIn(text: string): string {
   // it the role reads as blank-location and a non-US on-site role
   // passes the sweep's location rule as a review lead
   // (Teleperformance's Jamaica role, 2026-11-12 local round).
+  // The span may carry nested inline markup (an <i> map-marker icon
+  // inside it): the capture allows tags and strips them, instead of
+  // requiring bare text directly after the open tag — a span that
+  // reads blank for that reason lets an on-site role through as a
+  // review lead (Sitel's live Phenom cards, 2026-11-12 canary).
+  // A <div>/<p> with an exact 'location' / 'job-location' class
+  // token counts too — but only the exact token: a
+  // 'location-filter' div holds a list of places, not the card's
+  // own location.
+  const cleanSpan = (raw: string): string => {
+    const v = stripTags(raw).replace(/\s+/g, ' ').trim();
+    return v.length >= 2 && v.length <= 80 ? v : '';
+  };
   let lastSpan = '';
   for (const m of text.matchAll(
-    /<span[^>]*class="[^"]*(?:job-)?location[^"]*"[^>]*>([^<]{2,80})<\/span>/gi,
+    /<span[^>]*class="[^"]*(?:job-)?location[^"]*"[^>]*>([\s\S]{0,120}?)<\/span>/gi,
   )) {
-    const v = stripTags(m[1]).trim();
+    const v = cleanSpan(m[1]);
+    if (v) lastSpan = v;
+  }
+  if (lastSpan) return lastSpan;
+  for (const m of text.matchAll(
+    /<(div|p)[^>]*class="([^"]*)"[^>]*>([\s\S]{0,120}?)<\/\1>/gi,
+  )) {
+    const tokens = m[2].split(/\s+/);
+    if (!tokens.some((t) => t === 'location' || t === 'job-location')) continue;
+    const v = cleanSpan(m[3]);
     if (v) lastSpan = v;
   }
   if (lastSpan) return lastSpan;
   if (/\bRemote\b/i.test(text)) return 'Remote';
   return '';
+}
+
+/** The location a Phenom-style job URL carries in its slug:
+ *  /job/<City>-<Title-words>-<State>/<numeric-id>/
+ *  (jobs.foundever.com: /job/Wise-Retention-Customer-Service-
+ *  Associate-Virg/1372881000/, /job/Remote-Remote-Customer-Service-
+ *  Representative-Any/1450284100/). Used ONLY when the card itself
+ *  carries no readable location: the slug is the portal's own
+ *  statement of where the role sits, and a blank location would
+ *  otherwise pass the remote-only sweep as a review lead (Sitel's
+ *  Retention role, live 2026-11-12 canary — Wise, VA on-site, read
+ *  blank). A slug starting in 'Remote' is remote; any other slug
+ *  must end in a resolvable US state token (a 2-letter abbreviation,
+ *  or a truncated state name — 'Virg' maps by name prefix) or it
+ *  returns '' — a plain title slug (/job/customer-service-
+ *  representative/123/) proves no location and must never become
+ *  one. Never a guess. */
+export function locationFromJobSlug(rawUrl: string): string {
+  let path = '';
+  try {
+    path = new URL(rawUrl).pathname;
+  } catch {
+    return '';
+  }
+  const segs = path.replace(/\/+$/, '').split('/').filter(Boolean);
+  if (segs.length !== 3 || segs[0].toLowerCase() !== 'job') return '';
+  if (!/^\d+$/.test(segs[2])) return '';
+  const tokens = segs[1].split('-').filter(Boolean);
+  if (tokens.length < 2) return '';
+  if (!tokens.every((t) => /^[A-Za-z0-9]+$/.test(t))) return '';
+  const stateOf = (tok: string): string => {
+    if (/^[A-Za-z]{2}$/.test(tok)) {
+      const abbr = tok.toUpperCase();
+      return STATE_NAMES.some(([, a]) => a.toUpperCase() === abbr) ? abbr : '';
+    }
+    // A truncated state name: exactly one state name may start with
+    // it ('Virg' -> Virginia, 'Tex' -> Texas). An ambiguous prefix
+    // ('New' -> four states) or a title word ('Ass', 'Rep') matches
+    // none or several, and proves no state.
+    if (tok.length >= 3) {
+      const hits = STATE_NAMES.filter(([name]) => name.startsWith(tok.toLowerCase()));
+      return hits.length === 1 ? hits[0][1].toUpperCase() : '';
+    }
+    return '';
+  };
+  const first = tokens[0];
+  const last = tokens[tokens.length - 1];
+  if (/^remote$/i.test(first)) {
+    const st = stateOf(last);
+    return st ? `Remote, ${st}` : 'Remote';
+  }
+  const st = stateOf(last);
+  if (!st) return '';
+  return `${first}, ${st}`;
 }
 
 const APPLY_HREF = /job|apply|position|opening|detail|career|posting|vacancy|role/i;
@@ -958,10 +1034,25 @@ export function parseCareersPage(html: string, pageUrl: string): Posting[] {
     const key = `${title}\n${url}`;
     if (seen.has(key)) return;
     seen.add(key);
-    postings.push({ title, location, url, description: '', postedDate: '' });
+    // A card with no readable location still carries one in its
+    // Phenom slug — read it there rather than passing the role on
+    // as blank-location (Sitel's Retention role, 2026-11-12).
+    postings.push({ title, location: location || locationFromJobSlug(url), url, description: '', postedDate: '' });
   };
-  // Strategy A: job blocks.
-  const chunks = clean.split(/(?=<[^>]*\b(?:class|id)="[^"]*(?:job|career|position|opening)[^"]*")/i);
+  // Strategy A: job blocks. The splitter fires on a class/id that
+  // mentions a job word — but NOT a bare location element: a
+  // <span class="job-location"> is the card's location display, not
+  // a card, and splitting on it shatters the card from its own span
+  // (the card chunk then reads blank and the slug fallback has to
+  // rescue the location — Sitel's live Phenom cards, 2026-11-12
+  // canary). 'job-card' / 'job-list' still split; 'job-location'
+  // (and 'job-locations') do not. A <a data-job-id> is a card
+  // container too (TalentBrew): without it, the chunk starts at the
+  // inner h2 — which sits INSIDE the card's anchor — and Strategy A
+  // pairs the title with the NEXT card's link (the first <a> in the
+  // chunk), crossing titles and URLs. Splitting on the anchor keeps
+  // each card's title, link, and span in one chunk.
+  const chunks = clean.split(/(?=<[^>]*\b(?:(?:class|id)="[^"]*(?:job(?!-location)|career|position|opening)[^"]*"|data-job-id="[^"]+"))/i);
   for (let i = 1; i < chunks.length; i++) {
     const chunk = chunks[i].slice(0, 3000);
     const heading = chunk.match(/<h[234][^>]*>([\s\S]{0,200}?)<\/h[234]>/i);
@@ -1483,6 +1574,12 @@ export function renderTargetScore(u: string, careersUrl: string): number {
       '';
     const lang = locale.split(/[-_]/)[0].toLowerCase();
     if (lang && lang !== 'en') score -= 4;
+    // An ATS company-list URL IS the portal (Paylocity's
+    // /recruiting/jobs/All/<uuid>/<Company>): it must outrank the
+    // marketing careers page that merely links to it, or the render
+    // goes to a page that drifts to a register form (NexRep,
+    // 2026-11-12 canary).
+    if (isAtsListUrl(u)) score += 2;
   } catch {
     // Unparseable URL — scores only the careers-link bonus below.
   }
@@ -1556,6 +1653,43 @@ export function companyHostBonus(u: string, companyName: string): number {
     return 0;
   } catch {
     return 0;
+  }
+}
+
+/** An ATS company-list URL: the employer's whole job list on an
+ *  applicant-tracking host, not one role. Paylocity's shape is
+ *  /recruiting/jobs/All/<uuid>/<Company> — the '/jobs/All/' pair is
+ *  the list marker (a single role never sits under 'All'), and the
+ *  same shape on any host is the same list. isJobDetailUrl misreads
+ *  it as a detail (the 'jobs' segment trips its marker rule), so
+ *  the render rank excluded the portal entirely and NexRep's render
+ *  went to a marketing page that drifts to a register form
+ *  (2026-11-12 canary). Only the list marker exempts a URL from the
+ *  detail exclusion — everywhere else the exclusion stands. */
+export function isAtsListUrl(rawUrl: string): boolean {
+  try {
+    return /\/jobs\/all(\/|$)/i.test(new URL(rawUrl).pathname);
+  } catch {
+    return false;
+  }
+}
+
+/** Path segments that are never a job list — a blog, a category
+ *  index, a newsroom, a press page. They score as render targets
+ *  through their page content (a WordPress front page's search box
+ *  + detail links), and the render then burns on a blog while the
+ *  jobs portal sits unrendered (Working Solutions: the render went
+ *  to jobs.workingsolutions.com/blog/ and harvested a scam-warning
+ *  post, 2026-11-12 canary). Excluded from candidacy outright — a
+ *  portal is never filed under one of these. */
+export function isJunkRenderPath(rawUrl: string): boolean {
+  try {
+    const segs = new URL(rawUrl).pathname.toLowerCase().split('/').filter(Boolean);
+    return segs.some((s) =>
+      /^(blog|category|categories|tag|tags|news|press|author|authors|events|event)$/.test(s),
+    );
+  } catch {
+    return false;
   }
 }
 
@@ -1747,8 +1881,12 @@ export async function searchCompanyJobs(
         // URLs and they outranked the /careers guess, burning both
         // renders on detail pages (2026-11-12 local round). The
         // plain-HTML fetch already captured the role as a teaser
-        // fallback; only the render rank is lost, not the role.
-        if (!isJobDetailUrl(u)) {
+        // fallback; only the render rank is lost, not the role. An
+        // ATS company-list URL is the exception: it looks like a
+        // detail to isJobDetailUrl but it IS the list (NexRep's
+        // Paylocity portal, 2026-11-12 canary). A blog/category path
+        // is never a target either (Working Solutions).
+        if ((!isJobDetailUrl(u) || isAtsListUrl(u)) && !isJunkRenderPath(u)) {
           // Score on path AND host, like the fetched branch: a
           // jobs./careers. subdomain homepage scores 0 on path alone,
           // so without the host bonus it would always lose to the
@@ -1764,7 +1902,6 @@ export async function searchCompanyJobs(
     }
     const pagePostings = await collectPagePostings(html, u, false);
     if (pagePostings.length > 0) {
-      readWithPostings.add(u);
       // A single posting is a teaser, not the list — UNLESS it is
       // the whole list. The old rule trusted isListLikeUrl alone,
       // but a teaser CAN live on a list-like path: Teleperformance's
@@ -1787,6 +1924,13 @@ export async function searchCompanyJobs(
       if (isTeaser) {
         if (!fallbackPostings) fallbackPostings = { postings: pagePostings, url: u };
       } else {
+        // Only a page treated as the list earns the -10 re-render
+        // penalty below: its SSR content is proven. A teaser page
+        // (one posting on a non-list page) is exactly a page whose
+        // real list may be JS-only — penalizing it pushed Working
+        // Solutions' jobs homepage below its own blog pages
+        // (2026-11-12 canary) and the render went to the blog.
+        readWithPostings.add(u);
         const screened = screenPostings(company.name, pagePostings, resumeText, company.isUSCompany ?? false);
         // A page whose postings ALL die as no-match is not the list
         // — either the extractor misread the page (Teleperformance's
@@ -1839,7 +1983,11 @@ export async function searchCompanyJobs(
     // alone, never the portal, so it must not spend render budget.
     // The plain-HTML fetch already captured the role as a teaser
     // fallback; only the render rank is lost, not the role.
-    if ((contentScore > 0 || isCareersLikeUrl(u, careersUrl) || atsHostBonus(u) > 0) && !isJobDetailUrl(u)) {
+    if (
+      (contentScore > 0 || isCareersLikeUrl(u, careersUrl) || atsHostBonus(u) > 0) &&
+      (!isJobDetailUrl(u) || isAtsListUrl(u)) &&
+      !isJunkRenderPath(u)
+    ) {
       zeroYieldTargets.push({
         url: u,
         score:
@@ -1874,35 +2022,77 @@ export async function searchCompanyJobs(
     renderTargets = targets.map((t) => ({ url: t.url, score: t.score }));
     for (const { url: target } of targets) {
       if (renderBudget.used >= renderBudget.max || Date.now() >= renderDeadlineMs) break;
-      renderBudget.used += 1;
-      renderAttempted = true;
-      const started = Date.now();
+      // A render that dies FAST (under 5s, no HTML — a host that
+      // resets the connection, a launch failure) is not a real
+      // attempt: it is retried once on the SAME target without
+      // consuming budget, and a fast death never consumes budget at
+      // all — so a transport failure on the best target cannot
+      // strand the company before the next-best target is tried
+      // (Teleperformance: jobs.teleperformance.com RSTs the render
+      // in ~180ms, 2026-11-12 canary; the loop then spent its two
+      // charged attempts on the portal and the apex homepage and
+      // never reached the careers job-opportunities page). A slow
+      // failure (a 20s navigation timeout) still consumes budget:
+      // it did the work of a real attempt. A board redirect is not
+      // a failure to retry — the target really is a board.
       let rendered: RenderPageResult | null = null;
-      try {
-        rendered = await opts.renderPage(target, portalSearchTerm(resumeText));
-      } catch {
-        rendered = null;
+      let attemptMs = 0;
+      for (let attemptNo = 0; attemptNo < 2; attemptNo++) {
+        if (attemptNo === 0) {
+          if (renderBudget.used >= renderBudget.max || Date.now() >= renderDeadlineMs) break;
+          renderBudget.used += 1;
+        } else if (Date.now() >= renderDeadlineMs) {
+          break;
+        }
+        renderAttempted = true;
+        const started = Date.now();
+        let attemptRendered: RenderPageResult | null = null;
+        try {
+          attemptRendered = await opts.renderPage(target, portalSearchTerm(resumeText));
+        } catch {
+          attemptRendered = null;
+        }
+        attemptMs = Date.now() - started;
+        renderMs += attemptMs;
+        // Record every attempt — including a null render (the renderer
+        // died or the call threw): without this the live canary cannot
+        // tell a retry that never ran from a retry that failed.
+        renderAttempts.push({
+          target,
+          ms: attemptMs,
+          outcome: attemptRendered?.searchOutcome ?? null,
+          error: attemptRendered ? (attemptRendered.renderError ?? null) : 'render-null',
+          renderedUrl: attemptRendered?.renderedUrl ?? '',
+          cookieClicks: attemptRendered?.cookieClicks ?? 0,
+          bannerPresent: attemptRendered?.bannerPresent ?? false,
+          bannerButtons: attemptRendered?.bannerButtons ?? [],
+          cookieClickedLabel: attemptRendered?.cookieClickedLabel ?? null,
+          bannerVisible: attemptRendered?.bannerVisible ?? false,
+          searchToggleClicked: attemptRendered?.searchToggleClicked ?? null,
+          searchCountryClicked: attemptRendered?.searchCountryClicked ?? null,
+          searchGateClicked: attemptRendered?.searchGateClicked ?? null,
+        });
+        rendered = attemptRendered;
+        // A FAST failure is a transport death, not a rendered page
+        // that found nothing: a no-form / no-results render carries
+        // an outcome (and usually HTML), so an empty-HTML no-form
+        // must NOT retry for free — the old "no HTML" test retried
+        // it on the same target instead of moving to the next one
+        // (testRenderRetry, 2026-11-12). Only a renderError, a null
+        // outcome, or a null render counts as died-fast.
+        const failedFast =
+          !attemptRendered?.html &&
+          (attemptRendered?.renderError || attemptRendered?.searchOutcome == null) &&
+          attemptMs < 5000;
+        if (attemptNo === 0 && failedFast) {
+          // The attempt died fast — refund its budget and retry the
+          // same target once. A null render (the renderer threw)
+          // counts the same way: it carries no HTML either.
+          renderBudget.used -= 1;
+          continue;
+        }
+        break;
       }
-      const attemptMs = Date.now() - started;
-      renderMs += attemptMs;
-      // Record every attempt — including a null render (the renderer
-      // died or the call threw): without this the live canary cannot
-      // tell a retry that never ran from a retry that failed.
-      renderAttempts.push({
-        target,
-        ms: attemptMs,
-        outcome: rendered?.searchOutcome ?? null,
-        error: rendered ? (rendered.renderError ?? null) : 'render-null',
-        renderedUrl: rendered?.renderedUrl ?? '',
-        cookieClicks: rendered?.cookieClicks ?? 0,
-        bannerPresent: rendered?.bannerPresent ?? false,
-        bannerButtons: rendered?.bannerButtons ?? [],
-        cookieClickedLabel: rendered?.cookieClickedLabel ?? null,
-        bannerVisible: rendered?.bannerVisible ?? false,
-        searchToggleClicked: rendered?.searchToggleClicked ?? null,
-        searchCountryClicked: rendered?.searchCountryClicked ?? null,
-        searchGateClicked: rendered?.searchGateClicked ?? null,
-      });
       if (!rendered) {
         // The renderer died before returning anything — the next
         // target may still load (a host that RSTs one path may serve

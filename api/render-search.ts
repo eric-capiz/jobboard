@@ -1040,7 +1040,22 @@ export function selectGateAction(
   searchTerm: string,
   gateOpened: boolean,
   pageUrl: string,
+  // Labels already driven on this page (a non-navigating pick that
+  // revealed no listings): re-picking one accomplishes nothing, and
+  // the resolver must move on to the next gate instead of clicking
+  // the same button again.
+  excludeLabels: string[] = [],
+  // Gate targets already satisfied on this page: a language pick
+  // after a country pick is never a job filter — it switches the
+  // UI language — and the loop would otherwise click 'English',
+  // then 'French', then 'Spanish', burning the re-submit budget
+  // (Alorica's bling-ai portal, 2026-11-12 local round). A language
+  // pick is still valid BEFORE any country pick (a Language opener
+  // whose English option routes to the US portal).
+  excludeTargets: GateTarget[] = [],
 ): GateAction | null {
+  const excluded = (rawLabel: string): boolean =>
+    excludeLabels.some((x) => normalizeGateLabel(x) === normalizeGateLabel(rawLabel));
   let bestPick: GateAction | null = null;
   let bestPriority = Number.POSITIVE_INFINITY;
   const consider = (action: GateAction): void => {
@@ -1067,10 +1082,12 @@ export function selectGateAction(
     if (!raw) continue;
     const normalized = normalizeGateLabel(raw);
     if (!normalized) continue;
+    if (excluded(raw)) continue;
     const inPicker =
       c.containerRole !== '' || c.containerClass || c.role === 'tab' || c.role === 'option' || c.role === 'menuitem';
     const target = gateTargetOf(normalized, searchTerm);
     if (!target) continue;
+    if (excludeTargets.includes(target)) continue;
     if (target === 'role' && !inPicker) continue;
     // A bare locale link ("United States", "English") is pickable
     // without a gate having opened: the label is an exact locale
@@ -1104,13 +1121,25 @@ export function selectGateAction(
   // once it has fired (re-clicking it would close the picker it
   // opened); before it has fired it is a legitimate opener for a
   // search step that starved before the toggle.
+  // An opener never starts with a nav verb. "Meet Our Leadership
+  // Team" is a nav link, not a gate: the old word list matched
+  // 'team' in it, the click navigated to the leadership page, and
+  // that page's single careers link then read as listings (Omni,
+  // 2026-11-12 canary). 'category'/'area'/'division' are gone from
+  // the word list for the same reason: a blog's "Category" filter
+  // is not a jobs gate (Working Solutions' blog page, same canary),
+  // and a bare "Area"/"Division" label is as likely a nav item as
+  // a filter. The choose/select/pick phrasing still covers a gate
+  // opener that names its field ("Choose your division").
   for (const c of scan.controls) {
     if (c.kind !== 'button' || !c.visible) continue;
     const text = `${c.label} ${c.ariaLabel}`.trim();
     if (!text) continue;
+    if (excluded(text)) continue;
     if (/search jobs|find jobs|find a job/i.test(text) && gateOpened) continue;
+    if (/^(meet|our|about|learn|view|explore|read|see|discover|join|contact|get)\b/i.test(text)) continue;
     if (
-      /\b(country|region|location|language|department|category|team|area|division|choose your|select your|pick your)\b/i.test(
+      /\b(country|region|location|language|department|choose your|select your|pick your)\b/i.test(
         text,
       )
     ) {
@@ -1128,11 +1157,13 @@ type GateResult = 'picked' | 'navigated' | 'opened' | 'board' | null;
  *  lag behind the cards — the links themselves are the signal. Used
  *  only after a gate action: at the search step's entry a bare job
  *  link is a teaser, not the list, and must not short-circuit the
- *  search (Teleperformance's homepage carries one featured role
- *  while the portal holds hundreds). Never throws. */
+ *  search. Two links, not one: a single job-looking link is a nav
+ *  item, not a list — a leadership page's "See open roles" link
+ *  read as listings and ended the search on the wrong page (Omni,
+ *  2026-11-12 canary). A real results page carries many. */
 async function jobLinksNow(page: SearchablePage): Promise<boolean> {
   try {
-    return ((await page.evaluate(countJobListings)) as JobListingCount).jobLinks >= 1;
+    return ((await page.evaluate(countJobListings)) as JobListingCount).jobLinks >= 2;
   } catch {
     return false;
   }
@@ -1153,6 +1184,8 @@ async function resolveGateOnce(
   gateOpened: boolean,
   onCountry?: (label: string) => void,
   onGate?: (label: string) => void,
+  excludeLabels: string[] = [],
+  excludeTargets: GateTarget[] = [],
 ): Promise<GateResult> {
   // A gate action is a single click plus a short change wait — it
   // needs ~2.5s, not the 6s a full search attempt needs. The old
@@ -1167,7 +1200,7 @@ async function resolveGateOnce(
   } catch {
     return null;
   }
-  const action = selectGateAction(scan, searchTerm, gateOpened, page.url());
+  const action = selectGateAction(scan, searchTerm, gateOpened, page.url(), excludeLabels, excludeTargets);
   if (!action) return null;
   const startUrl = page.url();
   const startLen = await textLength(page);
@@ -1255,7 +1288,7 @@ async function attemptSearch(
   return 'settled';
 }
 
-type GatesAfterSearchResult = 'searched' | 'no-form' | 'board-redirect' | null;
+type GatesAfterSearchResult = 'searched' | 'no-form' | 'board-redirect' | 'picked' | null;
 
 /** Drive gates AFTER the search submits settled with no listings (or
  *  the term retry found no box): a gate may still be standing behind
@@ -1268,7 +1301,10 @@ type GatesAfterSearchResult = 'searched' | 'no-form' | 'board-redirect' | null;
  *  pick is terminal: the pick chose its destination, and a submit
  *  there would reset the context it just established (the same rule
  *  as the no-form branch). Null when there is no gate to drive — the
- *  caller then returns the search outcome it already had. A gate
+ *  caller then returns the search outcome it already had.
+ *  'picked' when a gate was driven but no listings appeared: the
+ *  caller re-submits, because the submits ran before the gate and
+ *  the portal may need the gate's filter first. A gate
  *  action that navigates lands on a FRESH page: the opener/toggle
  *  exclusion is about the page the gate opened on, not this new one,
  *  so gateOpened resets when the URL changes (Sitel: the gate opener
@@ -1282,9 +1318,41 @@ async function driveGatesAfterSearch(
   onGate?: (label: string) => void,
 ): Promise<GatesAfterSearchResult> {
   let gateOpened = false;
+  // Labels already driven on this page: a non-navigating pick that
+  // revealed no listings is a dead end, and selectGateAction is told
+  // to skip it so the next round drives the NEXT gate (a department
+  // filter behind the country pick) instead of clicking the same
+  // button again. droveGate records that a gate fired at all: the
+  // caller re-submits after it, because the submits ran before the
+  // gate and the portal may need the gate's filter first (Alorica's
+  // bling-ai portal, 2026-11-12 canary). droveCountry records that
+  // a country pick fired: after it, language buttons are excluded —
+  // a language pick after a country pick switches the UI language,
+  // it does not filter jobs, and the loop would otherwise click
+  // 'English', then 'French', then 'Spanish' and burn the
+  // re-submit budget (same canary, local round).
+  const drivenLabels: string[] = [];
+  let droveGate = false;
+  let droveCountry = false;
   for (let round = 0; round < 3; round++) {
     const roundUrl = page.url();
-    const gated = await resolveGateOnce(page, remainMs, searchTerm, gateOpened, onCountry, onGate);
+    let roundLabel: string | null = null;
+    const gated = await resolveGateOnce(
+      page,
+      remainMs,
+      searchTerm,
+      gateOpened,
+      (label) => {
+        droveCountry = true;
+        onCountry?.(label);
+      },
+      (label) => {
+        roundLabel = label;
+        onGate?.(label);
+      },
+      drivenLabels,
+      droveCountry ? ['english'] : [],
+    );
     if (gated === 'board') return 'board-redirect';
     if (gated === 'navigated') {
       gateOpened = true;
@@ -1294,6 +1362,8 @@ async function driveGatesAfterSearch(
       return 'no-form';
     }
     if (gated) {
+      droveGate = true;
+      if (roundLabel) drivenLabels.push(roundLabel);
       if (page.url() !== roundUrl) gateOpened = false;
       else gateOpened = true;
       await waitForDomStable(page, remainMs, 3000, 500);
@@ -1301,12 +1371,12 @@ async function driveGatesAfterSearch(
       if (await jobLinksNow(page)) return 'searched';
       continue;
     }
-    return null;
+    return droveGate ? 'picked' : null;
   }
   await waitForDomStable(page, remainMs, 3000, 500);
   if (await listingsNow(page)) return 'searched';
   if (await jobLinksNow(page)) return 'searched';
-  return null;
+  return droveGate ? 'picked' : null;
 }
 
 /** The search step: on a rendered careers page that shows no listings,
@@ -1355,9 +1425,25 @@ export async function tryPortalSearch(
     if (toggled === 'board') return 'board-redirect';
     let gateOpened = toggled === 'toggled';
     let ranSearch = false;
+    // Same rule as driveGatesAfterSearch below: once a country pick
+    // has fired, language buttons are excluded from later rounds —
+    // they switch the UI language, they do not filter jobs.
+    let droveCountry = false;
     for (let round = 0; round < 4; round++) {
       const roundUrl = page.url();
-      const gated = await resolveGateOnce(page, remainMs, searchTerm, gateOpened, onCountry, onGate);
+      const gated = await resolveGateOnce(
+        page,
+        remainMs,
+        searchTerm,
+        gateOpened,
+        (label) => {
+          droveCountry = true;
+          onCountry?.(label);
+        },
+        onGate,
+        [],
+        droveCountry ? ['english'] : [],
+      );
       if (gated === 'board') return 'board-redirect';
       if (gated === 'navigated') {
         // The pick chose its destination page. Let it settle, then
@@ -1444,5 +1530,25 @@ export async function tryPortalSearch(
   if (gated === 'board-redirect') return 'board-redirect';
   if (gated === 'searched') return 'searched';
   if (gated === 'no-form') return 'no-form';
+  if (gated === 'picked') {
+    // A gate was driven after the submits (a country filter the
+    // portal needed before its search returns anything) but no
+    // listings appeared yet: the submits ran BEFORE the gate, so
+    // re-run them once on the gated page — never after a navigating
+    // pick ('no-form' above), where a submit would reset the
+    // context the pick just established (Alorica's bling-ai portal,
+    // 2026-11-12 canary: both submits returned 0 roles before the
+    // "United States" filter was picked).
+    if (remainMs() < 6000) return 'no-results';
+    const retry = await attemptSearch(page, '', remainMs);
+    if (retry === 'board') return 'board-redirect';
+    if (retry === 'failed') return 'submit-failed';
+    if (await listingsNow(page)) return 'searched';
+    if (!searchTerm || remainMs() < 6000) return 'no-results';
+    const retryTerm = await attemptSearch(page, searchTerm, remainMs);
+    if (retryTerm === 'board') return 'board-redirect';
+    if (retryTerm === 'failed') return 'submit-failed';
+    return (await listingsNow(page)) ? 'searched' : 'no-results';
+  }
   return tail;
 }

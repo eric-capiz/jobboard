@@ -4766,6 +4766,495 @@ async function testMatchingFixes() {
   );
 }
 
+async function testRound17() {
+  // Batch 17 (2026-11-12 round-17 canary vs 41b96b44): Foundever
+  // still 0 (skipped-time), Sitel's Retention lead is a false
+  // positive (Wise, VA read blank), and Teleperformance / Alorica /
+  // Omni / NexRep / Working Solutions still return nothing.
+  const jobsMod = freshRequire(`${OUT}/find-jobs.cjs`);
+  const searchMod = freshRequire(`${OUT}/render-search.cjs`);
+  const resumeText =
+    'Customer service representative with phone support experience, technical support, troubleshooting, billing questions, and help desk work for members';
+
+  // --- Sitel: the location lives in the Phenom slug --------------
+  // Live evidence (sitel.json): the Retention card's location span
+  // was unread, so the role read blank and passed as a review lead
+  // — while its own apply URL says
+  // /job/Wise-Retention-Customer-Service-Associate-Virg/1372881000/.
+  check(
+    'round17: Phenom slug reads Wise, VA; Remote slug reads Remote; a plain title slug reads nothing',
+    jobsMod.locationFromJobSlug(
+      'https://jobs.foundever.com/job/Wise-Retention-Customer-Service-Associate-Virg/1372881000/?utm_source=x',
+    ) === 'Wise, VA' &&
+      jobsMod.locationFromJobSlug(
+        'https://jobs.foundever.com/job/Remote-Remote-Customer-Service-Representative-Any/1450284100/',
+      ) === 'Remote' &&
+      jobsMod.locationFromJobSlug('https://portal.example/job/customer-service-representative/123/') === '' &&
+      jobsMod.locationFromJobSlug('https://portal.example/job/Quality-Specialist-Remote/5001/') === '' &&
+      jobsMod.locationFromJobSlug('https://portal.example/job/Dallas-Customer-Service-Representative-Tex/9/') === 'Dallas, TX',
+    null,
+  );
+  // The live Sitel card set, mirrored: two Remote CSRs + Bilingual
+  // (spans read) + Retention (no span — location from the slug).
+  // Screened the way test-company screens (no isUSCompany flag):
+  // the 3 remote roles are leads, Retention is location-rejected
+  // with its real location read — not a fourth lead.
+  const slugHtml = `<html><body>
+<div class="job-list">
+  <div class="job-card"><a href="/job/Remote-Remote-Customer-Service-Representative-Any/1450276400/">Remote Customer Service Representative</a><span class="location">Remote, Any Location, US</span></div>
+  <div class="job-card"><a href="/job/Remote-Remote-Customer-Service-Representative-Any/1450284100/">Remote Customer Service Representative</a><span class="location">Remote, Any Location, US</span></div>
+  <div class="job-card"><a href="/job/Remote-Bilingual-Customer-Service-Associate-1-Any/1448643800/">Bilingual Customer Service Associate 1</a><span class="location">Remote, Any Location, US</span></div>
+  <div class="job-card"><a href="/job/Wise-Retention-Customer-Service-Associate-Virg/1372881000/">Retention Customer Service Associate</a></div>
+</div>
+</body></html>`;
+  const slugParsed = jobsMod.parseCareersPage(slugHtml, 'https://jobs.foundever.com/go/Search-Jobs-US/9244800/');
+  check(
+    'round17: Retention reads Wise, VA from its slug while the 3 remote leads keep their spans',
+    slugParsed.length === 4 &&
+      slugParsed[3]?.title === 'Retention Customer Service Associate' &&
+      slugParsed[3]?.location === 'Wise, VA' &&
+      slugParsed[0]?.location === 'Remote, Any Location, US',
+    slugParsed,
+  );
+  const slugScreened = jobsMod.screenPostings('Sitel', slugParsed, resumeText, false);
+  check(
+    'round17: Retention is location-rejected, not a lead; the 3 remote roles still pass',
+    slugScreened.leads.length === 3 &&
+      slugScreened.rejectedLocation === 1 &&
+      slugScreened.rejected.some((r) => r.title === 'Retention Customer Service Associate' && r.location === 'Wise, VA' && r.reason === 'location'),
+    slugScreened,
+  );
+  // The span hardening itself: an icon inside the location span,
+  // and a <div class="location"> instead of a span — both read.
+  const spanHardHtml = `<html><body>
+<div class="job-list">
+  <div class="job-card"><a href="/job/Dallas-Customer-Service-Representative-Tex/11/">Customer Service Representative</a><span class="job-location"><i class="fa fa-map-marker"></i> Dallas, Texas, US</span></div>
+  <div class="job-card"><a href="/job/Austin-Customer-Service-Representative-Tex/12/">Customer Service Representative</a><div class="location">Austin, TX</div></div>
+</div>
+</body></html>`;
+  const spanHardParsed = jobsMod.parseCareersPage(spanHardHtml, 'https://portal.example/careers');
+  check(
+    'round17: icon-nested span and div.location both read into the posting',
+    spanHardParsed.length === 2 &&
+      spanHardParsed[0]?.location === 'Dallas, Texas, US' &&
+      spanHardParsed[1]?.location === 'Austin, TX',
+    spanHardParsed,
+  );
+
+  // --- NexRep: the Paylocity list URL is the portal --------------
+  const paylocityUrl =
+    'https://recruiting.paylocity.com/recruiting/jobs/All/73b38a10-35d0-4c94-a004-b534bb49e176/NexRep-LLC';
+  check(
+    'round17: Paylocity /jobs/All/ URL is an ATS list, not a job detail',
+    jobsMod.isAtsListUrl(paylocityUrl) === true &&
+      jobsMod.isJobDetailUrl(paylocityUrl) === true &&
+      jobsMod.isAtsListUrl('https://nexrep.com/careers/') === false &&
+      jobsMod.isAtsListUrl('https://example.com/jobs/customer-service-representative') === false,
+    null,
+  );
+  check(
+    'round17: the Paylocity list outranks the marketing careers page as a render target',
+    jobsMod.renderTargetScore(paylocityUrl, '') > jobsMod.renderTargetScore('https://nexrep.com/careers/', ''),
+    { paylocity: jobsMod.renderTargetScore(paylocityUrl, ''), careers: jobsMod.renderTargetScore('https://nexrep.com/careers/', '') },
+  );
+  // End to end: the careers page links to the Paylocity portal, the
+  // portal's plain HTML is a JS shell (0 postings), the render goes
+  // to the portal FIRST and surfaces its 4 non-CS roles (0 leads is
+  // correct — they are not CS).
+  const nexrepCareersHtml = `<html><body>
+<header><nav><a href="/nexrep.html">Careers at NexRep</a></nav></header>
+<main><h2>Agent Opportunities</h2>
+<p><a href="${paylocityUrl}">Click here to see and apply for current NexRep career opportunities</a></p></main>
+</body></html>`;
+  const paylocityShellHtml = `<html><body><div id="app"></div><script>/* Paylocity app shell: roles render client-side */</script></body></html>`;
+  const paylocityResultsHtml = `<html><body>
+<p>Results 1 – 4 of 4</p>
+<div class="job-list">
+  <div class="job-card"><a href="/job/Quality-Specialist-Remote/5001/">Quality Specialist</a><span class="location">Remote, US</span></div>
+  <div class="job-card"><a href="/job/Resource-Specialist-Remote/5002/">Resource Specialist</a><span class="location">Remote, US</span></div>
+  <div class="job-card"><a href="/job/Real-Time-Analyst-Remote/5003/">Real Time Analyst</a><span class="location">Remote, US</span></div>
+  <div class="job-card"><a href="/job/Payroll-Administrator-Remote/5004/">Payroll Administrator</a><span class="location">Remote, US</span></div>
+</div>
+</body></html>`;
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u === 'https://nexrep.com') return { ok: true, text: async () => nexrepCareersHtml };
+    if (u === paylocityUrl) return { ok: true, text: async () => paylocityShellHtml };
+    return { ok: true, text: async () => '<html><body>No careers here.</body></html>' };
+  };
+  const nexrepCalls = [];
+  const stubNexrep = async (url) => {
+    nexrepCalls.push(url);
+    if (url === paylocityUrl) {
+      return { html: paylocityResultsHtml, searchOutcome: 'has-listings', searchMs: 300, renderedUrl: url };
+    }
+    return { html: '<html><body>No careers here.</body></html>', searchOutcome: 'no-form', searchMs: 100, renderedUrl: url };
+  };
+  const nexrep = await jobsMod.searchCompanyJobs(
+    { name: 'NexRep', website: 'https://nexrep.com', careersUrl: '', isUSCompany: true },
+    resumeText,
+    { renderPage: stubNexrep },
+  );
+  check(
+    'round17: NexRep renders the Paylocity portal first and surfaces its 4 roles (0 leads, correct)',
+    nexrepCalls.length >= 1 &&
+      nexrepCalls[0] === paylocityUrl &&
+      nexrep.renderTargets[0]?.url === paylocityUrl &&
+      nexrep.postingsSeen === 4 &&
+      nexrep.leads.length === 0,
+    { calls: nexrepCalls, targets: nexrep.renderTargets, postings: nexrep.postingsSeen, leads: nexrep.leads.length },
+  );
+
+  // --- Teleperformance: a fast render death is free --------------
+  // The jobs portal RSTs the render in ~180ms (live canary). The
+  // retry must fire on the SAME target without consuming budget,
+  // and fast deaths on the /careers + /jobs guesses must not spend
+  // the budget either — the loop has to reach the apex homepage
+  // (which carries the list) inside a max-2 budget.
+  const tpListHtml = `<html><body>
+<div class="job-listing"><h3>Customer Support Specialist</h3><p>Location: Remote</p><a href="/jobs/customer-support-specialist">Apply</a></div>
+<div class="job-listing"><h3>Member Services Representative</h3><p>Location: Remote</p><a href="/jobs/member-services-representative">Apply</a></div>
+<div class="job-listing"><h3>Call Center Agent</h3><p>Location: Remote</p><a href="/jobs/call-center-agent">Apply</a></div>
+</body></html>`;
+  const tpTeaserHtml = `<html><body>
+<div class="job-listing"><h3>Customer Support Specialist</h3><p>Location: Remote</p><a href="/jobs/customer-support-specialist">Apply</a></div>
+</body></html>`;
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u === 'https://jobs.tp.example' || u === 'https://jobs.tp.example/careers' || u === 'https://jobs.tp.example/jobs') {
+      throw new Error('RST');
+    }
+    if (u === 'https://tp.example') {
+      return { ok: true, text: async () => `<html><body><input name="keyword" placeholder="Search by Keyword"><a href="/en-us/careers/job-opportunities/">See all jobs</a></body></html>` };
+    }
+    if (u === 'https://tp.example/en-us/careers/job-opportunities/') return { ok: true, text: async () => tpTeaserHtml };
+    return { ok: true, text: async () => '<html><body>No careers here.</body></html>' };
+  };
+  const tpCalls = [];
+  const stubTp = async (url) => {
+    tpCalls.push(url);
+    if (url === 'https://tp.example/en-us/careers/job-opportunities/') {
+      return { html: tpListHtml, searchOutcome: 'has-listings', searchMs: 300, renderedUrl: url };
+    }
+    // A fast transport death: no HTML, render-failed, ~0ms.
+    return { html: '', searchOutcome: null, searchMs: 0, renderedUrl: '', renderError: 'render-failed' };
+  };
+  const tp = await jobsMod.searchCompanyJobs(
+    { name: 'TP Retry Co', website: 'https://jobs.tp.example', careersUrl: '', isUSCompany: true },
+    resumeText,
+    { renderPage: stubTp, renderBudget: { used: 0, max: 2 } },
+  );
+  check(
+    'round17: fast render deaths are free — same-target retries fire, the loop reaches the late opportunities page inside a max-2 budget',
+    tpCalls.length === 5 &&
+      tpCalls[0] === 'https://jobs.tp.example' &&
+      tpCalls[1] === 'https://jobs.tp.example' &&
+      tpCalls[2] === 'https://tp.example' &&
+      tpCalls[3] === 'https://tp.example' &&
+      tpCalls[4] === 'https://tp.example/en-us/careers/job-opportunities/' &&
+      tp.postingsSeen === 3 &&
+      tp.leads.length >= 2,
+    { calls: tpCalls, postings: tp.postingsSeen, leads: tp.leads.length },
+  );
+  check(
+    'round17: every fast death is recorded with its render-failed error',
+    tp.renderAttempts.length === 5 &&
+      tp.renderAttempts[0]?.error === 'render-failed' &&
+      tp.renderAttempts[1]?.error === 'render-failed' &&
+      tp.renderAttempts[0]?.target === tp.renderAttempts[1]?.target &&
+      tp.renderAttempts[2]?.target === tp.renderAttempts[3]?.target,
+    tp.renderAttempts,
+  );
+
+  // --- Working Solutions: the jobs homepage outranks its blog ----
+  // The walk misread a blog post on the jobs homepage as its only
+  // posting (a teaser), and the old -10 penalty pushed the homepage
+  // below its own /blog/ and /category/ pages — the render went to
+  // the blog and harvested a scam-warning post (live canary). The
+  // teaser carries no penalty now, and blog/category paths are
+  // never render targets at all.
+  check(
+    'round17: blog and category paths are junk render targets',
+    jobsMod.isJunkRenderPath('https://jobs.workingsolutions.com/blog/') === true &&
+      jobsMod.isJunkRenderPath('https://jobs.workingsolutions.com/category/company-news/') === true &&
+      jobsMod.isJunkRenderPath('https://jobs.workingsolutions.com/') === false &&
+      jobsMod.isJunkRenderPath('https://www.workingsolutions.com/careers') === false,
+    null,
+  );
+  const wsHomeHtml = `<html><body>
+<header><nav><a href="https://jobs.ws.example/">Looking for Remote Agent Jobs?</a></nav>
+<form action="/" method="get" role="search"><input type="search" name="s" placeholder="Search"><button type="submit">Search</button></form></header>
+<main><h1>Working Solutions</h1></main>
+</body></html>`;
+  const wsJobsHtml = `<html><body>
+<header><h1>Remote Agent Jobs</h1>
+<a href="https://jobs.ws.example/blog/">Read our blog for job search tips</a>
+<a href="https://jobs.ws.example/category/company-news/">Company news about jobs</a></header>
+<div class="job-list">
+  <div class="job-card"><a href="/blog/how-to-spot-a-recruitment-scam">How to spot a recruitment scam</a><span class="location">Remote, US</span></div>
+</div>
+</body></html>`;
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u === 'https://www.ws.example') return { ok: true, text: async () => wsHomeHtml };
+    if (u === 'https://jobs.ws.example/') return { ok: true, text: async () => wsJobsHtml };
+    return { ok: true, text: async () => '<html><body>No careers here.</body></html>' };
+  };
+  const wsCalls = [];
+  const stubWs = async (url) => {
+    wsCalls.push(url);
+    return { html: '', searchOutcome: 'no-form', searchMs: 100, renderedUrl: url };
+  };
+  const ws = await jobsMod.searchCompanyJobs(
+    { name: 'Working Solutions', website: 'https://www.ws.example', careersUrl: '', isUSCompany: true },
+    resumeText,
+    { renderPage: stubWs, renderBudget: { used: 0, max: 2 } },
+  );
+  check(
+    'round17: the jobs homepage is the first render target and no blog/category page is a target at all',
+    ws.renderTargets.length >= 1 &&
+      ws.renderTargets[0]?.url === 'https://jobs.ws.example/' &&
+      !ws.renderTargets.some((t) => t.url.includes('/blog/') || t.url.includes('/category/')) &&
+      wsCalls[0] === 'https://jobs.ws.example/',
+    { targets: ws.renderTargets, calls: wsCalls },
+  );
+
+  // --- Gate resolver: nav links are not openers ------------------
+  // Live evidence (omni-interactions.json): the resolver clicked
+  // "Meet Our Leadership Team" as a gate opener and the render
+  // ended on the leadership page. A bare "Category" button did the
+  // same on Working Solutions' blog page.
+  const mkGateButton = (over) => ({
+    kind: 'button', index: 0, label: '', ariaLabel: '', href: '', containerRole: '', containerClass: false,
+    role: 'button', visible: true, options: [], ...over,
+  });
+  check(
+    'round17: "Meet Our Leadership Team" is NOT a gate opener; "Select your country" still is',
+    searchMod.selectGateAction(
+      {
+        controls: [
+          mkGateButton({ index: 0, label: 'Meet Our Leadership Team', href: 'https://portal.example/leadership' }),
+          mkGateButton({ index: 1, label: 'Select your country' }),
+        ],
+      },
+      'customer service',
+      false,
+      'https://portal.example/corporate-careers/',
+    )?.label === 'Select your country',
+    null,
+  );
+  check(
+    'round17: a page with only nav/blog controls has no gate opener',
+    searchMod.selectGateAction(
+      {
+        controls: [
+          mkGateButton({ index: 0, label: 'Meet Our Leadership Team', href: 'https://portal.example/leadership' }),
+          mkGateButton({ index: 1, label: 'Category', type: 'button' }),
+          mkGateButton({ index: 2, label: 'Join Our Talent Network', href: 'https://portal.example/join' }),
+        ],
+      },
+      'customer service',
+      false,
+      'https://portal.example/corporate-careers/',
+    ) === null,
+    null,
+  );
+  check(
+    'round17: "Department" and "Language" are still gate openers',
+    searchMod.selectGateAction(
+      { controls: [mkGateButton({ index: 0, label: 'Department' })] },
+      'customer service',
+      false,
+      'https://portal.example/careers',
+    )?.target === 'open' &&
+      searchMod.selectGateAction(
+        { controls: [mkGateButton({ index: 0, label: 'Language' })] },
+        'customer service',
+        false,
+        'https://portal.example/careers',
+      )?.target === 'open',
+    null,
+  );
+
+  // --- Post-gate listings: one link is not a list ----------------
+  // A gate pick that lands on a page with exactly one job-looking
+  // link and no results count must NOT read as 'searched': that is
+  // a nav link on the wrong page, and the render loop must retry
+  // the next target (Omni: the leadership page's "See open roles").
+  // The FakePage plumbing below is the same shape as the
+  // tryPortalSearch gate tests in testPortalSearch.
+  const mkInput = (over) => ({
+    index: 0, type: 'text', name: '', id: '', placeholder: '', ariaLabel: '', role: '', cls: '', title: '', labelText: '', describedBy: '', formIndex: 0, visible: true, top: 0, ...over,
+  });
+  const mkButton = (over) => ({
+    index: 0, text: '', ariaLabel: '', title: '', type: 'submit', formIndex: 0, visible: true, top: 0, ...over,
+  });
+  class FakePage2 {
+    constructor(opts = {}) {
+      this._url = opts.url || 'https://portal.example/corporate-careers/';
+      this.scanResult = opts.scanResult || { inputs: [], buttons: [], forms: [] };
+      this.countQueue = [...(opts.counts || [])];
+      this.onGateClick = opts.onGateClick || null;
+      this.gateScan = opts.gateScan || { controls: [] };
+      this.gateClicks = 0;
+      this.gateLabels = [];
+      this.buttonClicks = 0;
+      this.pressedKeys = [];
+      this.currentTerm = '';
+      const self = this;
+      this.keyboard = {
+        press: async (key) => {
+          self.pressedKeys.push(key);
+        },
+        down: async () => {},
+        up: async () => {},
+      };
+    }
+    url() {
+      return this._url;
+    }
+    setUrl(u) {
+      this._url = u;
+    }
+    async evaluate(fn, ...args) {
+      const name = fn.name || 'anon';
+      if (name === 'scanSearchForm') return this.scanResult;
+      if (name === 'countJobListings') {
+        return this.countQueue.length > 0 ? this.countQueue.shift() : { jobLinks: 0, resultsText: false };
+      }
+      if (name === 'scanGateControls') return this.gateScan;
+      return 1000;
+    }
+    async evaluateHandle(fn, ...args) {
+      const isGate = String(fn).includes('gateButtonElement');
+      const self = this;
+      return {
+        asElement: () => ({
+          click: async () => {
+            if (isGate) {
+              const btns = (self.gateScan.controls || []).filter((c) => c.kind === 'button');
+              const label = btns[args[0]]?.label ?? '';
+              self.gateClicks += 1;
+              self.gateLabels.push(label);
+              if (self.onGateClick) self.onGateClick(label, self);
+            } else {
+              self.buttonClicks += 1;
+            }
+          },
+          type: async () => {},
+          evaluate: async () => {},
+        }),
+        dispose: async () => {},
+      };
+    }
+  }
+  const oneLinkPage = new FakePage2({
+    scanResult: { inputs: [], buttons: [], forms: [] },
+    counts: [
+      { jobLinks: 0, resultsText: false },
+      { jobLinks: 1, resultsText: false },
+      { jobLinks: 1, resultsText: false },
+    ],
+    gateScan: {
+      controls: [mkGateButton({ index: 0, label: 'United States (USA)', containerRole: 'dialog' })],
+    },
+    onGateClick: (label, page) => {
+      page.gateScan = { controls: [] };
+      page.setUrl('https://portal.example/leadership');
+    },
+  });
+  const oneLinkOutcome = await searchMod.tryPortalSearch(oneLinkPage, 'customer service', Date.now() + 30000);
+  check(
+    'round17: a gate pick landing on a 1-link page is no-form, not searched',
+    oneLinkOutcome === 'no-form' && oneLinkPage.gateLabels[0] === 'United States (USA)',
+    { outcome: oneLinkOutcome, gateLabels: oneLinkPage.gateLabels },
+  );
+
+  // --- Alorica: re-submit after a post-submit gate pick ----------
+  // Live evidence (alorica.json): both submits returned 0 roles,
+  // the "United States" filter was picked AFTER them, and the
+  // search never ran again — so a portal that needs its filter
+  // first reads as genuinely empty. The fix re-submits once after
+  // a non-navigating gate pick. The FakePage models it: submits
+  // land on a zero page until the US filter is picked, then the
+  // re-submit lands on the results page.
+  let gatePicked = false;
+  const aloricaPage = new FakePage2({
+    scanResult: {
+      inputs: [mkInput({ index: 0, name: 'search', placeholder: 'Search jobs', formIndex: 0 })],
+      buttons: [mkButton({ index: 0, text: 'Search', formIndex: 0 })],
+      forms: [{ action: '/results', method: 'get' }],
+    },
+    counts: [
+      { jobLinks: 0, resultsText: false },
+      { jobLinks: 0, resultsText: false },
+      { jobLinks: 0, resultsText: false },
+      { jobLinks: 0, resultsText: false },
+      { jobLinks: 0, resultsText: false },
+      { jobLinks: 5, resultsText: true },
+    ],
+    gateScan: {
+      // The live bling-ai shell also carries language buttons
+      // (English / French / Spanish): after the United States pick
+      // they must NOT be driven as gates — a language pick after a
+      // country pick switches the UI language, it does not filter
+      // jobs, and the loop would otherwise click English, then
+      // French, and burn the re-submit budget (D1, local round).
+      controls: [
+        mkGateButton({ index: 0, label: 'English' }),
+        mkGateButton({ index: 1, label: 'French' }),
+        mkGateButton({ index: 2, label: 'Spanish' }),
+        mkGateButton({ index: 3, label: 'United States' }),
+      ],
+    },
+    onGateClick: () => {
+      gatePicked = true;
+    },
+  });
+  // FakePage2 has no onEnter hook — wire the navigation through the
+  // keyboard + button-click paths by patching the instance.
+  const origKeyboard = aloricaPage.keyboard;
+  aloricaPage.keyboard = {
+    press: async (key) => {
+      origKeyboard.press(key);
+      if (key === 'Enter') {
+        if (gatePicked) aloricaPage.setUrl('https://portal.example/careers/results');
+        else if (aloricaPage.currentTerm) aloricaPage.setUrl('https://portal.example/careers/zero?q=service');
+        else aloricaPage.setUrl('https://portal.example/careers/zero');
+      }
+    },
+    down: async () => {},
+    up: async () => {},
+  };
+  // The input handle's type() records the term on the page.
+  const origHandle = aloricaPage.evaluateHandle.bind(aloricaPage);
+  aloricaPage.evaluateHandle = async (fn, ...args) => {
+    const handle = await origHandle(fn, ...args);
+    const el = handle.asElement();
+    const origType = el.type.bind(el);
+    el.type = async (text) => {
+      aloricaPage.currentTerm = text;
+      return origType(text);
+    };
+    return { asElement: () => el, dispose: handle.dispose };
+  };
+  const aloricaOutcome = await searchMod.tryPortalSearch(
+    aloricaPage,
+    'customer service',
+    Date.now() + 30000,
+    () => {},
+    (label) => {},
+    (label) => {},
+  );
+  check(
+    'round17: after a post-submit US pick, the search re-runs and finds listings',
+    aloricaOutcome === 'searched' &&
+      gatePicked === true &&
+      JSON.stringify(aloricaPage.gateLabels) === JSON.stringify(['United States']),
+    { outcome: aloricaOutcome, gateLabels: aloricaPage.gateLabels, gatePicked },
+  );
+}
+
 async function testPaginationAndSearchScan() {
   // Pagination: a real list page that links "Next" is followed with
   // plain fetches (TalentBrew: 8/page over 38 pages; Concentrix JDQ:
@@ -4887,6 +5376,7 @@ await testRound7();
 await testRound8();
 await testRound9();
 await testRound11();
+await testRound17();
 await testPaginationAndSearchScan();
 await testTestCompany();
 await testJazzhr();
