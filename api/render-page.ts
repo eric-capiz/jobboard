@@ -195,59 +195,101 @@ export async function renderPageHtml(url: string, searchTerm: string = '', timeo
       else void req.continue();
     });
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: Math.max(1000, remain()) });
-    // Let the board's JS settle. The signal is the rendered text
-    // itself: poll the page's visible text until it stops changing for
-    // two polls, or the cap hits. Network-idle is the wrong signal —
-    // boards keep polling analytics (never idle, so the whole budget
-    // burns) or go idle before their jobs request fires (so the
-    // listings are missed). A page whose text never stabilises (live
-    // counters, clocks) just runs to the cap and proceeds.
-    await waitForDomStable(page, remain, SETTLE_CAP_MS, 1000);
-    // A redirect off the business site onto a board is not a source.
-    if (isBoardUrl(page.url())) {
-      return { html: '', searchOutcome: null, searchMs: 0, renderedUrl: page.url() };
-    }
     // Cookie banners cover some portals' search boxes (Foundever's
     // render is banner-only text until accepted) and can intercept
     // the click on the box itself. Best-effort "Accept cookies"
     // clicks, up to two passes — some banners stack a second consent
-    // dialog behind the first — then a short settle. Never throws; a
-    // page without a banner just skips it.
-    if (remain() > 8000) {
+    // dialog behind the first. Never throws; a page without a banner
+    // just skips it.
+    const tryCookieAccept = async (pg: Page): Promise<boolean> => {
       try {
-        for (let pass = 0; pass < 2 && remain() > 3000; pass++) {
-          const accepted = await page.evaluate(() => {
-            const btns = Array.from(document.querySelectorAll('button, a')) as HTMLElement[];
-            const isVisible = (b: HTMLElement): boolean => {
-              const r = b.getBoundingClientRect();
-              return r.width > 0 && r.height > 0;
-            };
-            const textOf = (b: HTMLElement): string => (b.innerText || '').trim();
-            // Tier 1: the strict English accept. Tier 2: a
-            // contains-match for the same idea in other languages
-            // ("Alle Cookies akzeptieren" — Foundever's German banner
-            // — does not start with "Alle akzeptieren", so the
-            // anchored pattern misses it).
-            const strict = btns.find(
-              (b) =>
-                isVisible(b) &&
-                /^(accept( all)?( cookies)?|allow all( cookies)?|accept & close|i agree|alle akzeptieren|tout accepter|aceptar( todo| las cookies)?)/i.test(
-                  textOf(b),
-                ),
-            );
-            const loose = btns.find(
-              (b) => isVisible(b) && /accept|akzeptieren|tout accepter|aceptar/i.test(textOf(b)),
-            );
-            const accept = strict ?? loose ?? null;
-            if (!accept) return false;
-            accept.click();
-            return true;
-          });
-          if (!accepted) break;
-          await waitForDomStable(page, remain, 2000, 500);
-        }
+        return await pg.evaluate(() => {
+          const btns = Array.from(document.querySelectorAll('button, a, [role="button"]')) as HTMLElement[];
+          const isVisible = (b: HTMLElement): boolean => {
+            const r = b.getBoundingClientRect();
+            return r.width > 0 && r.height > 0;
+          };
+          const textOf = (b: HTMLElement): string => (b.innerText || '').trim();
+          // Tier 1: the strict anchored accept. Tier 2: a
+          // contains-match for the same idea in other languages
+          // ("Alle Cookies akzeptieren" — Foundever's German banner
+          // — does not start with "Alle akzeptieren", so the
+          // anchored pattern misses it). The loose tier only scans
+          // real buttons and links: a [role="button"] div can be a
+          // whole page section whose text merely contains 'accept',
+          // and clicking it would navigate somewhere unrelated.
+          const strict = btns.find(
+            (b) =>
+              isVisible(b) &&
+              /^(accept( all)?( cookies)?|allow all( cookies)?|accept & close|i agree|alle akzeptieren|tout accepter|aceptar( todo| las cookies)?)/i.test(
+                textOf(b),
+              ),
+          );
+          const loose = btns.find(
+            (b) =>
+              isVisible(b) &&
+              (b.tagName === 'BUTTON' || b.tagName === 'A') &&
+              /accept|akzeptieren|tout accepter|aceptar/i.test(textOf(b)),
+          );
+          const accept = strict ?? loose ?? null;
+          if (!accept) return false;
+          accept.click();
+          return true;
+        });
       } catch {
-        // The banner clicks are best-effort; the search step runs anyway.
+        return false;
+      }
+    };
+    // Accept EARLY — right after a short settle, while the 20s
+    // budget is still full. The old order settled first (up to 12s)
+    // and the accept step's remain() > 8000 gate then starved on
+    // slow pages, so the click never ran (Foundever, 2026-11-12:
+    // renderMs 16.7s, banner still up, 0 visible inputs). A consent
+    // cookie often only takes effect on the NEXT load, so an accepted
+    // banner reloads the page once and the portal's content renders.
+    await waitForDomStable(page, remain, 2000, 500);
+    // A redirect off the business site onto a board is not a source.
+    if (isBoardUrl(page.url())) {
+      return { html: '', searchOutcome: null, searchMs: 0, renderedUrl: page.url() };
+    }
+    let cookieAccepted = false;
+    for (let pass = 0; pass < 2 && remain() > 3000; pass++) {
+      if (!(await tryCookieAccept(page))) break;
+      cookieAccepted = true;
+      await waitForDomStable(page, remain, 2000, 500);
+    }
+    if (cookieAccepted) {
+      try {
+        await page.reload({ waitUntil: 'domcontentloaded', timeout: Math.max(1000, remain()) });
+      } catch {
+        // Keep the current page — it may already show content.
+      }
+      await waitForDomStable(page, remain, 6000, 1000);
+      if (isBoardUrl(page.url())) {
+        return { html: '', searchOutcome: null, searchMs: 0, renderedUrl: page.url() };
+      }
+    } else {
+      // No banner accepted early: the full settle (the page's own
+      // JS may still need it), then one late attempt for a banner
+      // that injected after the early passes.
+      // Let the board's JS settle. The signal is the rendered text
+      // itself: poll the page's visible text until it stops changing for
+      // two polls, or the cap hits. Network-idle is the wrong signal —
+      // boards keep polling analytics (never idle, so the whole budget
+      // burns) or go idle before their jobs request fires (so the
+      // listings are missed). A page whose text never stabilises (live
+      // counters, clocks) just runs to the cap and proceeds.
+      await waitForDomStable(page, remain, SETTLE_CAP_MS, 1000);
+      if (isBoardUrl(page.url())) {
+        return { html: '', searchOutcome: null, searchMs: 0, renderedUrl: page.url() };
+      }
+      if (remain() > 8000 && (await tryCookieAccept(page))) {
+        try {
+          await page.reload({ waitUntil: 'domcontentloaded', timeout: Math.max(1000, remain()) });
+        } catch {
+          // Keep the current page.
+        }
+        await waitForDomStable(page, remain, 4000, 500);
       }
     }
     // Search-portal step: the page may be an empty search shell that

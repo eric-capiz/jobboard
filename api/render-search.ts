@@ -232,8 +232,12 @@ export function countJobListings(): JobListingCount {
   // — proven on Concentrix 2026-11-11, where the portal-direct render
   // returned the shell untouched because of exactly this. "1-25 of
   // 4,659 jobs" still counts (4,659 > 0); "0 jobs" never does.
+  // "roles" joins the count words: Rippling boards count their list
+  // as "9 roles across all departments" (Liveops, 2026-11-12), and
+  // without it the search step hides a visible list behind a term
+  // search that returns nothing.
   let resultsText = false;
-  for (const m of bodyText.matchAll(/([\d,]+)\s+(jobs?|results?|openings?|positions?)\b/gi)) {
+  for (const m of bodyText.matchAll(/([\d,]+)\s+(jobs?|results?|openings?|positions?|roles?)\b/gi)) {
     if (parseInt(m[1].replace(/,/g, ''), 10) > 0) {
       resultsText = true;
       break;

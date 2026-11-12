@@ -75,6 +75,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       searchMs: result.searchMs,
       renderedUrl: result.renderedUrl,
       renderTextSample: result.renderTextSample,
+      // Per-attempt render telemetry + the sorted target list, so a
+      // zero-listing canary can say whether the retry fired, what it
+      // tried, and whether a portal ever made the target list.
+      renderAttempts: result.renderAttempts ?? [],
+      renderTargets: result.renderTargets ?? [],
       screened: result.screened,
       leads: result.leads,
     });

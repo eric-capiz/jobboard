@@ -81,9 +81,22 @@ function stripTags(text: string): string {
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#39;|&apos;/g, "'")
+    // Numeric character references — the named-entity decodes above
+    // left these raw, so TTEC's TalentBrew titles arrived as
+    // 'Fran&#xE7;ais' and read as garbage in lead cards and in the
+    // rejected-title telemetry (2026-11-12 canary). decodeNumericEntity
+    // runs after the &amp; decode, so a double-escaped &#233; is caught
+    // too. An out-of-range code point decodes to '' rather than
+    // throwing (String.fromCodePoint throws past 0x10FFFF).
+    .replace(/&#x([0-9a-f]+);/gi, (_m, hex: string) => decodeNumericEntity(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_m, dec: string) => decodeNumericEntity(parseInt(dec, 10)))
     .replace(/<[^>]+>/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function decodeNumericEntity(n: number): string {
+  return Number.isFinite(n) && n > 0 && n <= 0x10ffff ? String.fromCodePoint(n) : '';
 }
 
 /** The job-list widget embedded IN a business careers page: some
@@ -659,6 +672,20 @@ export interface CompanySearchResult {
    *  page, an empty search state, or job titles the extractors
    *  missed — the diagnosis for a zero-listing render. */
   renderTextSample: string;
+  /** One entry per render attempt, in order — the target URL, the
+   *  milliseconds it took, the portal-search outcome, any render
+   *  error, and the URL the render ended on. A null render (the
+   *  renderer died or the call threw) is recorded with outcome null
+   *  and error 'render-null'. Without this the live canary cannot
+   *  tell a retry that never ran from a retry that failed silently
+   *  (ModSquad, 2026-11-12: exactly one render per company, and no
+   *  field said why the second never fired). */
+  renderAttempts?: { target: string; ms: number; outcome: PortalSearchOutcome | null; error: string | null; renderedUrl: string }[];
+  /** The render targets in the order the loop tried them (best score
+   *  first), with their scores — so a live canary can say whether a
+   *  portal ever made the target list, and whether it outscored the
+   *  marketing page that won the render. */
+  renderTargets?: { url: string; score: number }[];
 }
 
 /** The fallback keyword for a portal's search box: the resume's two
@@ -705,6 +732,12 @@ function titleOk(title: string): boolean {
   // "See open roles", "View jobs", "Browse positions" — hub/hero copy,
   // never a role title.
   if (/^(see|view|browse|explore|find|search|discover)\b/i.test(title) && /\b(jobs?|roles?|openings?|positions?|careers?|opportunities)\b/i.test(title)) return false;
+  // A title ending in a call-to-action is a fragment glued to its
+  // link label, not a role: Strategy A's link-text fallback on a
+  // Rippling row reads "Agent Success Remote (United States) View
+  // job" — the real title is the first segment, which Strategy E
+  // takes. A real role title never ends in "View job" / "Apply".
+  if (/\b(view (job|details|opening)|apply( now)?|see details|learn more)$/i.test(title)) return false;
   return true;
 }
 
@@ -907,6 +940,42 @@ export function parseCareersPage(html: string, pageUrl: string): Posting[] {
     const tbLoc = tbLocSpan ? stripTags(tbLocSpan[1]).trim() : locationIn(tm[2]);
     if (!APPLY_HREF.test(tbApply) && !tbLoc) continue;
     push(tbTitle, tbLoc, tbApply);
+  }
+  // Strategy E: ATS rows that are bare anchors to a job-detail UUID
+  // (Rippling: <a href="/liveops/jobs/<uuid>"><div>Agent Success
+  // </div><div>Remote (United States)</div> … View job</a>). No
+  // heading, no job-ish class, no data-job-id — Strategies A-D all
+  // miss them, and the walk discovered the detail URLs from the list
+  // page (Liveops, 2026-11-12), proving the anchors exist even though
+  // no strategy parses them. The /jobs/<uuid> path is the marker; the
+  // first title-like text segment inside the anchor is the title
+  // (a location segment — "Remote (United States)" — is skipped, it
+  // is not a role); the location comes from locationIn() on the
+  // anchor's inner HTML. The UUID shape keeps this off ordinary
+  // links (a Lever apply link carries no title segment inside it).
+  const uuidAnchorRe = /<a[^>]*href=["']([^"']+)["'][^>]*>([\s\S]{0,6000}?)<\/a>/gi;
+  let um: RegExpExecArray | null;
+  while ((um = uuidAnchorRe.exec(clean)) !== null) {
+    if (!/\/jobs?\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(um[1])) continue;
+    const uuidApply = resolvePageLink(um[1], pageUrl);
+    if (!uuidApply) continue;
+    // Title: the first text segment inside the anchor that reads like
+    // a role title. Split the inner HTML on tags so segments stay
+    // separate — a flat stripTags would glue the title to the
+    // location and the "View job" label into one string.
+    let uuidTitle = '';
+    for (const seg of um[2].split(/<[^>]+>/g)) {
+      const t = cleanTitle(seg);
+      if (!titleOk(t)) continue;
+      if (/\bremote\b/i.test(t)) continue;
+      if (/^[A-Z][A-Za-z .'-]+,\s*[A-Z]{2}\b/.test(t)) continue;
+      uuidTitle = t;
+      break;
+    }
+    if (!uuidTitle) continue;
+    const uuidLoc = locationIn(um[2]);
+    if (!APPLY_HREF.test(uuidApply) && !uuidLoc) continue;
+    push(uuidTitle, uuidLoc, uuidApply);
   }
   // Strategy B: View-details / Apply links with a title just before them.
   const viewRe = /<a[^>]*href=["']([^"']+)["'][^>]*>([\s\S]{0,80}?)<\/a>/gi;
@@ -1254,7 +1323,13 @@ const ATS_HOST_SIGNS = [
 export function atsHostBonus(u: string): number {
   try {
     const host = new URL(u).hostname.toLowerCase();
-    return ATS_HOST_SIGNS.some((s) => host.includes(s)) ? 6 : 0;
+    // +8, not +6: at +6 ModSquad's Workday portal (6 + 0 content +
+    // 3 host = 9) lost the render to the join marketing page (2 + 5
+    // content + 3 host = 10) by one point (2026-11-12 canary) — the
+    // retry then never fired, so the portal was never reached. A
+    // known ATS host IS the portal, so it must clear a marketing
+    // page's content score outright: 8 + 0 + 3 = 11 > 10.
+    return ATS_HOST_SIGNS.some((s) => host.includes(s)) ? 8 : 0;
   } catch {
     return 0;
   }
@@ -1265,7 +1340,13 @@ export function renderTargetScore(u: string, careersUrl: string): number {
   try {
     const parsed = new URL(u);
     const path = parsed.pathname.toLowerCase();
-    if (/job-search|search-results|\/results(\/|$)/.test(path)) score += 5;
+    // +7, not +5: the jobs-subdomain homepage rule below is +6, so a
+    // /job-search/ path must stay above it — the search page is the
+    // most specific portal URL there is (Concentrix's /job-search/
+    // is the portal; the bare jobs.concentrix.com homepage is not).
+    // At +5 the bare homepage (6) outranked /job-search/ (5) and the
+    // render went to a shell page instead of the portal.
+    if (/job-search|search-results|\/results(\/|$)/.test(path)) score += 7;
     else if (/search/.test(path)) score += 4;
     else if (/jobs?|careers?/.test(path)) score += 2;
     // A jobs./careers. subdomain's bare homepage IS the portal
@@ -1273,9 +1354,17 @@ export function renderTargetScore(u: string, careersUrl: string): number {
     // the /careers and /jobs guesses on the same host, which usually
     // fail the same way the homepage fetch did (Teleperformance: the
     // render went to a /careers guess that RSTs, never to the portal
-    // homepage). A /job-search/ path still outscores it (+5).
+    // homepage). +6, not +4: at +4 Sitel's render went to the
+    // Foundever marketing homepage instead of the jobs portal — the
+    // marketing copy's content score (5) beat the portal homepage
+    // (4) (2026-11-12 canary). A portal homepage must clear a
+    // marketing page's content score, the same lesson as the ATS
+    // bonus. It now also outscores a /job-search/ path (+5) by one —
+    // acceptable, because both are the same portal and the homepage
+    // is the more reliable entry (a deep /job-search/ link can be a
+    // stale query URL).
     const firstLabel = parsed.hostname.split('.')[0].toLowerCase();
-    if ((firstLabel === 'jobs' || firstLabel === 'careers') && path === '/') score += 4;
+    if ((firstLabel === 'jobs' || firstLabel === 'careers') && path === '/') score += 6;
     // A non-English locale param (locale=de_DE, lang=es) marks a
     // page that serves another country's jobs — the US portal is the
     // en variant. Foundever's render went to the de_DE variant and
@@ -1386,6 +1475,27 @@ export function isCareersLikeUrl(u: string, careersUrl: string): boolean {
   }
 }
 
+/** A URL that IS a job list page, not a page that merely mentions a
+ *  job: the user-given careers link, or a path whose segments name a
+ *  listing page (/careers, /jobs, /job-search, /results, /openings).
+ *  A bare homepage — even on a jobs. subdomain — is NOT list-like:
+ *  it can carry a single featured role (a teaser) while the search
+ *  behind it holds hundreds. Used by the walk's teaser rule: a
+ *  single posting on a non-list page is remembered as a fallback
+ *  while the walk continues for the real list. */
+export function isListLikeUrl(u: string, careersUrl: string): boolean {
+  if (careersUrl && u === careersUrl) return true;
+  try {
+    const parsed = new URL(u);
+    const segs = parsed.pathname.toLowerCase().split('/').filter(Boolean);
+    return segs.some((s) =>
+      /^(careers?|jobs?|job-search|jobsearch|find-a-job|find-jobs|search-jobs|search|results|openings|positions|roles|opportunities)$/i.test(s),
+    );
+  } catch {
+    return false;
+  }
+}
+
 /** Visible text of a rendered careers page, for diagnosing what the
  *  browser actually saw: a bot challenge, an empty search state, or
  *  job titles the extractors missed. Body only, scripts and styles
@@ -1454,6 +1564,14 @@ export async function searchCompanyJobs(
   let searchScan: SearchScanSummary | null = null;
   let searchMs = 0;
   let renderedUrl = '';
+  let renderAttempts: { target: string; ms: number; outcome: PortalSearchOutcome | null; error: string | null; renderedUrl: string }[] = [];
+  let renderTargets: { url: string; score: number }[] = [];
+  // A single posting on a non-list page, remembered while the walk
+  // continues for the real list — a teaser, not the list
+  // (Teleperformance's homepage carries one featured role while the
+  // real portal holds hundreds, 2026-11-12 canary). Returned only
+  // when neither the walk nor the render finds a real list.
+  let fallbackPostings: { postings: Posting[]; url: string } | null = null;
   // Deferred rendering: the plain-HTML walk runs FIRST and the render
   // fires only after it, on the single most promising zero-yielding
   // candidate. Rendering the first zero-yielding candidate mid-walk
@@ -1500,29 +1618,44 @@ export async function searchCompanyJobs(
     }
     const pagePostings = await collectPagePostings(html, u, false);
     if (pagePostings.length > 0) {
-      const screened = screenPostings(company.name, pagePostings, resumeText, company.isUSCompany ?? false);
-      return {
-        leads: screened.leads,
-        postingsSeen: pagePostings.length,
-        sourcePage: u,
-        triedUrls,
-        fetchOk: true,
-        screened: {
-          rejectedNoMatch: screened.rejectedNoMatch,
-          rejectedLocation: screened.rejectedLocation,
-          reviewLocation: screened.reviewLocation,
-          rejected: screened.rejected,
-        },
-        renderUsed,
-        renderAttempted,
-        renderMs,
-        renderError,
-        searchOutcome,
-        searchScan,
-        searchMs,
-        renderedUrl,
-        renderTextSample,
-      };
+      // A single posting on a non-list page is a teaser, not the
+      // list — remember it as the fallback and keep walking for the
+      // real list (Teleperformance's homepage carries one featured
+      // role while the portal behind it holds hundreds; the old
+      // early return stranded the company on that one teaser and
+      // the render never ran). A list page (isListLikeUrl) with any
+      // postings, or a page with two or more postings, IS the list —
+      // return it at once, as before. The teaser page stays eligible
+      // as a render target below, and its links are still discovered.
+      if (pagePostings.length === 1 && !isListLikeUrl(u, careersUrl)) {
+        if (!fallbackPostings) fallbackPostings = { postings: pagePostings, url: u };
+      } else {
+        const screened = screenPostings(company.name, pagePostings, resumeText, company.isUSCompany ?? false);
+        return {
+          leads: screened.leads,
+          postingsSeen: pagePostings.length,
+          sourcePage: u,
+          triedUrls,
+          fetchOk: true,
+          screened: {
+            rejectedNoMatch: screened.rejectedNoMatch,
+            rejectedLocation: screened.rejectedLocation,
+            reviewLocation: screened.reviewLocation,
+            rejected: screened.rejected,
+          },
+          renderUsed,
+          renderAttempted,
+          renderMs,
+          renderError,
+          searchOutcome,
+          searchScan,
+          searchMs,
+          renderedUrl,
+          renderTextSample,
+          renderAttempts,
+          renderTargets,
+        };
+      }
     }
     // Zero REAL postings — the page stays eligible for the render.
     // A page that carries the portal's search box or a job-board
@@ -1563,6 +1696,7 @@ export async function searchCompanyJobs(
     // Best score first; the sort is stable, so ties keep walk order
     // (the user-given careers link first).
     const targets = [...zeroYieldTargets].sort((a, b) => b.score - a.score);
+    renderTargets = targets.map((t) => ({ url: t.url, score: t.score }));
     for (const { url: target } of targets) {
       if (renderBudget.used >= renderBudget.max || Date.now() >= renderDeadlineMs) break;
       renderBudget.used += 1;
@@ -1574,7 +1708,18 @@ export async function searchCompanyJobs(
       } catch {
         rendered = null;
       }
-      renderMs += Date.now() - started;
+      const attemptMs = Date.now() - started;
+      renderMs += attemptMs;
+      // Record every attempt — including a null render (the renderer
+      // died or the call threw): without this the live canary cannot
+      // tell a retry that never ran from a retry that failed.
+      renderAttempts.push({
+        target,
+        ms: attemptMs,
+        outcome: rendered?.searchOutcome ?? null,
+        error: rendered ? (rendered.renderError ?? null) : 'render-null',
+        renderedUrl: rendered?.renderedUrl ?? '',
+      });
       if (!rendered) {
         // The renderer died before returning anything — the next
         // target may still load (a host that RSTs one path may serve
@@ -1622,6 +1767,8 @@ export async function searchCompanyJobs(
             searchMs,
             renderedUrl,
             renderTextSample,
+            renderAttempts,
+            renderTargets,
           };
         }
       }
@@ -1634,6 +1781,39 @@ export async function searchCompanyJobs(
       if (failedRender || searchOutcome === 'no-form') continue;
       break;
     }
+  }
+  // Neither the walk nor the render found a real list — fall back
+  // to the single teaser posting remembered during the walk (a real
+  // posting, just not the list). It beats returning nothing: a
+  // company with one featured role and a portal the render could not
+  // read still surfaces its role. Only reached when no list page and
+  // no render yielded postings.
+  if (fallbackPostings) {
+    const screened = screenPostings(company.name, fallbackPostings.postings, resumeText, company.isUSCompany ?? false);
+    return {
+      leads: screened.leads,
+      postingsSeen: fallbackPostings.postings.length,
+      sourcePage: fallbackPostings.url,
+      triedUrls,
+      fetchOk: anyFetchOk,
+      screened: {
+        rejectedNoMatch: screened.rejectedNoMatch,
+        rejectedLocation: screened.rejectedLocation,
+        reviewLocation: screened.reviewLocation,
+        rejected: screened.rejected,
+      },
+      renderUsed,
+      renderAttempted,
+      renderMs,
+      renderError,
+      searchOutcome,
+      searchScan,
+      searchMs,
+      renderedUrl,
+      renderTextSample,
+      renderAttempts,
+      renderTargets,
+    };
   }
   return {
     leads: [],
@@ -1651,6 +1831,8 @@ export async function searchCompanyJobs(
     searchMs,
     renderedUrl,
     renderTextSample,
+    renderAttempts,
+    renderTargets,
   };
 }
 

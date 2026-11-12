@@ -1981,6 +1981,16 @@ async function testPortalSearch() {
     realCount('Showing 0 results for your search.', []).resultsText === false,
     null,
   );
+  check(
+    'portal-search: "9 roles across all departments" counts as a results line (Rippling)',
+    realCount('9 roles across all departments in all locations', []).resultsText === true,
+    null,
+  );
+  check(
+    'portal-search: "0 roles" is NOT a results line',
+    realCount('0 roles across all departments', []).resultsText === false,
+    null,
+  );
   const csResume =
     'Customer service professional with member support experience. Customer Service Agent at Alorica, handling billing and service issues.';
   check('portal-search: term is the resume top-2 terms', jobsMod.portalSearchTerm(csResume) === 'service customer', jobsMod.portalSearchTerm(csResume));
@@ -2305,7 +2315,7 @@ async function testDeferredRender() {
   const jobsMod = freshRequire(`${OUT}/find-jobs.cjs`);
   check(
     'deferred-render: search/results URL outscores the FAQ page',
-    jobsMod.renderTargetScore('https://jobs.concentrix.com/job-search/', 'https://careers.concentrix.com/united-states/') === 5 &&
+    jobsMod.renderTargetScore('https://jobs.concentrix.com/job-search/', 'https://careers.concentrix.com/united-states/') === 7 &&
       jobsMod.renderTargetScore('https://careers.concentrix.com/united-states/', 'https://careers.concentrix.com/united-states/') === 2,
     null,
   );
@@ -2317,11 +2327,11 @@ async function testDeferredRender() {
   );
   check(
     'deferred-render: user-given careers link beats a guessed sibling',
-    // A jobs-subdomain homepage IS the portal (6 = 4 homepage + 2
+    // A jobs-subdomain homepage IS the portal (8 = 6 homepage + 2
     // user-given), so it outscores the /careers guess (2) on the
     // same host — the guess is a path that usually 404s or
     // redirects, the homepage is the search itself.
-    jobsMod.renderTargetScore('https://jobs.cvshealth.com/', 'https://jobs.cvshealth.com/') === 6 &&
+    jobsMod.renderTargetScore('https://jobs.cvshealth.com/', 'https://jobs.cvshealth.com/') === 8 &&
       jobsMod.renderTargetScore('https://jobs.cvshealth.com/careers', 'https://jobs.cvshealth.com/') === 2,
     null,
   );
@@ -2392,30 +2402,41 @@ async function testRenderTargetScoring() {
   // ATS bonus: the employer's real portal outscores a same-host
   // marketing page. Board hosts never earn it.
   check(
-    'target-scoring: ATS hosts earn +6, other hosts 0',
-    jobsMod.atsHostBonus('https://ats.rippling.com/liveops/jobs') === 6 &&
-      jobsMod.atsHostBonus('https://modsquad.wd5.myworkdayjobs.com/en-US/ModSquad') === 6 &&
-      jobsMod.atsHostBonus('https://recruiting.paylocity.com/recruiting/jobs/All/73b38a10/NexRep-LLC') === 6 &&
-      jobsMod.atsHostBonus('https://alorica-hire.bling-ai.com/alorica/career') === 6 &&
+    'target-scoring: ATS hosts earn +8, other hosts 0',
+    jobsMod.atsHostBonus('https://ats.rippling.com/liveops/jobs') === 8 &&
+      jobsMod.atsHostBonus('https://modsquad.wd5.myworkdayjobs.com/en-US/ModSquad') === 8 &&
+      jobsMod.atsHostBonus('https://recruiting.paylocity.com/recruiting/jobs/All/73b38a10/NexRep-LLC') === 8 &&
+      jobsMod.atsHostBonus('https://alorica-hire.bling-ai.com/alorica/career') === 8 &&
       jobsMod.atsHostBonus('https://jobs.concentrix.com/job-search/') === 0 &&
       jobsMod.atsHostBonus('https://boards.greenhouse.io/datagrail/jobs/7982580003') === 0,
     null,
   );
-  // The ATS bonus flips the actual canary losers: Rippling 8 vs
-  // Liveops marketing 5, Workday 9 vs ModSquad join-page 5.
+  // The ATS bonus flips the actual canary losers: Rippling 11 vs
+  // Liveops marketing 5, Workday 11 vs ModSquad join-page 10. The
+  // comparison must include the marketing page's content score — the
+  // old version compared renderTargetScore + host bonus only (9 vs
+  // 5) and passed while the live walk scored the join page 10
+  // (2 path + 5 content + 3 host) and the portal 9 (6 + 0 + 3),
+  // so the portal lost by one and the retry never reached it
+  // (2026-11-12 canary). At +8 the portal clears the marketing
+  // page outright (8 + 0 + 3 = 11 > 10).
+  const joinTwoDetail = `<html><body>
+<a href="/en/job/las-vegas/customer-service-representative/44028/103182764528">Customer Service Representative</a>
+<a href="/en/job/athens/dutch-customer-service/44028/103179030912">Dutch - Customer Service</a>
+</body></html>`;
   check(
     'target-scoring: ATS portal beats the marketing page that won the canary',
     jobsMod.renderTargetScore('https://ats.rippling.com/liveops/jobs', '') + jobsMod.companyHostBonus('https://ats.rippling.com/liveops/jobs', 'Liveops') >
       jobsMod.renderTargetScore('https://liveops.com/about-us/careers/', '') + jobsMod.companyHostBonus('https://liveops.com/about-us/careers/', 'Liveops') &&
-      jobsMod.renderTargetScore('https://modsquad.wd5.myworkdayjobs.com/en-US/ModSquad', '') + jobsMod.companyHostBonus('https://modsquad.wd5.myworkdayjobs.com/en-US/ModSquad', 'ModSquad') >
-      jobsMod.renderTargetScore('https://join.modsquad.com/careers/', '') + jobsMod.companyHostBonus('https://join.modsquad.com/careers/', 'ModSquad'),
+      jobsMod.renderTargetScore('https://modsquad.wd5.myworkdayjobs.com/en-US/ModSquad', '') + jobsMod.portalContentScore('<html><body><div id="root"></div></body></html>') + jobsMod.companyHostBonus('https://modsquad.wd5.myworkdayjobs.com/en-US/ModSquad', 'ModSquad') >
+      jobsMod.renderTargetScore('https://join.modsquad.com/careers/', '') + jobsMod.portalContentScore(joinTwoDetail) + jobsMod.companyHostBonus('https://join.modsquad.com/careers/', 'ModSquad'),
     null,
   );
-  // Jobs-subdomain homepage: Teleperformance's homepage (4) outranks
+  // Jobs-subdomain homepage: Teleperformance's homepage (6) outranks
   // the /careers guess (2) on the same host.
   check(
     'target-scoring: jobs-subdomain homepage outranks the /careers guess',
-    jobsMod.renderTargetScore('https://jobs.teleperformance.com', '') === 4 &&
+    jobsMod.renderTargetScore('https://jobs.teleperformance.com', '') === 6 &&
       jobsMod.renderTargetScore('https://jobs.teleperformance.com/careers', '') === 2 &&
       jobsMod.renderTargetScore('https://jobs.teleperformance.com/jobs', '') === 2,
     null,
@@ -2463,12 +2484,12 @@ async function testRenderTargetScoring() {
     found.triedUrls.filter((t) => t.startsWith('https://jobs.found.example/')).length === 1,
     found.triedUrls,
   );
-  // Non-English locale param: the de_DE variant loses 4, en_US keeps 4.
+  // Non-English locale param: the de_DE variant loses 4, en_US keeps 6.
   check(
     'target-scoring: non-English locale variant penalized, en_US kept',
-    jobsMod.renderTargetScore('https://jobs.foundever.com/?utm_source=x&locale=de_DE', '') === 0 &&
-      jobsMod.renderTargetScore('https://jobs.foundever.com/?utm_source=x&locale=en_US', '') === 4 &&
-      jobsMod.renderTargetScore('https://jobs.foundever.com/?utm_source=x&locale=es_ES', '') === 0,
+    jobsMod.renderTargetScore('https://jobs.foundever.com/?utm_source=x&locale=de_DE', '') === 2 &&
+      jobsMod.renderTargetScore('https://jobs.foundever.com/?utm_source=x&locale=en_US', '') === 6 &&
+      jobsMod.renderTargetScore('https://jobs.foundever.com/?utm_source=x&locale=es_ES', '') === 2,
     null,
   );
   // ATS eligibility: a Workday URL whose path has no job word is
@@ -2535,6 +2556,18 @@ async function testRenderRetry() {
     'render-retry: no-form retries the next target and finds the role',
     calls.length === 2 && calls[1] === 'https://retry.example/jobs' && retried.leads.length === 1 && retried.renderUsed === true && retried.searchOutcome === 'searched',
     { calls, leads: retried.leads, searchOutcome: retried.searchOutcome },
+  );
+  check(
+    'render-retry: every attempt is recorded in order, with the sorted targets',
+    retried.renderAttempts.length === 2 &&
+      retried.renderAttempts[0]?.target === 'https://retry.example/careers' &&
+      retried.renderAttempts[0]?.outcome === 'no-form' &&
+      retried.renderAttempts[1]?.target === 'https://retry.example/jobs' &&
+      retried.renderAttempts[1]?.outcome === 'searched' &&
+      retried.renderTargets.length === 2 &&
+      retried.renderTargets[0]?.url === 'https://retry.example/careers' &&
+      retried.renderTargets[0]?.score === 2,
+    { attempts: retried.renderAttempts, targets: retried.renderTargets },
   );
   // A null render retries too.
   calls = [];
@@ -2905,11 +2938,15 @@ async function testTalentBrewAndRenderError() {
   <li><a href="/en/job/las-vegas/join-our-team/44028/103182764529" data-job-id="103182764529">
     <div class="sr-job-list-wrap"><h2 class="job-title-logo-spacing">Join our team</h2>
     <span class="job-location logo-spacing">Las Vegas, Nevada</span></div></a></li>
+  <li><a href="/en/job/athens/french-customer-service/44028/103179030913" data-job-id="103179030913">
+    <div class="sr-job-list-wrap"><h2 class="job-title-logo-spacing">Fran&#xE7;ais/Anglais - Conseiller / Conseill&#xE8;re voyages pour Booking.com</h2>
+    <span class="job-location logo-spacing">Athens, Greece</span></div></a></li>
 </ul></body></html>`;
   const tb = jobsMod.parseCareersPage(tbHtml, 'https://www.ttecjobs.com/en/search-jobs');
-  check('talentbrew: 2 real cards parsed (junk title dropped)', tb.length === 2, tb);
+  check('talentbrew: 3 real cards parsed (junk title dropped)', tb.length === 3, tb);
   check('talentbrew: US card fields resolved', tb[0]?.title === 'Customer Service Representative' && tb[0]?.location === 'Las Vegas, Nevada' && tb[0]?.url === 'https://www.ttecjobs.com/en/job/las-vegas/customer-service-representative/44028/103182764528', tb[0]);
   check('talentbrew: non-US card keeps its location', tb[1]?.location === 'Athens, Greece', tb[1]);
+  check('talentbrew: numeric entities decode in the title (Français)', tb[2]?.title === 'Français/Anglais - Conseiller / Conseillère voyages pour Booking.com' && tb[2]?.location === 'Athens, Greece', tb[2]);
   // Careers-like URLs: a jobs./careers. subdomain homepage counts (it
   // IS the portal), a plain homepage does not.
   check(
@@ -2945,6 +2982,103 @@ async function testTalentBrewAndRenderError() {
     'render-error: null render leaves error null',
     nullRender.renderAttempted === true && nullRender.renderError === null,
     nullRender,
+  );
+}
+
+async function testRound4() {
+  // Batch 4 (2026-11-12 canary): Strategy E (Rippling UUID anchors),
+  // the teaser fallback (a single posting on a non-list page), and
+  // the glued-title guard in titleOk.
+  const jobsMod = freshRequire(`${OUT}/find-jobs.cjs`);
+  const resumeText =
+    'Customer support specialist with Zendesk, chat support, and troubleshooting experience for SaaS customers';
+  // Strategy E: Rippling rows are bare anchors to /jobs/<uuid> with
+  // the title in a plain <div> — no heading, no job-ish class, no
+  // data-job-id. Strategy A would read the whole row as one glued
+  // title ("Agent Success Remote (United States) View job"); the
+  // titleOk CTA guard rejects it, so only Strategy E's clean title
+  // lands.
+  const ripplingHtml = `<html><body><div class="job-list">
+<a href="/liveops/jobs/3e94f2e4-5247-4bdd-bfe0-ccb439465de0"><div>Agent Success</div><div>Remote (United States)</div><span>View job</span></a>
+<a href="/liveops/jobs/a716704b-695c-41ea-8725-8378644e807b"><div>Agent Experience Specialist</div><div>Remote (United States)</div><span>View job</span></a>
+<a href="/liveops/jobs/9234e10b-8292-46b8-b8fc-919e71f5f295"><div>Agent Support Specialist</div><div>Remote (United States)</div><span>View job</span></a>
+</div></body></html>`;
+  const rip = jobsMod.parseCareersPage(ripplingHtml, 'https://ats.rippling.com/liveops/jobs');
+  check('strategy-e: 3 Rippling rows parsed', rip.length === 3, rip);
+  check(
+    'strategy-e: titles are clean (no glued location / View job)',
+    rip[0]?.title === 'Agent Success' &&
+      rip[1]?.title === 'Agent Experience Specialist' &&
+      rip[2]?.title === 'Agent Support Specialist',
+    rip.map((p) => p.title),
+  );
+  check(
+    'strategy-e: locations read Remote, URLs are the UUID detail links',
+    rip[0]?.location === 'Remote' &&
+      rip[0]?.url === 'https://ats.rippling.com/liveops/jobs/3e94f2e4-5247-4bdd-bfe0-ccb439465de0',
+    rip[0],
+  );
+  // A UUID anchor with no title-like segment yields nothing.
+  const noTitleHtml = `<html><body><a href="/liveops/jobs/3e94f2e4-5247-4bdd-bfe0-ccb439465de0"><div>Remote (United States)</div><span>View job</span></a></body></html>`;
+  check(
+    'strategy-e: a location-only row yields no posting',
+    jobsMod.parseCareersPage(noTitleHtml, 'https://ats.rippling.com/liveops/jobs').length === 0,
+    null,
+  );
+  // Teaser fallback: a homepage with ONE posting and a /careers page
+  // with three — the walk must return the /careers list, not the
+  // homepage teaser.
+  const teaserHtml = `<html><body>
+<div class="job-listing"><h3>Customer Support Specialist</h3><p>Location: Remote</p><a href="/jobs/customer-support-specialist">Apply</a></div>
+</body></html>`;
+  const listHtml = `<html><body>
+<div class="job-listing"><h3>Customer Support Specialist</h3><p>Location: Remote</p><a href="/jobs/customer-support-specialist">Apply</a></div>
+<div class="job-listing"><h3>Member Services Representative</h3><p>Location: Remote</p><a href="/jobs/member-services-representative">Apply</a></div>
+<div class="job-listing"><h3>Call Center Agent</h3><p>Location: Remote</p><a href="/jobs/call-center-agent">Apply</a></div>
+</body></html>`;
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u === 'https://teaser.example/careers') return { ok: true, text: async () => listHtml };
+    if (u === 'https://teaser.example') return { ok: true, text: async () => teaserHtml };
+    return { ok: true, text: async () => '<html><body>No careers here.</body></html>' };
+  };
+  const listed = await jobsMod.searchCompanyJobs(
+    { name: 'Teaser Co', website: 'https://teaser.example', careersUrl: '', isUSCompany: true },
+    resumeText,
+    {},
+  );
+  check(
+    'teaser: a 1-posting homepage does not stop the walk; the /careers list wins',
+    listed.postingsSeen === 3 && listed.sourcePage === 'https://teaser.example/careers' && listed.leads.length >= 2,
+    { postingsSeen: listed.postingsSeen, sourcePage: listed.sourcePage, leads: listed.leads },
+  );
+  // Teaser-only company: the one featured role still comes back as
+  // the fallback when nothing better exists.
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u === 'https://teaser.example') return { ok: true, text: async () => teaserHtml };
+    return { ok: true, text: async () => '<html><body>No careers here.</body></html>' };
+  };
+  const only = await jobsMod.searchCompanyJobs(
+    { name: 'Teaser Co', website: 'https://teaser.example', careersUrl: '', isUSCompany: true },
+    resumeText,
+    {},
+  );
+  check(
+    'teaser: a lone featured role returns as the fallback, not zero',
+    only.postingsSeen === 1 && only.sourcePage === 'https://teaser.example' && only.leads.length === 1,
+    { postingsSeen: only.postingsSeen, sourcePage: only.sourcePage, leads: only.leads },
+  );
+  // isListLikeUrl: the user-given link and list paths count; a bare
+  // homepage does not.
+  check(
+    'teaser: list-like URL detection',
+    jobsMod.isListLikeUrl('https://tele.example/careers', '') === true &&
+      jobsMod.isListLikeUrl('https://jobs.tele.example/job-search/', '') === true &&
+      jobsMod.isListLikeUrl('https://jobs.tele.example/', '') === false &&
+      jobsMod.isListLikeUrl('https://tele.example/', 'https://tele.example/') === true &&
+      jobsMod.isListLikeUrl('https://tele.example/about', '') === false,
+    null,
   );
 }
 
@@ -3400,6 +3534,7 @@ await testJobCardAnchors();
 await testRealPostingGate();
 await testJunkWalkAndRender();
 await testTalentBrewAndRenderError();
+await testRound4();
 await testPaginationAndSearchScan();
 await testTestCompany();
 await testJazzhr();
