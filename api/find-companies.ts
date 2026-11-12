@@ -711,170 +711,213 @@ async function wdqsJson(
   return (data as { results?: { bindings?: unknown[] } })?.results?.bindings ?? [];
 }
 
-const wikidataTypesKeysetAdapter: SourceAdapter = {
-  key: 'wikidata-types-keyset',
-  label: 'Wikidata types keyset',
-  neverSkip: true,
-  async fetchPage(state, budgetMs, fetchFn): Promise<SourcePage> {
-    const startedAt = Date.now();
-    const types = WDQS_TYPE_KEYSET_IDS;
-    let typeIndex =
-      typeof state.typeIndex === 'number' &&
-      state.typeIndex >= 0 &&
-      state.typeIndex <= types.length
-        ? state.typeIndex
-        : 0;
-    let lastIri =
-      typeof state.lastIri === 'string' && state.lastIri ? state.lastIri : '';
-    let failures =
-      typeof state.failures === 'number' && state.failures >= 0
-        ? state.failures
-        : 0;
-    let skipped: number[] = Array.isArray(state.skipped)
-      ? (state.skipped as unknown[]).filter(
-          (n): n is number =>
-            typeof n === 'number' && n >= 0 && n < types.length,
-        )
-      : [];
-    let round = state.round === 1 ? 1 : 0;
+/**
+ * Keyset walk over a list of entity types, shared by the 17-type walk
+ * below and the business re-walk: the type list is the only thing
+ * that differs between walks, so both adapters are built from this
+ * one function — same keyset paging, same two-phase labels, same
+ * state shape (typeIndex, lastIri, failures, skipped, round), same
+ * per-type skip + one retry round, same neverSkip contract.
+ */
+function keysetTypesAdapter(key: string, label: string, typeIds: string[]): SourceAdapter {
+  return {
+    key,
+    label,
+    neverSkip: true,
+    async fetchPage(state, budgetMs, fetchFn): Promise<SourcePage> {
+      const startedAt = Date.now();
+      const types = typeIds;
+      let typeIndex =
+        typeof state.typeIndex === 'number' &&
+        state.typeIndex >= 0 &&
+        state.typeIndex <= types.length
+          ? state.typeIndex
+          : 0;
+      let lastIri =
+        typeof state.lastIri === 'string' && state.lastIri ? state.lastIri : '';
+      let failures =
+        typeof state.failures === 'number' && state.failures >= 0
+          ? state.failures
+          : 0;
+      let skipped: number[] = Array.isArray(state.skipped)
+        ? (state.skipped as unknown[]).filter(
+            (n): n is number =>
+              typeof n === 'number' && n >= 0 && n < types.length,
+          )
+        : [];
+      let round = state.round === 1 ? 1 : 0;
 
-    // End of the type list: skipped types get one retry round, then
-    // the source is truly exhausted.
-    if (typeIndex >= types.length) {
-      if (skipped.length > 0 && round === 0) {
-        round = 1;
-        typeIndex = skipped[0];
-        skipped = [];
-        lastIri = '';
-        failures = 0;
-      } else {
-        return {
-          companies: [],
-          nextState: { typeIndex, lastIri: '', failures: 0, skipped, round },
-          exhausted: true,
-        };
+      // End of the type list: skipped types get one retry round, then
+      // the source is truly exhausted.
+      if (typeIndex >= types.length) {
+        if (skipped.length > 0 && round === 0) {
+          round = 1;
+          typeIndex = skipped[0];
+          skipped = [];
+          lastIri = '';
+          failures = 0;
+        } else {
+          return {
+            companies: [],
+            nextState: { typeIndex, lastIri: '', failures: 0, skipped, round },
+            exhausted: true,
+          };
+        }
       }
-    }
 
-    const typeId = types[typeIndex];
-    const pageQuery =
-      'SELECT ?company ?website WHERE { ' +
-      `?company wdt:P31 wd:${typeId} . ` +
-      '{ ?company wdt:P17 wd:Q30 . } UNION { ?company wdt:P159 ?hq . ?hq wdt:P17 wd:Q30 . } ' +
-      '. ?company wdt:P856 ?website . ' +
-      (lastIri ? `FILTER(STR(?company) > '${lastIri}') ` : '') +
-      `} ORDER BY STR(?company) LIMIT ${WDQS_PAGE_ROWS}`;
-    let bindings: unknown[];
-    try {
-      bindings = await wdqsJson(pageQuery, budgetMs, fetchFn);
-    } catch {
-      // Type failure: count it in the returned state (the loop saves
-      // every page's state, so the count survives across presses).
-      // After 3, skip ONLY this type and move on; the retry round at
-      // the end of the list gives it a second chance.
-      failures += 1;
-      if (failures >= 3) {
-        if (!skipped.includes(typeIndex)) skipped.push(typeIndex);
+      const typeId = types[typeIndex];
+      const pageQuery =
+        'SELECT ?company ?website WHERE { ' +
+        `?company wdt:P31 wd:${typeId} . ` +
+        '{ ?company wdt:P17 wd:Q30 . } UNION { ?company wdt:P159 ?hq . ?hq wdt:P17 wd:Q30 . } ' +
+        '. ?company wdt:P856 ?website . ' +
+        (lastIri ? `FILTER(STR(?company) > '${lastIri}') ` : '') +
+        `} ORDER BY STR(?company) LIMIT ${WDQS_PAGE_ROWS}`;
+      let bindings: unknown[];
+      try {
+        bindings = await wdqsJson(pageQuery, budgetMs, fetchFn);
+      } catch {
+        // Type failure: count it in the returned state (the loop saves
+        // every page's state, so the count survives across presses).
+        // After 3, skip ONLY this type and move on; the retry round at
+        // the end of the list gives it a second chance.
+        failures += 1;
+        if (failures >= 3) {
+          if (!skipped.includes(typeIndex)) skipped.push(typeIndex);
+          return {
+            companies: [],
+            nextState: {
+              typeIndex: typeIndex + 1,
+              lastIri: '',
+              failures: 0,
+              skipped,
+              round,
+            },
+            exhausted: false,
+          };
+        }
         return {
           companies: [],
-          nextState: {
-            typeIndex: typeIndex + 1,
-            lastIri: '',
-            failures: 0,
-            skipped,
-            round,
-          },
+          nextState: { typeIndex, lastIri, failures, skipped, round },
           exhausted: false,
         };
       }
-      return {
-        companies: [],
-        nextState: { typeIndex, lastIri, failures, skipped, round },
-        exhausted: false,
-      };
-    }
 
-    const byEnt = new Map<string, { name: string; website: string }>();
-    let lastSeen = lastIri;
-    for (const b of bindings as {
-      company?: { value?: string };
-      website?: { value?: string };
-    }[]) {
-      const uri: string = b.company?.value ?? '';
-      if (uri) lastSeen = uri;
-      const ent = uri.split('/').pop() ?? uri;
-      const site: string = b.website?.value ?? '';
-      if (!site) continue;
-      const cur = byEnt.get(ent);
-      if (!cur || websiteScore(site) < websiteScore(cur.website)) {
-        byEnt.set(ent, { name: ent, website: site });
-      }
-    }
-    // Phase 2: labels for exactly this page's entities, in chunks of
-    // 100 IRIs. A chunk that cannot finish in the remaining budget is
-    // skipped (those rows keep their QID as a name) so the page still
-    // lands inside the press budget.
-    const iris = [...byEnt.keys()];
-    const labels = new Map<string, string>();
-    for (let i = 0; i < iris.length; i += 100) {
-      if (Date.now() - startedAt > budgetMs - 8000) break;
-      const chunk = iris.slice(i, i + 100);
-      const values = chunk
-        .map((qid) => `<http://www.wikidata.org/entity/${qid}>`)
-        .join(' ');
-      try {
-        const labelBindings = await wdqsJson(
-          `SELECT ?company ?companyLabel WHERE { VALUES ?company { ${values} } ` +
-            'SERVICE wikibase:label { bd:serviceParam wikibase:language "en" . } }',
-          10000,
-          fetchFn,
-        );
-        for (const b of labelBindings as {
-          company?: { value?: string };
-          companyLabel?: { value?: string };
-        }[]) {
-          const ent = (b.company?.value ?? '').split('/').pop() ?? '';
-          if (ent && b.companyLabel?.value) labels.set(ent, b.companyLabel.value);
+      const byEnt = new Map<string, { name: string; website: string }>();
+      let lastSeen = lastIri;
+      for (const b of bindings as {
+        company?: { value?: string };
+        website?: { value?: string };
+      }[]) {
+        const uri: string = b.company?.value ?? '';
+        if (uri) lastSeen = uri;
+        const ent = uri.split('/').pop() ?? uri;
+        const site: string = b.website?.value ?? '';
+        if (!site) continue;
+        const cur = byEnt.get(ent);
+        if (!cur || websiteScore(site) < websiteScore(cur.website)) {
+          byEnt.set(ent, { name: ent, website: site });
         }
-      } catch {
-        // Labels are cosmetic: keep QID names for this chunk's rows.
       }
-    }
-    for (const [qid, c] of byEnt) {
-      const label = labels.get(qid);
-      if (label) c.name = label;
-    }
+      // Phase 2: labels for exactly this page's entities, in chunks of
+      // 100 IRIs. A chunk that cannot finish in the remaining budget is
+      // skipped (those rows keep their QID as a name) so the page still
+      // lands inside the press budget.
+      const iris = [...byEnt.keys()];
+      const labels = new Map<string, string>();
+      for (let i = 0; i < iris.length; i += 100) {
+        if (Date.now() - startedAt > budgetMs - 8000) break;
+        const chunk = iris.slice(i, i + 100);
+        const values = chunk
+          .map((qid) => `<http://www.wikidata.org/entity/${qid}>`)
+          .join(' ');
+        try {
+          const labelBindings = await wdqsJson(
+            `SELECT ?company ?companyLabel WHERE { VALUES ?company { ${values} } ` +
+              'SERVICE wikibase:label { bd:serviceParam wikibase:language "en" . } }',
+            10000,
+            fetchFn,
+          );
+          for (const b of labelBindings as {
+            company?: { value?: string };
+            companyLabel?: { value?: string };
+          }[]) {
+            const ent = (b.company?.value ?? '').split('/').pop() ?? '';
+            if (ent && b.companyLabel?.value) labels.set(ent, b.companyLabel.value);
+          }
+        } catch {
+          // Labels are cosmetic: keep QID names for this chunk's rows.
+        }
+      }
+      for (const [qid, c] of byEnt) {
+        const label = labels.get(qid);
+        if (label) c.name = label;
+      }
 
-    const shortPage = bindings.length < WDQS_PAGE_ROWS;
-    const nextTypeIndex = shortPage ? typeIndex + 1 : typeIndex;
-    // Do NOT report exhausted while skipped types still await their
-    // retry round: the loop advances past the adapter on exhausted,
-    // which would strand the retry round. The next fetchPage call
-    // jumps to the first skipped type instead.
-    const exhausted =
-      nextTypeIndex >= types.length &&
-      shortPage &&
-      !(skipped.length > 0 && round === 0);
-    return {
-      companies: [...byEnt.entries()].map(([qid, c]) => ({
-        name: c.name,
-        website: c.website,
-        careersUrl: '',
-        category: 'General',
-        source: 'Wikidata',
-        sourceId: qid,
-      })),
-      nextState: {
-        typeIndex: nextTypeIndex,
-        lastIri: shortPage ? '' : lastSeen,
-        failures: 0,
-        skipped,
-        round,
-      },
-      exhausted,
-    };
-  },
-};
+      const shortPage = bindings.length < WDQS_PAGE_ROWS;
+      const nextTypeIndex = shortPage ? typeIndex + 1 : typeIndex;
+      // Do NOT report exhausted while skipped types still await their
+      // retry round: the loop advances past the adapter on exhausted,
+      // which would strand the retry round. The next fetchPage call
+      // jumps to the first skipped type instead.
+      const exhausted =
+        nextTypeIndex >= types.length &&
+        shortPage &&
+        !(skipped.length > 0 && round === 0);
+      return {
+        companies: [...byEnt.entries()].map(([qid, c]) => ({
+          name: c.name,
+          website: c.website,
+          careersUrl: '',
+          category: 'General',
+          source: 'Wikidata',
+          sourceId: qid,
+        })),
+        nextState: {
+          typeIndex: nextTypeIndex,
+          lastIri: shortPage ? '' : lastSeen,
+          failures: 0,
+          skipped,
+          round,
+        },
+        exhausted,
+      };
+    },
+  };
+}
+
+/** The 17-type walk (2026-11-03), unchanged in behavior — built
+ *  from the shared factory above, so its state shape and cursor
+ *  are exactly what they were. */
+const wikidataTypesKeysetAdapter = keysetTypesAdapter(
+  'wikidata-types-keyset',
+  'Wikidata types keyset',
+  WDQS_TYPE_KEYSET_IDS,
+);
+
+/**
+ * Business-type keyset re-walk (2026-11-11): the four business types
+ * (business, company, public company, enterprise) were only ever
+ * walked by the OFFSET website adapter, which has no neverSkip —
+ * three slow pages skip it for good, the same failure mode that
+ * stranded the OFFSET organization walk. Once the sources after it
+ * are past, no later source walks business types at all: a company
+ * the OFFSET walk missed never surfaces, and a social-only row
+ * (Concentrix, TTEC, Liveops — found by the social walk, which only
+ * queries these four types, but never upgraded because no later
+ * source emits their website row) never upgrades. This adapter
+ * re-walks the same four types with the keyset pattern, so future
+ * presses converge on the missed remainder: already-known rows
+ * dedupe, and a website row for a stored social-only QID upgrades
+ * it through the normal upgrade pass. New source key, so a stored
+ * cursor past the types walk moves straight onto it with no
+ * version bump.
+ */
+const wikidataBusinessKeysetAdapter = keysetTypesAdapter(
+  'wikidata-business-keyset',
+  'Wikidata business keyset',
+  WDQS_TYPE_IDS,
+);
 
 /** Live sources, in the order the button walks them. */
 // Social runs first so social-only companies flow from the first press;
@@ -886,6 +929,11 @@ const wikidataTypesKeysetAdapter: SourceAdapter = {
 // skipped OFFSET organization walk) moves straight onto it. The
 // types keyset adapter is appended after that: a stored cursor at
 // index 6 (past the exhausted organization keyset walk) moves onto it.
+// The business keyset adapter is appended after that: a stored cursor
+// at index 7 (past the exhausted types walk) moves onto it — it
+// re-walks the four business types the OFFSET website walk can no
+// longer reach, so its missed remainder and its social-only rows get
+// a second chance.
 const SOURCES: SourceAdapter[] = [
   wikidataSocialAdapter,
   wikidataAdapter,
@@ -894,6 +942,7 @@ const SOURCES: SourceAdapter[] = [
   wikidataOrgAdapter,
   wikidataOrgKeysetAdapter,
   wikidataTypesKeysetAdapter,
+  wikidataBusinessKeysetAdapter,
 ];
 
 export interface FindCompaniesDeps {

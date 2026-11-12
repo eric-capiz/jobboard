@@ -409,8 +409,8 @@ async function testFindCompanies() {
   check('find-companies core full walk added 93', out.added === 93, out);
   const cursorDoc = await metaCol.findOne({ _id: 'find-companies' });
   check(
-    'find-companies core cursor past all sources (social + per-type wikidata + empty edgar + organization + keyset + types)',
-    cursorDoc?.sourceIndex === 7 &&
+    'find-companies core cursor past all sources (social + per-type wikidata + empty edgar + organization + keyset + types + business keyset)',
+    cursorDoc?.sourceIndex === 8 &&
       cursorDoc?.state?.['wikidata-social']?.comboIndex === 24 &&
       JSON.stringify(cursorDoc?.state?.['wikidata-social']?.offsets?.slice(0, 1)) === JSON.stringify([600]) &&
       cursorDoc?.state?.wikidata?.typeIndex === 4 &&
@@ -419,7 +419,8 @@ async function testFindCompanies() {
       JSON.stringify(cursorDoc?.state?.['wikidata-social-organization']?.offsets) === JSON.stringify([300, 300, 300, 300, 300, 300]) &&
       cursorDoc?.state?.['wikidata-organization']?.offset === 300 &&
       cursorDoc?.state?.['wikidata-organization-keyset']?.lastIri === '' &&
-      cursorDoc?.state?.['wikidata-types-keyset']?.typeIndex === 17,
+      cursorDoc?.state?.['wikidata-types-keyset']?.typeIndex === 17 &&
+      cursorDoc?.state?.['wikidata-business-keyset']?.typeIndex === 4,
     cursorDoc,
   );
   const comp1 = (await companiesCol.find({ name: 'Company 1' }).toArray())[0];
@@ -484,7 +485,8 @@ async function testFindCompaniesDupeStretch() {
       cursorDoc?.state?.['wikidata-organization']?.offset === 300 &&
       cursorDoc?.state?.['wikidata-organization-keyset']?.lastIri === '' &&
       cursorDoc?.state?.['wikidata-types-keyset']?.typeIndex === 17 &&
-      cursorDoc?.sourceIndex === 7,
+      cursorDoc?.state?.['wikidata-business-keyset']?.typeIndex === 4 &&
+      cursorDoc?.sourceIndex === 8,
     cursorDoc,
   );
 }
@@ -1189,7 +1191,7 @@ async function testEdgar() {
     { limit: 2000 },
   );
   check('edgar: added 3 (US+website only)', out.added === 3, out);
-  check('edgar: walk ends at Wikidata types keyset', out.source === 'Wikidata types keyset', out);
+  check('edgar: walk ends at Wikidata business keyset', out.source === 'Wikidata business keyset', out);
   check('edgar: exhausted after map end', out.exhausted === true, out);
   const cursorDoc = await metaCol.findOne({ _id: 'find-companies' });
   check('edgar: tickerIndex advanced past all 6 entries', cursorDoc?.state?.edgar?.tickerIndex === 6, cursorDoc);
@@ -1478,7 +1480,7 @@ async function testOrgKeysetPaging() {
     { limit: 2000 },
   );
   check('keyset: added 302 across both pages', out.added === 302, out);
-  check('keyset: source label (walk continues into types after)', out.source === 'Wikidata types keyset', out);
+  check('keyset: source label (walk continues into business keyset after)', out.source === 'Wikidata business keyset', out);
   check('keyset: page 1 has no resume filter', !seenUrls[0].includes('FILTER(STR'), seenUrls[0]);
   check(
     'keyset: page 2 filters past page 1 last entity (Q399)',
@@ -1489,7 +1491,7 @@ async function testOrgKeysetPaging() {
   const cursorDoc = await metaCol.findOne({ _id: 'find-companies' });
   check(
     'keyset: cursor past source, lastIri at Q500',
-    cursorDoc?.sourceIndex === 7 &&
+    cursorDoc?.sourceIndex === 8 &&
       cursorDoc?.state?.['wikidata-organization-keyset']?.lastIri === 'http://www.wikidata.org/entity/Q500',
     cursorDoc,
   );
@@ -1634,11 +1636,162 @@ async function testTypesSkipRetry() {
     { companiesCol, metaCol, fetchFn: globalThis.fetch },
     { limit: 2000 },
   );
-  check('types-skip-retry: added 16 (one per surviving type)', out.added === 16, out);
+  check('types-skip-retry: added 20 (16 surviving types + 4 business types)', out.added === 20, out);
   check('types-skip-retry: exhausted after retry round', out.exhausted === true, out);
   check('types-skip-retry: dead type tried 3 + 3 times', type0Throws === 6, type0Throws);
   const cursorDoc = await metaCol.findOne({ _id: 'find-companies' });
-  check('types-skip-retry: cursor past source', cursorDoc?.sourceIndex === 7, cursorDoc);
+  check('types-skip-retry: cursor past source', cursorDoc?.sourceIndex === 8, cursorDoc);
+}
+
+async function testBusinessKeyset() {
+  // 2026-11-11: the four business types were only ever walked by the
+  // OFFSET website adapter, which can be permanently skipped after 3
+  // slow pages — and no later source walks business types at all. The
+  // appended business keyset re-walk recovers the missed remainder
+  // and upgrades social-only rows (same QID) to their real website.
+  const runMod = freshRequire(`${OUT}/find-companies.cjs`);
+  const companiesCol = new FakeCollection();
+  const metaCol = new FakeCollection();
+  // A stored Facebook-only row for Q9101 (Concentrix-shaped: found by
+  // the social walk, never upgraded because no later source emitted
+  // its website row).
+  await companiesCol.insertMany([{
+    name: 'Bpo Co', nameKey: 'bpo co', website: 'https://www.facebook.com/bpoco',
+    domain: 'facebook.com', careersUrl: '', category: 'General',
+    source: 'Wikidata', sourceId: 'Q9101', addedAt: new Date().toISOString(),
+  }]);
+  // Cursor past the exhausted types walk: the new adapter is next.
+  await metaCol.updateOne(
+    { _id: 'find-companies' },
+    { $set: { version: 2, sourceIndex: 7, state: {}, pending: [] } },
+    { upsert: true },
+  );
+  // Route by P31: business returns the FB-only QID with its real
+  // website plus one new company; company / public company return one
+  // new company each; enterprise is empty (exhausts the walk).
+  globalThis.fetch = async (url) => {
+    const u = decodeURIComponent(String(url)).replace(/\+/g, ' ');
+    if (u.includes('VALUES')) {
+      const iris = [...new Set([...u.matchAll(/entity\/(Q\d+)/g)].map((m) => m[1]))];
+      return {
+        ok: true,
+        json: async () => ({
+          results: {
+            bindings: iris.map((qid) => ({
+              company: { value: `http://www.wikidata.org/entity/${qid}` },
+              companyLabel: { value: `Label-${qid}` },
+            })),
+          },
+        }),
+      };
+    }
+    const m = u.match(/wdt:P31 wd:(Q\d+)/);
+    const typeId = m ? m[1] : '';
+    const page = {
+      Q4830453: [
+        { company: { value: 'http://www.wikidata.org/entity/Q9101' }, website: { value: 'https://bpoco.example' } },
+        { company: { value: 'http://www.wikidata.org/entity/Q9102' }, website: { value: 'https://newbpo.example' } },
+      ],
+      Q783794: [
+        { company: { value: 'http://www.wikidata.org/entity/Q9103' }, website: { value: 'https://otherbpo.example' } },
+      ],
+      Q891723: [
+        { company: { value: 'http://www.wikidata.org/entity/Q9104' }, website: { value: 'https://pubbpo.example' } },
+      ],
+    }[typeId] ?? [];
+    return { ok: true, json: async () => ({ results: { bindings: page } }) };
+  };
+  const out = await runMod.runFindCompanies(
+    { companiesCol, metaCol, fetchFn: globalThis.fetch },
+    { limit: 2000 },
+  );
+  check('business-keyset: added 3 (FB-only QID is an upgrade, not an add)', out.added === 3, out);
+  check('business-keyset: source label', out.source === 'Wikidata business keyset', out);
+  check('business-keyset: exhausted after the 4 types', out.exhausted === true, out);
+  const bpo = (await companiesCol.find({ name: 'Bpo Co' }).toArray())[0];
+  check('business-keyset: social row upgraded to real website', bpo?.website === 'https://bpoco.example' && bpo?.domain === 'bpoco.example', bpo);
+  const total = await companiesCol.countDocuments();
+  check('business-keyset: total 4 rows, no dupes', total === 4, total);
+  const cursorDoc = await metaCol.findOne({ _id: 'find-companies' });
+  check(
+    'business-keyset: cursor past source, all 4 types walked',
+    cursorDoc?.sourceIndex === 8 &&
+      cursorDoc?.state?.['wikidata-business-keyset']?.typeIndex === 4,
+    cursorDoc,
+  );
+  // A second press from the exhausted cursor adds nothing.
+  const out2 = await runMod.runFindCompanies(
+    { companiesCol, metaCol, fetchFn: globalThis.fetch },
+    { limit: 2000 },
+  );
+  check('business-keyset: exhausted press adds 0, no error', out2.added === 0 && out2.exhausted === true && !out2.error, out2);
+}
+
+async function testBusinessKeysetTypeSkip() {
+  // Per-type failure isolation, like the types walk: a dead business
+  // type is skipped (not the whole source) and gets exactly one retry
+  // round at the end of the list before the source exhausts. The
+  // adapter counts WDQS failures internally, so a throwing fetch
+  // never reaches the runner's 3-failure source skip.
+  const runMod = freshRequire(`${OUT}/find-companies.cjs`);
+  const companiesCol = new FakeCollection();
+  const metaCol = new FakeCollection();
+  await metaCol.updateOne(
+    { _id: 'find-companies' },
+    { $set: { version: 2, sourceIndex: 7, state: {}, pending: [] } },
+    { upsert: true },
+  );
+  let type0Throws = 0;
+  globalThis.fetch = async (url) => {
+    const u = decodeURIComponent(String(url)).replace(/\+/g, ' ');
+    if (u.includes('VALUES')) {
+      const iris = [...new Set([...u.matchAll(/entity\/(Q\d+)/g)].map((m) => m[1]))];
+      return {
+        ok: true,
+        json: async () => ({
+          results: {
+            bindings: iris.map((qid) => ({
+              company: { value: `http://www.wikidata.org/entity/${qid}` },
+              companyLabel: { value: `Label-${qid}` },
+            })),
+          },
+        }),
+      };
+    }
+    const m = u.match(/wdt:P31 wd:(Q\d+)/);
+    const typeId = m ? m[1] : '';
+    if (typeId === 'Q4830453') {
+      type0Throws += 1;
+      throw new Error('WDQS down for business');
+    }
+    const page = {
+      Q783794: [
+        { company: { value: 'http://www.wikidata.org/entity/Q9103' }, website: { value: 'https://otherbpo.example' } },
+      ],
+      Q891723: [
+        { company: { value: 'http://www.wikidata.org/entity/Q9104' }, website: { value: 'https://pubbpo.example' } },
+      ],
+      Q6881511: [
+        { company: { value: 'http://www.wikidata.org/entity/Q9105' }, website: { value: 'https://entbpo.example' } },
+      ],
+    }[typeId] ?? [];
+    return { ok: true, json: async () => ({ results: { bindings: page } }) };
+  };
+  const out = await runMod.runFindCompanies(
+    { companiesCol, metaCol, fetchFn: globalThis.fetch },
+    { limit: 2000 },
+  );
+  check('business-skip-retry: added 3 (one per surviving type)', out.added === 3, out);
+  check('business-skip-retry: exhausted after retry round', out.exhausted === true, out);
+  check('business-skip-retry: dead type tried 3 + 3 times', type0Throws === 6, type0Throws);
+  const cursorDoc = await metaCol.findOne({ _id: 'find-companies' });
+  check(
+    'business-skip-retry: cursor past source, dead type still recorded',
+    cursorDoc?.sourceIndex === 8 &&
+      JSON.stringify(cursorDoc?.state?.['wikidata-business-keyset']?.skipped) === JSON.stringify([0]) &&
+      cursorDoc?.state?.['wikidata-business-keyset']?.round === 1,
+    cursorDoc,
+  );
 }
 
 async function testPortalSearch() {
@@ -2157,6 +2310,232 @@ async function testJobCardAnchors() {
   );
 }
 
+async function testRealPostingGate() {
+  // The junk-posting gate (v4 diagnosis, 2026-11-11): the parser used
+  // to accept nav/category/CTA links as postings, so a junk-only
+  // homepage 'found' postings and the walk returned early — render
+  // and search never ran. A real posting is a specific role title AND
+  // a job-detail link; either half failing drops the listing.
+  const jobsMod = freshRequire(`${OUT}/find-jobs.cjs`);
+  const { isJunkTitle, isJobDetailUrl, isRealPosting } = jobsMod;
+  // Proven junk from the live homepages (TTEC, Working Solutions,
+  // Foundever, Liveops, Kelly, NexRep, Sutherland, 2026-11-11).
+  const junk = [
+    ['Customer service jobs', 'https://www.ttecjobs.com/en/customer-service'],
+    ['Sales jobs', 'https://www.ttecjobs.com/en/sales'],
+    ['Work from home jobs', 'https://www.ttecjobs.com/en/work-from-home'],
+    ['Corporate jobs', 'https://www.ttecjobs.com/en/corporate'],
+    ['Technology jobs', 'https://www.ttecjobs.com/en/technology'],
+    ['Licensed insurance agents careers', 'https://www.ttecjobs.com/en/licensed-insurance'],
+    ['Jobs for veterans & military spouses', 'https://www.ttecjobs.com/en/veterans'],
+    ['Jobs for interns & recent grads', 'https://www.ttecjobs.com/en/interns'],
+    ['Join Our Talent Community', 'https://www.ttec.com/why-ttec'],
+    ['OUR EMPLOYEES SAY IT BEST', 'https://www.ttecjobs.com/en/privacy'],
+    ['Driven by values. United by culture.', 'https://www.ttecjobs.com/en/who-we-are'],
+    ['Ready to Build Better Customer Operations?', 'https://jobs.workingsolutions.com/'],
+    ['Apply Today', 'https://jobs.workingsolutions.com/'],
+    ['Jobs near you', 'https://jobs.foundever.com/'],
+    ['Become an agent', 'https://ats.rippling.com/liveops/jobs'],
+    ['Looking for your next opportunity?', 'https://www.kellyservices.com/find-a-job/'],
+    ['Current Career Opportunities', 'https://secure.saashr.com/ta/6164834.careers?ShowJobId=1'],
+    ['Cookies Preferences', 'https://www.jobs.sutherlandglobal.com/cookie-preferences'],
+  ];
+  check(
+    'gate: every proven junk title+url pair is dropped',
+    junk.every(([t, u]) => isRealPosting(t, u) === false),
+    junk.filter(([t, u]) => isRealPosting(t, u) !== false),
+  );
+  // Real postings from the same round of live checks survive.
+  const real = [
+    ['REMOTE CALL CENTER REPRESENTATIVE – WORK FROM HOME', 'https://www.ariseworkfromhome.com/program/remote-call-center-representative-work-from-home-47/'],
+    ['Customer Support Advisor - Evenings', 'https://jobs.concentrix.com/job/?id=2141102703'],
+    ['BI Functional Analyst', 'https://jobs.concentrix.com/job/?id=R1781395'],
+    ['Frontend Developer', 'https://rawco.example/jobs/frontend-developer'],
+    ['Customer Support Specialist', 'https://portal.example/jobs/support-specialist'],
+    ['Pharmacy Technician / Care Coordinator', 'https://houserx.example/career-details'],
+    ['Senior Product Designer', 'https://example.com/open-roles/senior-product-designer-remote'],
+    ['Customer Success Manager', 'https://job-boards.greenhouse.io/datagrail/jobs/7982580003'],
+  ];
+  check(
+    'gate: every proven real title+url pair survives',
+    real.every(([t, u]) => isRealPosting(t, u) === true),
+    real.filter(([t, u]) => isRealPosting(t, u) !== true),
+  );
+  // URL-shape edges: a category slug stops at three hyphenated
+  // words; a role slug runs to four or more; a portal root is a
+  // list, never a job; a job-id query param makes a detail link
+  // even when the last path segment is the bare word 'job'.
+  check(
+    'gate: 3-word category slug is not a detail',
+    isJobDetailUrl('https://www.ttecjobs.com/en/technology-and-digital') === false &&
+      isJobDetailUrl('https://jobs.workingsolutions.com/') === false &&
+      isJobDetailUrl('https://ats.rippling.com/liveops/jobs') === false,
+    null,
+  );
+  check(
+    'gate: 4-word role slug is a detail, query id overrides a bare segment',
+    isJobDetailUrl('https://example.com/open-roles/senior-product-designer-remote') === true &&
+      isJobDetailUrl('https://jobs.concentrix.com/job/?id=R1779018') === true,
+    null,
+  );
+  check(
+    'gate: junk title alone kills a real-looking URL, and vice versa',
+    isJunkTitle('Customer service jobs') === true &&
+      isJunkTitle('Customer Support Specialist') === false &&
+      isRealPosting('Customer service jobs', 'https://rawco.example/jobs/frontend-developer') === false &&
+      isRealPosting('Frontend Developer', 'https://www.ttecjobs.com/en/customer-service') === false,
+    null,
+  );
+  // End to end: a TTEC-like homepage full of junk links parses to
+  // ZERO postings — including the footer link whose chunk happened
+  // to contain the word Remote.
+  const junkHtml = `<html><body>
+<nav>
+<div class="job-listing"><a href="/en/customer-service">Customer service jobs</a></div>
+<div class="job-listing"><a href="/en/sales">Sales jobs</a></div>
+<div class="job-listing"><a href="/en/work-from-home">Work from home jobs</a></div>
+<div class="job-listing"><a href="/en/corporate">Corporate jobs</a></div>
+<div class="job-listing"><a href="/en/technology">Technology jobs</a></div>
+<div class="job-listing"><a href="/en/licensed-insurance">Licensed insurance agents careers</a></div>
+<div class="job-listing"><a href="/en/veterans">Jobs for veterans &amp; military spouses</a></div>
+<div class="job-listing"><a href="/en/interns">Jobs for interns &amp; recent grads</a></div>
+<div class="job-listing"><a href="https://www.ttec.com/why-ttec">Join Our Talent Community</a></div>
+<div class="job-listing"><p>Remote</p><a href="/en/privacy">OUR EMPLOYEES SAY IT BEST</a></div>
+<div class="job-listing"><a href="/en/who-we-are">Driven by values. United by culture.</a></div>
+<div class="job-listing"><a href="https://jobs.foundever.com/">Jobs near you</a></div>
+</nav>
+</body></html>`;
+  check(
+    'gate: junk-only homepage parses to zero postings',
+    jobsMod.parseCareersPage(junkHtml, 'https://www.ttecjobs.com').length === 0,
+    jobsMod.parseCareersPage(junkHtml, 'https://www.ttecjobs.com'),
+  );
+  // The same page with one real role mixed in yields exactly that role.
+  const mixedHtml = junkHtml.replace(
+    '</nav>',
+    '<div class="job-listing"><h3>Customer Support Specialist</h3><p>Location: Remote</p><a href="/jobs/customer-support-specialist">Apply</a></div></nav>',
+  );
+  const mixedOut = jobsMod.parseCareersPage(mixedHtml, 'https://www.ttecjobs.com');
+  check(
+    'gate: real role survives on a junk-heavy page, junk stays dropped',
+    mixedOut.length === 1 && mixedOut[0]?.title === 'Customer Support Specialist',
+    mixedOut,
+  );
+  // Content scoring: a job-search input on the page is the strongest
+  // portal signal; a bare shell scores nothing.
+  check(
+    'gate: portal content score reads search input + widget + list markers',
+    jobsMod.portalContentScore('<html><body><input name="keyword" placeholder="Search jobs"></body></html>') === 5 &&
+      jobsMod.portalContentScore('<html><body><div class="job-card"></div></body></html>') === 3 &&
+      jobsMod.portalContentScore('<html><body><div id="root"></div></body></html>') === 0,
+    null,
+  );
+  check(
+    'gate: company-host bonus fires on the company ATS subdomain only',
+    jobsMod.companyHostBonus('https://modsquad.wd5.myworkdayjobs.com/en-US/ModSquad', 'ModSquad') === 3 &&
+      jobsMod.companyHostBonus('https://www.ttecjobs.com/', 'TTEC') === 3 &&
+      jobsMod.companyHostBonus('https://ats.rippling.com/liveops/jobs', 'Liveops') === 0,
+    null,
+  );
+}
+
+async function testJunkWalkAndRender() {
+  // The walk must NOT return on junk: a junk-only homepage stays
+  // eligible for the render, the render target is the page with the
+  // portal (its search input + company host), and the leads it
+  // produces are stamped searched. A fetch-failed careers URL is
+  // still a render candidate.
+  const jobsMod = freshRequire(`${OUT}/find-jobs.cjs`);
+  const resumeText = 'Customer support specialist with Zendesk, chat support, and troubleshooting experience for SaaS customers';
+  const junkHtml = `<html><body>
+<div class="job-listing"><a href="/en/customer-service">Customer service jobs</a></div>
+<div class="job-listing"><a href="/en/sales">Sales jobs</a></div>
+<div class="job-listing"><a href="/en/privacy">OUR EMPLOYEES SAY IT BEST</a><p>Remote</p></div>
+<input name="keyword" placeholder="Search jobs">
+</body></html>`;
+  const renderedHtml = `<html><body>
+<div class="job-listing"><h3>Customer Support Specialist</h3><p>Location: Remote</p><a href="/jobs/customer-support-specialist">Apply</a></div>
+</body></html>`;
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u.startsWith('https://tele.example')) {
+      if (u === 'https://tele.example/careers') throw new Error('fetch failed');
+      return { ok: true, text: async () => '<html><body>No careers here.</body></html>' };
+    }
+    // The homepage is the portal (junk links + a search box); the
+    // /careers and /jobs guesses are bare shells.
+    if (u === 'https://www.ttecjobs.com') return { ok: true, text: async () => junkHtml };
+    return { ok: true, text: async () => '<html><body>No careers here.</body></html>' };
+  };
+  const renderedUrls = [];
+  const stubRender = async (url) => {
+    renderedUrls.push(url);
+    return { html: renderedHtml, searchOutcome: 'searched', searchMs: 250, renderedUrl: url };
+  };
+  // TTEC-like: junk homepage with a search box renders the homepage
+  // (not a /careers guess) and finds the real role through it.
+  const ttec = await jobsMod.searchCompanyJobs(
+    { name: 'TTEC', website: 'https://www.ttecjobs.com', careersUrl: '', isUSCompany: true },
+    resumeText,
+    { renderPage: stubRender },
+  );
+  check(
+    'junk-walk: junk-only homepage does not early-return; render finds the real role',
+    ttec.renderUsed === true &&
+      ttec.searchOutcome === 'searched' &&
+      ttec.leads.length === 1 &&
+      ttec.leads[0]?.title === 'Customer Support Specialist' &&
+      ttec.postingsSeen === 1,
+    ttec,
+  );
+  check(
+    'junk-walk: render target is the portal homepage (search box + company host), not a guess',
+    renderedUrls.length === 1 && renderedUrls[0] === 'https://www.ttecjobs.com',
+    renderedUrls,
+  );
+  check(
+    'junk-walk: rendered lead is stamped searched',
+    ttec.leads[0]?.searched === true,
+    ttec.leads[0],
+  );
+  // Fetch-failed careers URL still renders.
+  renderedUrls.length = 0;
+  const tele = await jobsMod.searchCompanyJobs(
+    { name: 'Tele Co', website: 'https://tele.example', careersUrl: 'https://tele.example/careers', isUSCompany: true },
+    resumeText,
+    { renderPage: stubRender },
+  );
+  check(
+    'junk-walk: fetch-failed careers URL still becomes the render target',
+    renderedUrls.length === 1 && renderedUrls[0] === 'https://tele.example/careers' && tele.renderUsed === true,
+    { renderedUrls, renderUsed: tele.renderUsed },
+  );
+  // Stats telemetry: the chunk run proves the search fired.
+  const companiesCol = new FakeCollection();
+  await companiesCol.insertMany([
+    { name: 'TTEC', website: 'https://www.ttecjobs.com', domain: 'ttecjobs.com', nameKey: 'ttec', careersUrl: '', category: 'General', source: 'Wikidata', addedAt: '2026-10-29T00:00:00Z' },
+  ]);
+  const out = await jobsMod.runFindJobs(
+    { companiesCol },
+    { resumeText, cursor: 0, limit: 15 },
+    { renderPage: stubRender },
+  );
+  check(
+    'junk-walk: stats count the search (searched + render attempts + ms)',
+    out.stats.searchSearched === 1 &&
+      out.stats.renderAttempts === 1 &&
+      out.stats.rendered === 1 &&
+      out.stats.searchMs === 250 &&
+      out.stats.searchNoForm === 0,
+    out.stats,
+  );
+  check(
+    'junk-walk: chunk lead carries the searched flag',
+    out.leads.length === 1 && out.leads[0]?.searched === true,
+    out.leads,
+  );
+}
+
 async function testMatchingFixes() {
   // The 0/3004 fix round: synonym groups replace the hard title gate,
   // location becomes three-way (ok / review / reject), and JSON-LD on
@@ -2510,12 +2889,16 @@ await testOrgKeysetPaging();
 await testNeverSkip();
 await testTypesKeysetPaging();
 await testTypesSkipRetry();
+await testBusinessKeyset();
+await testBusinessKeysetTypeSkip();
 await testFindJobs();
 await testFindJobsNonFrontend();
 await testRenderFallback();
 await testPortalSearch();
 await testDeferredRender();
 await testJobCardAnchors();
+await testRealPostingGate();
+await testJunkWalkAndRender();
 await testTestCompany();
 await testJazzhr();
 await testBusinessSiteFirst();

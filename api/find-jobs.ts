@@ -596,6 +596,10 @@ export interface FinderLead {
   /** Which reader produced the posting: page HTML, an embedded
    *  widget/iframe/embed, or JSON-LD from the same page. */
   sourceType: string;
+  /** True when this lead's listing was produced by a portal search
+   *  submit (rendered branch only) — search telemetry for the next
+   *  sweep, proving the search step fired for this company. */
+  searched?: boolean;
 }
 
 export interface CompanySearchInput {
@@ -624,6 +628,10 @@ export interface CompanySearchResult {
   screened: { rejectedNoMatch: number; rejectedLocation: number; reviewLocation: number };
   /** True when listings came from the browser render fallback. */
   renderUsed: boolean;
+  /** True when a render was ATTEMPTED for this company, even when it
+   *  failed or found nothing — the honest fire counter. renderMs can
+   *  be 0 for a fast render, so it cannot carry this. */
+  renderAttempted: boolean;
   /** Milliseconds spent rendering for this company (0 when unused). */
   renderMs: number;
   /** The portal-search outcome from the render fallback — what the
@@ -699,13 +707,93 @@ function locationIn(text: string): string {
 
 const APPLY_HREF = /job|apply|position|opening|detail|career|posting|vacancy|role/i;
 
+/** A parsed HTML listing counts as a REAL posting only when it looks
+ *  like one specific role — not a nav / category / CTA link. Proven
+ *  junk (live homepages, 2026-11-11): TTEC 'Customer service jobs'
+ *  -> /en/customer-service, 'Sales jobs' -> /en/sales (category
+ *  links); Working Solutions 'Ready to Build Better Customer
+ *  Operations?' -> jobs.workingsolutions.com/ (portal root);
+ *  Sutherland 'Cookies Preferences' -> /cookie-preferences (footer
+ *  link, passed only because its chunk contained the word Remote);
+ *  Kelly 'Looking for your next opportunity?' -> /find-a-job/.
+ *  Real postings look like Arise 'REMOTE CALL CENTER REPRESENTATIVE
+ *  – WORK FROM HOME' -> /program/remote-call-center-representative-
+ *  work-from-home-47/ (specific slug + numeric id) or a job block
+ *  'Frontend Developer' -> /jobs/frontend-developer. Junk is dropped
+ *  at parse time: it never reaches postingsSeen, never screens into a
+ *  lead, and — the load-bearing part — never triggers the walk's
+ *  early return, so a junk-only page stays eligible for the
+ *  render+search fallback instead of stranding the company at zero.
+ *  JSON-LD and embedded-widget postings bypass this gate (they never
+ *  go through parseCareersPage): a schema.org JobPosting or a board
+ *  embed's own jobs list is real by construction. */
+export function isJunkTitle(title: string): boolean {
+  const t = (title ?? '').trim();
+  if (!t) return true;
+  // A question is a CTA, never a role: 'Ready to Build Better
+  // Customer Operations?', 'Looking for your next opportunity?'.
+  if (/\?\s*$/.test(t)) return true;
+  // A real job title never starts with one of these verbs.
+  if (/^(join|become|apply)\b/i.test(t)) return true;
+  // Category labels: 'Jobs near you', 'Jobs for veterans ...',
+  // 'Customer service jobs', 'Sales jobs', 'Licensed insurance
+  // agents careers', 'Current Career Opportunities'.
+  if (/^\s*jobs?\b/i.test(t)) return true;
+  if (/\b(jobs|careers|openings|positions|roles|opportunities)\s*$/i.test(t)) return true;
+  return false;
+}
+
+/** The list words a URL path ends in when it is a listing/category
+ *  page, not one job: /jobs, /careers, /job-search, /find-a-job,
+ *  /search, /results, and friends. */
+const LIST_PATH_WORDS = /^(jobs?|careers?|job-search|jobsearch|find-a-job|find-jobs|search-jobs|search|results|openings|positions|roles|opportunities)$/i;
+
+export function isJobDetailUrl(rawUrl: string): boolean {
+  let u: URL;
+  try {
+    u = new URL(rawUrl);
+  } catch {
+    return false;
+  }
+  // Explicit detail query params first — a list page never carries
+  // one, and Concentrix's real detail links are /job/?id=R1779018
+  // (whose last path segment, 'job', would otherwise veto below).
+  const q = u.searchParams;
+  for (const k of ['id', 'jobid', 'job_id', 'gh_jid', 'req', 'reqid', 'job', 'position', 'posting']) {
+    const v = q.get(k);
+    if (v && v.trim()) return true;
+  }
+  const segs = u.pathname.toLowerCase().replace(/\/+$/, '').split('/').filter(Boolean);
+  if (segs.length === 0) return false; // portal root: a list, not a job
+  const last = segs[segs.length - 1];
+  if (LIST_PATH_WORDS.test(last)) return false;
+  // A job marker anywhere in the path: /jobs/frontend-developer,
+  // /careers/frontend, /career-details, /position/123.
+  if (/job|career|position|opening|posting|vacancy|apply|detail|role/i.test(u.pathname)) return true;
+  // A numeric id in the last segment: /program/remote-call-center-
+  // representative-work-from-home-47/, /jobs/12345.
+  if (/\d/.test(last)) return true;
+  // A long specific slug: a role slug runs to four or more hyphenated
+  // words, a category slug stops at three ('technology-and-digital').
+  if (last.split('-').filter(Boolean).length >= 4) return true;
+  return false;
+}
+
+/** Both halves of the real-posting gate: a specific role title AND a
+ *  job-detail link. Either half failing drops the listing. */
+export function isRealPosting(title: string, url: string | null): boolean {
+  if (!url) return false;
+  return !isJunkTitle(title) && isJobDetailUrl(url);
+}
+
 /** Parse job listings straight off a company's own careers page HTML:
  *  job blocks (class/id mentioning job/career/position/opening) and
- *  title + View-details/Apply link pairs. Only listings with a usable
- *  title AND an apply/detail link are kept, and a block only qualifies
- *  when its link looks like a job link or the block states a location —
- *  so a hero banner, nav link, or "see open roles" hub link never
- *  qualifies. Script/style content is stripped first so widget code
+ *  title + View-details/Apply link pairs. Only REAL listings are
+ *  kept: a usable title that names one specific role AND an
+ *  apply/detail link shaped like one job (see isRealPosting) — a
+ *  category link, portal root, hero banner, nav link, or 'see open
+ *  roles' hub link never qualifies, even when its chunk states a
+ *  location. Script/style content is stripped first so widget code
  *  can't ghost-match. */
 export function parseCareersPage(html: string, pageUrl: string): Posting[] {
   const clean = html
@@ -715,6 +803,7 @@ export function parseCareersPage(html: string, pageUrl: string): Posting[] {
   const seen = new Set<string>();
   const push = (title: string, location: string, url: string | null) => {
     if (!titleOk(title) || !url) return;
+    if (!isRealPosting(title, url)) return;
     // Keyed by title AND url: some pages (Webflow lists) give every
     // role the same generic detail link, and keying by url alone would
     // collapse distinct roles into one.
@@ -1055,10 +1144,61 @@ export function renderTargetScore(u: string, careersUrl: string): number {
   return score;
 }
 
+/** Signals in a fetched page's own HTML that it IS the portal — not
+ *  a marketing page that merely links to one. Scored during the
+ *  walk, while the HTML is already in hand. The strongest signal is
+ *  the portal's own job-search input (the render step can submit it);
+ *  next is an embedded job-board widget (JazzHR / Greenhouse /
+ *  iSolved) the plain walk could not read; weakest is job-list markup
+ *  on the page. A page that scores here becomes a render candidate
+ *  even when its path says nothing about jobs — portal homepages
+ *  ARE the portal (TTEC's homepage is its job search, Alorica's
+ *  careers page carries a search box the render can use). Kept as a
+ *  cheap regex pass over the raw HTML: no parsing, no extra fetches. */
+export function portalContentScore(html: string): number {
+  let score = 0;
+  if (
+    /<input[^>]*\b(name|id|placeholder|aria-label|class)\s*=\s*["'][^"']*(keyword|job[^"']*search|search[^"']*(job|career|position|title|role)|career[^"']*search)/i.test(
+      html,
+    )
+  ) {
+    score += 5;
+  } else if (/<input[^>]*\bname\s*=\s*["']q["']/i.test(html)) {
+    // A bare q input on a careers page is the job search, not a
+    // site search — the careers walk only ever sees careers pages.
+    score += 3;
+  }
+  if (jazzhrWidgetSlug(html) || greenhouseEmbedSlug(html) || isolvedIframeUrl(html)) score += 5;
+  if (/job-card|jobsData|job-list|job_list|jobList/i.test(html)) score += 3;
+  return score;
+}
+
+/** Bonus when a render candidate's hostname carries the company's
+ *  own name: the company ATS subdomain is the real portal
+ *  (modsquad.wd5.myworkdayjobs.com, alorica-hire.bling-ai.com),
+ *  while a generic careers page on a marketing domain is the
+ *  second choice. Only ranks candidates — it never creates one. */
+export function companyHostBonus(u: string, companyName: string): number {
+  try {
+    const host = new URL(u).hostname.toLowerCase();
+    const name = companyName.toLowerCase().replace(/[^a-z0-9]+/g, '');
+    if (!name || name.length < 3) return 0;
+    for (const label of host.split('.')) {
+      const clean = label.replace(/[^a-z0-9]+/g, '');
+      if (clean === name) return 3;
+      if (name.length >= 4 && clean.startsWith(name)) return 3;
+    }
+    return 0;
+  } catch {
+    return 0;
+  }
+}
+
 /** A URL worth rendering: the careers link the user gave, or a path
- *  that names careers/jobs. The bare homepage never renders — a JS
- *  homepage would only reveal nav links, and its /careers and /jobs
- *  guesses are tried (and rendered) as candidates anyway. */
+ *  that names careers/jobs. The bare homepage no longer renders on
+ *  path alone — but it earns candidacy when its page content scores
+ *  (portalContentScore: a job-search input or an embedded widget),
+ *  because a JS homepage can BE the portal. */
 function isCareersLikeUrl(u: string, careersUrl: string): boolean {
   if (careersUrl && u === careersUrl) return true;
   try {
@@ -1115,6 +1255,7 @@ export async function searchCompanyJobs(
   const renderDeadlineMs = opts.renderDeadlineMs ?? Date.now() + RENDER_WINDOW_MS;
   let anyFetchOk = false;
   let renderUsed = false;
+  let renderAttempted = false;
   let renderMs = 0;
   let renderTextSample = '';
   let searchOutcome: PortalSearchOutcome | null = null;
@@ -1122,14 +1263,22 @@ export async function searchCompanyJobs(
   let renderedUrl = '';
   // Deferred rendering: the plain-HTML walk runs FIRST and the render
   // fires only after it, on the single most promising zero-yielding
-  // candidate (renderTargetScore). Rendering the first zero-yielding
-  // candidate mid-walk spends the one-per-company budget on whatever
-  // the walk hits first — often an FAQ/culture page with no search
-  // box — before the page that actually carries the portal (a
-  // /job-search/ link on that same FAQ page) is ever discovered. The
-  // walk also finds plain-HTML postings on later candidates without
-  // spending any render budget at all.
-  const zeroYieldTargets: string[] = [];
+  // candidate. Rendering the first zero-yielding candidate mid-walk
+  // spends the one-per-company budget on whatever the walk hits first
+  // — often an FAQ/culture page with no search box — before the page
+  // that actually carries the portal (a /job-search/ link on that
+  // same FAQ page) is ever discovered. The walk also finds
+  // plain-HTML postings on later candidates without spending any
+  // render budget at all. Candidates carry a precomputed score
+  // (path + page-content signals + company-host bonus, see
+  // portalContentScore / companyHostBonus); a fetch-failed
+  // careers-like URL still scores on path alone, because a WAF that
+  // rejects the plain fetch may still serve the real browser.
+  interface RenderCandidate {
+    url: string;
+    score: number;
+  }
+  const zeroYieldTargets: RenderCandidate[] = [];
   for (let i = 0; i < candidates.length; i++) {
     const u = candidates[i];
     triedUrls.push(u);
@@ -1138,6 +1287,9 @@ export async function searchCompanyJobs(
       html = await fetchText(u);
       anyFetchOk = true;
     } catch {
+      if (isCareersLikeUrl(u, careersUrl)) {
+        zeroYieldTargets.push({ url: u, score: renderTargetScore(u, careersUrl) });
+      }
       continue;
     }
     const pagePostings = await collectPagePostings(html, u, false);
@@ -1155,6 +1307,7 @@ export async function searchCompanyJobs(
           reviewLocation: screened.reviewLocation,
         },
         renderUsed,
+        renderAttempted,
         renderMs,
         searchOutcome,
         searchMs,
@@ -1162,7 +1315,21 @@ export async function searchCompanyJobs(
         renderTextSample,
       };
     }
-    if (isCareersLikeUrl(u, careersUrl)) zeroYieldTargets.push(u);
+    // Zero REAL postings — the page stays eligible for the render.
+    // A page that carries the portal's search box or a job-board
+    // widget is a candidate even when its path says nothing about
+    // jobs: portal homepages ARE the portal (TTEC's homepage is its
+    // job search; the old rule never rendered a bare homepage).
+    const contentScore = portalContentScore(html);
+    if (contentScore > 0 || isCareersLikeUrl(u, careersUrl)) {
+      zeroYieldTargets.push({
+        url: u,
+        score:
+          renderTargetScore(u, careersUrl) +
+          contentScore +
+          companyHostBonus(u, company.name),
+      });
+    }
     let at = i + 1;
     for (const link of careersLinksOnPage(html, u)) {
       if (!isBoardUrl(link) && candidates.length < 8 && !candidates.includes(link) && !triedUrls.includes(link)) {
@@ -1181,16 +1348,16 @@ export async function searchCompanyJobs(
     renderBudget.used < renderBudget.max &&
     Date.now() < renderDeadlineMs
   ) {
-    let target = zeroYieldTargets[0];
-    let bestScore = renderTargetScore(target, careersUrl);
+    let target = zeroYieldTargets[0].url;
+    let bestScore = zeroYieldTargets[0].score;
     for (const t of zeroYieldTargets.slice(1)) {
-      const s = renderTargetScore(t, careersUrl);
-      if (s > bestScore) {
-        target = t;
-        bestScore = s;
+      if (t.score > bestScore) {
+        target = t.url;
+        bestScore = t.score;
       }
     }
     renderBudget.used += 1;
+    renderAttempted = true;
     const started = Date.now();
     let rendered: RenderPageResult | null = null;
     try {
@@ -1217,7 +1384,9 @@ export async function searchCompanyJobs(
           renderUsed = true;
           const screened = screenPostings(company.name, pagePostings, resumeText, company.isUSCompany ?? false);
           return {
-            leads: screened.leads,
+            // Stamp the search flag: these listings came out of a
+            // portal search submit, not the plain walk.
+            leads: screened.leads.map((l) => ({ ...l, searched: searchOutcome === 'searched' })),
             postingsSeen: pagePostings.length,
             sourcePage: target,
             triedUrls,
@@ -1228,6 +1397,7 @@ export async function searchCompanyJobs(
               reviewLocation: screened.reviewLocation,
             },
             renderUsed,
+            renderAttempted,
             renderMs,
             searchOutcome,
             searchMs,
@@ -1246,6 +1416,7 @@ export async function searchCompanyJobs(
     fetchOk: anyFetchOk,
     screened: { rejectedNoMatch: 0, rejectedLocation: 0, reviewLocation: 0 },
     renderUsed,
+    renderAttempted,
     renderMs,
     searchOutcome,
     searchMs,
@@ -1532,8 +1703,30 @@ export interface FindJobsResult {
     reviewLocation: number;
     /** Companies whose listings came from the render fallback. */
     rendered: number;
+    /** Renders attempted in this chunk (a render that found nothing
+     *  still counts — rendered above counts only renders that
+     *  produced postings, so the two together prove whether the
+     *  render step actually fired). */
+    renderAttempts: number;
     /** Total milliseconds spent rendering in this chunk. */
     renderMs: number;
+    /** Portal-search outcomes across the chunk, one counter per
+     *  render-search outcome value (has-listings / searched /
+     *  no-form / submit-failed / no-results / board-redirect /
+     *  skipped-time) plus the total search milliseconds. FLAT
+     *  NUMBERS only: the sweep client sums stats values generically,
+     *  so a nested object here would be dropped. These prove the
+     *  search step fired and what it returned — v4 could not
+     *  quantify it at all. */
+    searchHasListings: number;
+    searchSearched: number;
+    searchNoForm: number;
+    searchSubmitFailed: number;
+    searchNoResults: number;
+    searchBoardRedirect: number;
+    searchSkippedTime: number;
+    /** Total milliseconds spent inside the portal search step. */
+    searchMs: number;
   };
 }
 
@@ -1570,7 +1763,16 @@ export async function runFindJobs(
   let rejectedLocation = 0;
   let reviewLocation = 0;
   let rendered = 0;
+  let renderAttempts = 0;
   let renderMs = 0;
+  let searchHasListings = 0;
+  let searchSearched = 0;
+  let searchNoForm = 0;
+  let searchSubmitFailed = 0;
+  let searchNoResults = 0;
+  let searchBoardRedirect = 0;
+  let searchSkippedTime = 0;
+  let searchMsTotal = 0;
   // One render budget shared by the whole chunk, and one start
   // deadline: renders only begin in the first 30s so a slow page can
   // never push the invocation past its 60s maxDuration.
@@ -1599,7 +1801,37 @@ export async function runFindJobs(
     rejectedLocation += result.screened.rejectedLocation;
     reviewLocation += result.screened.reviewLocation;
     if (result.renderUsed) rendered += 1;
+    if (result.renderAttempted) renderAttempts += 1;
     renderMs += result.renderMs;
+    // Search telemetry: one flat counter per outcome value, so the
+    // next sweep can prove how often the portal search fired and
+    // what it returned (v4: unquantifiable).
+    if (result.searchOutcome) {
+      searchMsTotal += result.searchMs;
+      switch (result.searchOutcome) {
+        case 'has-listings':
+          searchHasListings += 1;
+          break;
+        case 'searched':
+          searchSearched += 1;
+          break;
+        case 'no-form':
+          searchNoForm += 1;
+          break;
+        case 'submit-failed':
+          searchSubmitFailed += 1;
+          break;
+        case 'no-results':
+          searchNoResults += 1;
+          break;
+        case 'board-redirect':
+          searchBoardRedirect += 1;
+          break;
+        case 'skipped-time':
+          searchSkippedTime += 1;
+          break;
+      }
+    }
     return result.leads;
   }
 
@@ -1646,7 +1878,16 @@ export async function runFindJobs(
       rejectedLocation,
       reviewLocation,
       rendered,
+      renderAttempts,
       renderMs,
+      searchHasListings,
+      searchSearched,
+      searchNoForm,
+      searchSubmitFailed,
+      searchNoResults,
+      searchBoardRedirect,
+      searchSkippedTime,
+      searchMs: searchMsTotal,
     },
   };
 }
