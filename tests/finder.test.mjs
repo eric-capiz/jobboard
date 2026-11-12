@@ -3082,6 +3082,134 @@ async function testRound4() {
   );
 }
 
+async function testRound5() {
+  // Batch 5 (2026-11-12 canary vs 7d80afa): 'support' is a role word
+  // (ModSquad's real CS roles died on the gate), a single posting is
+  // always a teaser even on a list-like path (Teleperformance), and
+  // cookie-accept telemetry rides the render attempts (Foundever/Sitel).
+  const jobsMod = freshRequire(`${OUT}/find-jobs.cjs`);
+  const resumeText =
+    'Customer service representative with phone support experience, technical support, troubleshooting, billing questions, and help desk work for members';
+
+  // --- Gate: 'support' is the role -------------------------------
+  // ModSquad's live 12: 'Customer Service Phone Support',
+  // 'Customer Service Support' and 'Remote Technical Customer
+  // Support' are real remote CS roles the gate rejected as
+  // no-match, because 'support' was not a role word.
+  const modsquad = jobsMod.screenPostings(
+    'ModSquad',
+    [
+      { title: 'Remote Technical Customer Support - QA and Game Dev', location: 'Remote', url: 'https://example.com/jobs/1', description: '', postedDate: '' },
+      { title: 'Customer Service Phone Support', location: 'Remote', url: 'https://example.com/jobs/2', description: '', postedDate: '' },
+      { title: 'Customer Service Support', location: 'Remote', url: 'https://example.com/jobs/3', description: '', postedDate: '' },
+      { title: 'Gaming Support - T2 Ticket CS (Korean Language)', location: 'Remote', url: 'https://example.com/jobs/4', description: '', postedDate: '' },
+      { title: 'Remote Gaming Moderation Specialist', location: 'Remote', url: 'https://example.com/jobs/5', description: '', postedDate: '' },
+      { title: 'Field Service Technician', location: 'Remote', url: 'https://example.com/jobs/6', description: '', postedDate: '' },
+      { title: 'Sales Support', location: 'Remote', url: 'https://example.com/jobs/7', description: '', postedDate: '' },
+    ],
+    resumeText,
+    true,
+  );
+  const byTitle = (t) => modsquad.leads.find((l) => l.title === t);
+  check(
+    'gate-support: ModSquad CS titles pass the gate as leads',
+    byTitle('Remote Technical Customer Support - QA and Game Dev')?.matchScore >= 60 &&
+      byTitle('Customer Service Phone Support')?.matchScore >= 60 &&
+      byTitle('Customer Service Support')?.matchScore >= 60,
+    modsquad.leads.map((l) => [l.title, l.matchScore]),
+  );
+  check(
+    'gate-support: moderation + field-service titles still die on the gate',
+    !byTitle('Remote Gaming Moderation Specialist') && !byTitle('Field Service Technician'),
+    modsquad.rejected.map((r) => r.title),
+  );
+  check(
+    'gate-support: a bare Sales Support passes the gate but stays a near-miss (<60)',
+    byTitle('Sales Support')?.matchScore < 60,
+    byTitle('Sales Support')?.matchScore,
+  );
+
+  // --- Teaser: a single posting on a LIST-LIKE path is still a
+  // teaser (Teleperformance's /en-us/careers/job-opportunities/
+  // carries one featured role while the portal holds hundreds, and
+  // the segment test called it a list).
+  const teaserHtml = `<html><body>
+<div class="job-listing"><h3>Customer Support Specialist</h3><p>Location: Remote</p><a href="/jobs/customer-support-specialist">Apply</a></div>
+</body></html>`;
+  const listHtml = `<html><body>
+<div class="job-listing"><h3>Customer Support Specialist</h3><p>Location: Remote</p><a href="/jobs/customer-support-specialist">Apply</a></div>
+<div class="job-listing"><h3>Member Services Representative</h3><p>Location: Remote</p><a href="/jobs/member-services-representative">Apply</a></div>
+<div class="job-listing"><h3>Call Center Agent</h3><p>Location: Remote</p><a href="/jobs/call-center-agent">Apply</a></div>
+</body></html>`;
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u === 'https://jobs.tele.example' || u === 'https://jobs.tele.example/careers' || u === 'https://jobs.tele.example/jobs') {
+      throw new Error('RST');
+    }
+    if (u === 'https://tele.example') {
+      return { ok: true, text: async () => `<html><body><a href="/en-us/careers/job-opportunities/">See all jobs</a></body></html>` };
+    }
+    if (u === 'https://tele.example/en-us/careers/job-opportunities/') return { ok: true, text: async () => teaserHtml };
+    return { ok: true, text: async () => '<html><body>No careers here.</body></html>' };
+  };
+  const renderedCalls = [];
+  const stubList = async (url) => {
+    renderedCalls.push(url);
+    return { html: listHtml, searchOutcome: 'has-listings', searchMs: 300, renderedUrl: url, cookieClicks: 0, bannerPresent: false };
+  };
+  const tele = await jobsMod.searchCompanyJobs(
+    { name: 'Teleperformance', website: 'https://jobs.tele.example', careersUrl: '', isUSCompany: true },
+    resumeText,
+    { renderPage: stubList },
+  );
+  check(
+    'teaser-listlike: a 1-posting list-like page does not stop the walk; the jobs-portal render wins',
+    renderedCalls.length >= 1 &&
+      renderedCalls[0] === 'https://jobs.tele.example' &&
+      tele.postingsSeen === 3 &&
+      tele.leads.length >= 2 &&
+      tele.renderUsed === true,
+    { renderedCalls, postingsSeen: tele.postingsSeen, leads: tele.leads.length },
+  );
+  check(
+    'cookie-telemetry: accept clicks + banner flag ride the attempt record',
+    tele.renderAttempts.length >= 1 &&
+      tele.renderAttempts[0]?.cookieClicks === 0 &&
+      tele.renderAttempts[0]?.bannerPresent === false,
+    tele.renderAttempts,
+  );
+  // Same company, no render: the single featured role still returns
+  // as the fallback, not zero.
+  const teleNoRender = await jobsMod.searchCompanyJobs(
+    { name: 'Teleperformance', website: 'https://jobs.tele.example', careersUrl: '', isUSCompany: true },
+    resumeText,
+    {},
+  );
+  check(
+    'teaser-listlike: with no render the single featured role still returns as the fallback',
+    teleNoRender.postingsSeen === 1 &&
+      teleNoRender.sourcePage === 'https://tele.example/en-us/careers/job-opportunities/' &&
+      teleNoRender.leads.length === 1,
+    { postingsSeen: teleNoRender.postingsSeen, sourcePage: teleNoRender.sourcePage, leads: teleNoRender.leads },
+  );
+  // A render stub that omits the cookie fields defaults to 0 clicks,
+  // no banner.
+  const stubNoCookie = async (url) => ({ html: listHtml, searchOutcome: 'has-listings', searchMs: 1, renderedUrl: url });
+  globalThis.fetch = async () => ({ ok: true, text: async () => '<html><body><div id="root"></div></body></html>' });
+  const noCookie = await jobsMod.searchCompanyJobs(
+    { name: 'Cookie Co', website: 'https://cookie.example', careersUrl: '', isUSCompany: true },
+    resumeText,
+    { renderPage: stubNoCookie },
+  );
+  check(
+    'cookie-telemetry: a render without cookie fields defaults to 0 clicks, no banner',
+    noCookie.renderAttempts.length === 1 &&
+      noCookie.renderAttempts[0]?.cookieClicks === 0 &&
+      noCookie.renderAttempts[0]?.bannerPresent === false,
+    noCookie.renderAttempts,
+  );
+}
+
 async function testMatchingFixes() {
   // The 0/3004 fix round: synonym groups replace the hard title gate,
   // location becomes three-way (ok / review / reject), and JSON-LD on
@@ -3535,6 +3663,7 @@ await testRealPostingGate();
 await testJunkWalkAndRender();
 await testTalentBrewAndRenderError();
 await testRound4();
+await testRound5();
 await testPaginationAndSearchScan();
 await testTestCompany();
 await testJazzhr();

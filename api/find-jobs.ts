@@ -680,7 +680,23 @@ export interface CompanySearchResult {
    *  tell a retry that never ran from a retry that failed silently
    *  (ModSquad, 2026-11-12: exactly one render per company, and no
    *  field said why the second never fired). */
-  renderAttempts?: { target: string; ms: number; outcome: PortalSearchOutcome | null; error: string | null; renderedUrl: string }[];
+  renderAttempts?: {
+    target: string;
+    ms: number;
+    outcome: PortalSearchOutcome | null;
+    error: string | null;
+    renderedUrl: string;
+    /** Cookie-banner accept clicks that landed during this render
+     *  (0 when no banner was found or the click never fired) and
+     *  whether a cookie banner was still covering the page when the
+     *  render ended — the Foundever/Sitel diagnostic (2026-11-12):
+     *  clicks 0 means the button was never found; clicks > 0 with
+     *  the banner still present means the click landed but the
+     *  banner came back (reload re-showed it, or the wrong element
+     *  was clicked). */
+    cookieClicks: number;
+    bannerPresent: boolean;
+  }[];
   /** The render targets in the order the loop tried them (best score
    *  first), with their scores — so a live canary can say whether a
    *  portal ever made the target list, and whether it outscored the
@@ -1564,7 +1580,15 @@ export async function searchCompanyJobs(
   let searchScan: SearchScanSummary | null = null;
   let searchMs = 0;
   let renderedUrl = '';
-  let renderAttempts: { target: string; ms: number; outcome: PortalSearchOutcome | null; error: string | null; renderedUrl: string }[] = [];
+  let renderAttempts: {
+    target: string;
+    ms: number;
+    outcome: PortalSearchOutcome | null;
+    error: string | null;
+    renderedUrl: string;
+    cookieClicks: number;
+    bannerPresent: boolean;
+  }[] = [];
   let renderTargets: { url: string; score: number }[] = [];
   // A single posting on a non-list page, remembered while the walk
   // continues for the real list — a teaser, not the list
@@ -1618,16 +1642,26 @@ export async function searchCompanyJobs(
     }
     const pagePostings = await collectPagePostings(html, u, false);
     if (pagePostings.length > 0) {
-      // A single posting on a non-list page is a teaser, not the
-      // list — remember it as the fallback and keep walking for the
-      // real list (Teleperformance's homepage carries one featured
-      // role while the portal behind it holds hundreds; the old
-      // early return stranded the company on that one teaser and
-      // the render never ran). A list page (isListLikeUrl) with any
-      // postings, or a page with two or more postings, IS the list —
+      // A single posting is a teaser, not the list — UNLESS it is
+      // the whole list. The old rule trusted isListLikeUrl alone,
+      // but a teaser CAN live on a list-like path: Teleperformance's
+      // /en-us/careers/job-opportunities/ carries one featured role
+      // ("Jamaica") while the portal behind it holds hundreds, and
+      // the segment test ('careers', 'opportunities') called it a
+      // list — so the walk returned the teaser at once and the render
+      // never ran (2026-11-12 canary). The tie-breaker is whether the
+      // walk already found a zero-yield render target: the portal
+      // the teaser points at (Teleperformance's jobs-subdomain
+      // homepage, fetch-failed and already a candidate when the
+      // teaser page is reached). A genuine one-job list page has no
+      // such target — its single posting returns at once, unrendered,
+      // as before (Static Co's /careers keeps its 'html' source and
+      // costs no render budget). Two or more postings IS the list —
       // return it at once, as before. The teaser page stays eligible
       // as a render target below, and its links are still discovered.
-      if (pagePostings.length === 1 && !isListLikeUrl(u, careersUrl)) {
+      const isTeaser =
+        pagePostings.length === 1 && (!isListLikeUrl(u, careersUrl) || zeroYieldTargets.length > 0);
+      if (isTeaser) {
         if (!fallbackPostings) fallbackPostings = { postings: pagePostings, url: u };
       } else {
         const screened = screenPostings(company.name, pagePostings, resumeText, company.isUSCompany ?? false);
@@ -1719,6 +1753,8 @@ export async function searchCompanyJobs(
         outcome: rendered?.searchOutcome ?? null,
         error: rendered ? (rendered.renderError ?? null) : 'render-null',
         renderedUrl: rendered?.renderedUrl ?? '',
+        cookieClicks: rendered?.cookieClicks ?? 0,
+        bannerPresent: rendered?.bannerPresent ?? false,
       });
       if (!rendered) {
         // The renderer died before returning anything — the next
@@ -1942,6 +1978,13 @@ const ROLE_WORDS = new Set([
   'analyst',
   'clerk',
   'supervisor',
+  // 'support' IS the role: 'Customer Service Support', 'Technical
+  // Customer Support' and 'Phone Support' name no other role word,
+  // so without it the gate rejects real CS roles outright (ModSquad,
+  // 2026-11-12 canary: all three died as no-match). The score
+  // formula still holds the 60 line — a bare 'Sales Support' matches
+  // one resume term and scores 55, a near-miss, never an auto-add.
+  'support',
   'assistant',
   'advisor',
   'consultant',

@@ -68,6 +68,19 @@ const RENDER_TIMEOUT_MS = 20000;
 /** Cap on waiting for the rendered listings to settle (see below). */
 const SETTLE_CAP_MS = 12000;
 
+/** Whether a page's rendered HTML still carries a cookie-consent
+ *  banner — OneTrust's banner text is unmistakable, and it is the
+ *  only thing a banner-covered page renders (Foundever's sample was
+ *  banner-only text). Checked on the final HTML so the next canary
+ *  can tell "clicked but the banner came back" from "never found". */
+function bannerTextPresent(html: string): boolean {
+  const text = html
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ');
+  return /we use cookies|cookie preferences|accept all cookies|consent preferences/i.test(text);
+}
+
 export interface RenderPageResult {
   /** The rendered DOM HTML — the post-search results page when the
    *  portal search ran. Empty when the render ended on a board domain
@@ -97,6 +110,14 @@ export interface RenderPageResult {
    *  was reached. The caller surfaces this instead of a bare null so
    *  a fast render death can be told apart from 'never attempted'. */
   renderError?: string;
+  /** Cookie-banner accept clicks that landed during this render (0
+   *  when no banner button was found) and whether a cookie banner
+   *  was still covering the page when the render ended. The
+   *  Foundever/Sitel diagnostic (2026-11-12): clicks 0 means the
+   *  button was never found; clicks > 0 with the banner still
+   *  present means the click landed but the banner came back. */
+  cookieClicks?: number;
+  bannerPresent?: boolean;
 }
 
 export type RenderPageFn = (
@@ -171,10 +192,11 @@ export async function renderPageHtml(url: string, searchTerm: string = '', timeo
   const remain = (): number => deadline - Date.now();
   let browser: Browser | null = null;
   let page: Page | null = null;
+  let cookieClicks = 0;
   try {
     browser = await withTimeout(getBrowser(), remain());
     if (!browser || remain() <= 0) {
-      return { html: '', searchOutcome: null, searchMs: 0, renderedUrl: '', renderError: 'browser-unavailable' };
+      return { html: '', searchOutcome: null, searchMs: 0, renderedUrl: '', renderError: 'browser-unavailable', cookieClicks };
     }
     page = await browser.newPage();
     // A standard Chrome UA matching the pinned engine (Chromium
@@ -210,18 +232,22 @@ export async function renderPageHtml(url: string, searchTerm: string = '', timeo
             return r.width > 0 && r.height > 0;
           };
           const textOf = (b: HTMLElement): string => (b.innerText || '').trim();
-          // Tier 1: the strict anchored accept. Tier 2: a
-          // contains-match for the same idea in other languages
-          // ("Alle Cookies akzeptieren" — Foundever's German banner
-          // — does not start with "Alle akzeptieren", so the
-          // anchored pattern misses it). The loose tier only scans
-          // real buttons and links: a [role="button"] div can be a
-          // whole page section whose text merely contains 'accept',
-          // and clicking it would navigate somewhere unrelated.
+          // Tier 1: the strict accept — the whole label, anchored at
+          // both ends. The old prefix-only pattern matched "Acceptable
+          // Use Policy" (a footer link): it starts with "Accept", so
+          // find() returned the footer link and the banner stayed up.
+          // Tier 2: a contains-match for the same idea in other
+          // languages ("Alle Cookies akzeptieren" — Foundever's
+          // German banner — does not start with "Alle akzeptieren",
+          // so the anchored pattern misses it), still guarded against
+          // "Acceptable..." labels. The loose tier only scans real
+          // buttons and links: a [role="button"] div can be a whole
+          // page section whose text merely contains 'accept', and
+          // clicking it would navigate somewhere unrelated.
           const strict = btns.find(
             (b) =>
               isVisible(b) &&
-              /^(accept( all)?( cookies)?|allow all( cookies)?|accept & close|i agree|alle akzeptieren|tout accepter|aceptar( todo| las cookies)?)/i.test(
+              /^(accept( all)?( cookies)?|allow all( cookies)?|accept & close|i agree|alle akzeptieren|tout accepter|aceptar( todo| las cookies)?)\s*$/i.test(
                 textOf(b),
               ),
           );
@@ -229,16 +255,49 @@ export async function renderPageHtml(url: string, searchTerm: string = '', timeo
             (b) =>
               isVisible(b) &&
               (b.tagName === 'BUTTON' || b.tagName === 'A') &&
+              !/^acceptable/i.test(textOf(b)) &&
               /accept|akzeptieren|tout accepter|aceptar/i.test(textOf(b)),
           );
           const accept = strict ?? loose ?? null;
           if (!accept) return false;
           accept.click();
           return true;
+        }).then((clicked) => {
+          if (clicked) cookieClicks += 1;
+          return clicked;
         });
       } catch {
         return false;
       }
+    };
+    // Dismiss a cookie banner: click the accept button (up to two
+    // passes for stacked dialogs), reload so the consent takes effect
+    // once, then check again — a reload can re-show the banner
+    // (consent not persisted) and a second dialog can sit behind the
+    // first. A click hides the banner itself even without a second
+    // reload, so the post-reload passes only click. Settles after a
+    // reload are short (3s): the render budget is 20s and the search
+    // step needs ≥6s left, so a long settle starves the search —
+    // exactly Foundever's skipped-time outcome (2026-11-12).
+    const dismissBanner = async (pg: Page): Promise<boolean> => {
+      let clicked = false;
+      for (let pass = 0; pass < 2 && remain() > 3000; pass++) {
+        if (!(await tryCookieAccept(pg))) break;
+        clicked = true;
+        await waitForDomStable(pg, remain, 2000, 500);
+      }
+      if (!clicked) return false;
+      try {
+        await pg.reload({ waitUntil: 'domcontentloaded', timeout: Math.max(1000, remain()) });
+      } catch {
+        // Keep the current page — it may already show content.
+      }
+      await waitForDomStable(pg, remain, 3000, 500);
+      for (let pass = 0; pass < 2 && remain() > 3000; pass++) {
+        if (!(await tryCookieAccept(pg))) break;
+        await waitForDomStable(pg, remain, 2000, 500);
+      }
+      return true;
     };
     // Accept EARLY — right after a short settle, while the 20s
     // budget is still full. The old order settled first (up to 12s)
@@ -250,28 +309,15 @@ export async function renderPageHtml(url: string, searchTerm: string = '', timeo
     await waitForDomStable(page, remain, 2000, 500);
     // A redirect off the business site onto a board is not a source.
     if (isBoardUrl(page.url())) {
-      return { html: '', searchOutcome: null, searchMs: 0, renderedUrl: page.url() };
+      return { html: '', searchOutcome: null, searchMs: 0, renderedUrl: page.url(), cookieClicks };
     }
-    let cookieAccepted = false;
-    for (let pass = 0; pass < 2 && remain() > 3000; pass++) {
-      if (!(await tryCookieAccept(page))) break;
-      cookieAccepted = true;
-      await waitForDomStable(page, remain, 2000, 500);
-    }
-    if (cookieAccepted) {
-      try {
-        await page.reload({ waitUntil: 'domcontentloaded', timeout: Math.max(1000, remain()) });
-      } catch {
-        // Keep the current page — it may already show content.
-      }
-      await waitForDomStable(page, remain, 6000, 1000);
-      if (isBoardUrl(page.url())) {
-        return { html: '', searchOutcome: null, searchMs: 0, renderedUrl: page.url() };
-      }
-    } else {
+    let dismissedEarly = await dismissBanner(page);
+    if (!dismissedEarly) {
       // No banner accepted early: the full settle (the page's own
-      // JS may still need it), then one late attempt for a banner
-      // that injected after the early passes.
+      // JS may still need it — a banner can inject after the early
+      // passes), then one more dismiss attempt for a late banner.
+      // The old remain() > 8000 gate starved this attempt on slow
+      // pages; a click is cheap, so the gate is now 3000.
       // Let the board's JS settle. The signal is the rendered text
       // itself: poll the page's visible text until it stops changing for
       // two polls, or the cap hits. Network-idle is the wrong signal —
@@ -281,15 +327,10 @@ export async function renderPageHtml(url: string, searchTerm: string = '', timeo
       // counters, clocks) just runs to the cap and proceeds.
       await waitForDomStable(page, remain, SETTLE_CAP_MS, 1000);
       if (isBoardUrl(page.url())) {
-        return { html: '', searchOutcome: null, searchMs: 0, renderedUrl: page.url() };
+        return { html: '', searchOutcome: null, searchMs: 0, renderedUrl: page.url(), cookieClicks };
       }
-      if (remain() > 8000 && (await tryCookieAccept(page))) {
-        try {
-          await page.reload({ waitUntil: 'domcontentloaded', timeout: Math.max(1000, remain()) });
-        } catch {
-          // Keep the current page.
-        }
-        await waitForDomStable(page, remain, 4000, 500);
+      if (remain() > 3000) {
+        await dismissBanner(page);
       }
     }
     // Search-portal step: the page may be an empty search shell that
@@ -313,14 +354,23 @@ export async function renderPageHtml(url: string, searchTerm: string = '', timeo
       }
     }
     if (searchOutcome === 'board-redirect') {
-      return { html: '', searchOutcome, searchMs, renderedUrl: page.url() };
+      return { html: '', searchOutcome, searchMs, renderedUrl: page.url(), cookieClicks };
     }
-    return { html: await page.content(), searchOutcome, searchMs, renderedUrl: page.url(), searchScan };
+    const html = await page.content();
+    return {
+      html,
+      searchOutcome,
+      searchMs,
+      renderedUrl: page.url(),
+      searchScan,
+      cookieClicks,
+      bannerPresent: bannerTextPresent(html),
+    };
   } catch {
     // A failed render still reports WHY instead of a bare null, so the
     // caller can tell a fast render death (host reset, launch failure)
     // apart from a render that never ran.
-    return { html: '', searchOutcome: null, searchMs: 0, renderedUrl: '', renderError: 'render-failed' };
+    return { html: '', searchOutcome: null, searchMs: 0, renderedUrl: '', renderError: 'render-failed', cookieClicks };
   } finally {
     try {
       await page?.close();
