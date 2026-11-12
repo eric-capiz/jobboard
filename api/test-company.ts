@@ -49,6 +49,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }
     const result = await searchCompanyJobs({ name, website, careersUrl }, resumeText, {
       renderPage: renderPageHtml,
+      // Two renders per test: a no-form or failed first render retries
+      // the next-best target instead of spending the test on the
+      // wrong page.
+      renderBudget: { used: 0, max: 2 },
     });
     res.status(200).json({
       company: name,
@@ -58,9 +62,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       fetchOk: result.fetchOk,
       renderUsed: result.renderUsed,
       renderMs: result.renderMs,
+      // True even when the render failed or found nothing — the honest
+      // fire counter (renderMs can be 0 for a fast render death).
+      renderAttempted: result.renderAttempted,
+      renderError: result.renderError ?? null,
       // What the portal search step did, so a zero-listing render can
       // be told apart from a render that never searched.
       searchOutcome: result.searchOutcome,
+      // Why the search found no box — the scan summary from the
+      // rendered page. Null unless the search ended no-form.
+      searchScan: result.searchScan ?? null,
       searchMs: result.searchMs,
       renderedUrl: result.renderedUrl,
       renderTextSample: result.renderTextSample,

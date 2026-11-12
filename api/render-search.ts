@@ -85,6 +85,19 @@ export interface SearchInputDescriptor {
   id: string;
   placeholder: string;
   ariaLabel: string;
+  /** ARIA role — some portals label the box by role (combobox), not
+   *  by name or placeholder (Alorica's bling-ai portal). */
+  role: string;
+  /** class attribute — the signal often lives in the class
+   *  (job-search-input) when name/placeholder are generic. */
+  cls: string;
+  /** title attribute. */
+  title: string;
+  /** Text of associated <label> elements. */
+  labelText: string;
+  /** Text of aria-describedby targets ("This is a search field with
+   *  an auto-suggest feature attached" — Alorica). */
+  describedBy: string;
   /** Index into document.querySelectorAll('form'), -1 when the input
    *  is not inside a form (React SPA search). */
   formIndex: number;
@@ -100,6 +113,8 @@ export interface SearchButtonDescriptor {
   index: number;
   text: string;
   ariaLabel: string;
+  /** title attribute — some submit buttons carry only a title. */
+  title: string;
   type: string;
   formIndex: number;
   visible: boolean;
@@ -148,6 +163,25 @@ export function scanSearchForm(): SearchFormInfo {
       id: el.getAttribute('id') || '',
       placeholder: el.getAttribute('placeholder') || '',
       ariaLabel: el.getAttribute('aria-label') || '',
+      role: el.getAttribute('role') || '',
+      cls: el.getAttribute('class') || '',
+      title: el.getAttribute('title') || '',
+      labelText: (() => {
+        try {
+          const labels = (el as HTMLInputElement).labels;
+          return labels ? Array.from(labels).map((l) => l.innerText || '').join(' ') : '';
+        } catch {
+          return '';
+        }
+      })(),
+      describedBy: (() => {
+        try {
+          const ids = (el.getAttribute('aria-describedby') || '').split(/\s+/).filter(Boolean);
+          return ids.map((id) => document.getElementById(id)?.innerText || '').join(' ');
+        } catch {
+          return '';
+        }
+      })(),
       formIndex: formIndexOf(el),
       visible: isVisible(el),
       top: topOf(el),
@@ -159,6 +193,7 @@ export function scanSearchForm(): SearchFormInfo {
     index,
     text: ((el as HTMLElement).innerText || el.getAttribute('value') || '').trim(),
     ariaLabel: el.getAttribute('aria-label') || '',
+    title: el.getAttribute('title') || '',
     type: (el.getAttribute('type') || '').toLowerCase(),
     formIndex: formIndexOf(el),
     visible: isVisible(el),
@@ -213,7 +248,12 @@ export function countJobListings(): JobListingCount {
 
 /** Score a visible text input as the portal's keyword box. Location
  *  boxes score negative (they also say "search"); a bare input with no
- *  job-search signal scores too low to trust. */
+ *  job-search signal scores too low to trust. The signal spans every
+ *  way a portal can label its box — name / id / placeholder /
+ *  aria-label (before), plus role, class, title, <label> text, and
+ *  aria-describedby text (2026-11-11: Alorica's box is described, not
+ *  named, and its render text proves a search field the old signal
+ *  could not see). */
 function scoreSearchInput(d: SearchInputDescriptor): number {
   if (
     ['hidden', 'password', 'checkbox', 'radio', 'file', 'submit', 'button', 'reset'].includes(
@@ -222,16 +262,25 @@ function scoreSearchInput(d: SearchInputDescriptor): number {
   ) {
     return -100;
   }
-  const signal = `${d.name} ${d.id} ${d.placeholder} ${d.ariaLabel}`.toLowerCase();
+  const signal = `${d.name} ${d.id} ${d.placeholder} ${d.ariaLabel} ${d.role || ''} ${d.cls || ''} ${d.title || ''} ${d.labelText || ''} ${d.describedBy || ''}`.toLowerCase();
   let score = 0;
   if (/location|zip|city|state|postal|radius|distance/.test(signal)) score -= 3;
   if (/keyword/.test(signal)) score += 4;
   if (/\bsearch\b/.test(signal)) score += 2;
   if (/job|title|\bwhat\b|role|position/.test(signal)) score += 2;
+  // "This is a search field" states outright that the input IS the
+  // search box — worth as much as the word 'search' itself.
+  if (/search (field|box|input)|find (jobs|a job)/.test(signal)) score += 2;
   if (d.name === 'q' || d.id === 'q') score += 2;
-  if (d.type === 'search') score += 1;
+  if (d.type === 'search') score += 2;
+  if (/combobox|searchbox/.test((d.role || '').toLowerCase())) score += 2;
   if (d.formIndex >= 0) score += 1;
   return score;
+}
+
+/** Button label for matching: visible text + aria-label + title. */
+function buttonLabel(b: SearchButtonDescriptor): string {
+  return `${b.text} ${b.ariaLabel} ${b.title || ''}`;
 }
 
 export interface SearchSelection {
@@ -278,19 +327,19 @@ export function selectSearchInput(info: SearchFormInfo): SearchSelection | null 
     return pick;
   };
   const byText = (list: SearchButtonDescriptor[]): SearchButtonDescriptor | undefined =>
-    nearest(list.filter((b) => /search|find/i.test(`${b.text} ${b.ariaLabel}`)));
+    nearest(list.filter((b) => /search|find/i.test(buttonLabel(b))));
   const button =
     byText(sameForm) ??
     nearest(sameForm.filter((b) => b.type === 'submit')) ??
     nearest(
       info.buttons.filter(
-        (b) => b.visible && /search jobs|find jobs/i.test(`${b.text} ${b.ariaLabel}`),
+        (b) => b.visible && /search jobs|find jobs/i.test(buttonLabel(b)),
       ),
     ) ??
     // A bare "Search" button (Walmart, Phenom): the portal's own
     // submit, labelled with nothing more specific.
     nearest(
-      info.buttons.filter((b) => b.visible && /\bsearch\b/i.test(`${b.text} ${b.ariaLabel}`)),
+      info.buttons.filter((b) => b.visible && /\bsearch\b/i.test(buttonLabel(b))),
     ) ??
     null;
   const formAction = best.formIndex >= 0 ? info.forms[best.formIndex]?.action ?? '' : '';
@@ -320,6 +369,35 @@ export function isSearchActionAllowed(action: string, pageUrl: string): boolean 
   } catch {
     return false;
   }
+}
+
+/** Diagnostics for a no-form render: how many inputs the scan saw,
+ *  how many were visible, and the best input score — so a live
+ *  no-form can be told apart: "no inputs at all" (empty shell) vs
+ *  "inputs exist but none qualifies" (collapsed panel, unlabeled
+ *  combobox) vs "a box qualified but its action is a board". */
+export type SearchScanSummary = {
+  inputs: number;
+  visibleInputs: number;
+  bestScore: number;
+  buttons: number;
+};
+
+export function summarizeScan(info: SearchFormInfo): SearchScanSummary {
+  let best: number | null = null;
+  let visibleInputs = 0;
+  for (const d of info.inputs) {
+    if (!d.visible) continue;
+    visibleInputs += 1;
+    const s = scoreSearchInput(d);
+    if (best === null || s > best) best = s;
+  }
+  return {
+    inputs: info.inputs.length,
+    visibleInputs,
+    bestScore: best ?? 0,
+    buttons: info.buttons.filter((b) => b.visible).length,
+  };
 }
 
 /* ------------------------------------------------------------------ */
@@ -514,6 +592,43 @@ async function clickButton(page: SearchablePage, buttonIndex: number): Promise<b
 
 type AttemptResult = 'no-form' | 'failed' | 'settled' | 'board';
 
+/** The no-form rescue: a portal whose search lives behind a "Search
+ *  jobs / Find jobs" toggle button — a collapsed panel, or a header
+ *  button that opens the search overlay — shows NO qualifying input
+ *  to the scan, because the box does not exist until the toggle is
+ *  clicked. One click, then the caller re-scans. A button whose form
+ *  submits to a board URL is never the toggle (the board-action
+ *  refusal stands). Bounded by the same budget as a search attempt. */
+async function clickSearchToggle(
+  page: SearchablePage,
+  remainMs: () => number,
+): Promise<'toggled' | 'board' | null> {
+  if (remainMs() < 6000) return null;
+  let info: SearchFormInfo;
+  try {
+    info = (await page.evaluate(scanSearchForm)) as SearchFormInfo;
+  } catch {
+    return null;
+  }
+  const allowed = (b: SearchButtonDescriptor): boolean => {
+    if (b.formIndex < 0) return true;
+    const action = info.forms[b.formIndex]?.action ?? '';
+    return isSearchActionAllowed(action, page.url());
+  };
+  const label = (b: SearchButtonDescriptor): string => buttonLabel(b).trim();
+  const pick =
+    info.buttons.find((b) => b.visible && allowed(b) && /search jobs|find jobs/i.test(label(b))) ??
+    info.buttons.find((b) => b.visible && allowed(b) && /\bsearch\b/i.test(label(b))) ??
+    null;
+  if (!pick) return null;
+  const startUrl = page.url();
+  const startLen = await textLength(page);
+  if (!(await clickButton(page, pick.index))) return null;
+  await waitForChange(page, remainMs, startUrl, startLen, 4000);
+  if (isBoardUrl(page.url())) return 'board';
+  return 'toggled';
+}
+
 /** One search attempt on the CURRENT page: re-scan (a previous submit
  *  may have navigated), pick the box, refuse board actions, submit by
  *  typing + Enter, and — only if that changes nothing and a submit
@@ -567,7 +682,27 @@ export async function tryPortalSearch(
   if (await listingsNow(page)) return 'has-listings';
   const first = await attemptSearch(page, '', remainMs);
   if (first === 'board') return 'board-redirect';
-  if (first === 'no-form') return 'no-form';
+  if (first === 'no-form') {
+    // No qualifying box — but the box may live behind a toggle
+    // ("Search jobs" expands the form). One click, one re-scan, one
+    // retry; a failed toggle still reports no-form.
+    const toggled = await clickSearchToggle(page, remainMs);
+    if (toggled === 'board') return 'board-redirect';
+    if (!toggled) return 'no-form';
+    const retry = await attemptSearch(page, '', remainMs);
+    if (retry === 'board') return 'board-redirect';
+    if (retry === 'no-form') return 'no-form';
+    if (retry === 'failed') return 'submit-failed';
+    if (await listingsNow(page)) return 'searched';
+    // The toggle revealed the box and the empty search ran, but
+    // showed nothing — fall through to the resume-term retry below.
+    if (!searchTerm || remainMs() < 6000) return 'no-results';
+    const second = await attemptSearch(page, searchTerm, remainMs);
+    if (second === 'board') return 'board-redirect';
+    if (second === 'no-form') return 'no-form';
+    if (second === 'failed') return 'submit-failed';
+    return (await listingsNow(page)) ? 'searched' : 'no-results';
+  }
   if (first === 'failed') return 'submit-failed';
   if (await listingsNow(page)) return 'searched';
   // Empty search showed nothing (some portals require a keyword).

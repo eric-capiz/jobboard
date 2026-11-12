@@ -1804,10 +1804,10 @@ async function testPortalSearch() {
   const jobsMod = freshRequire(`${OUT}/find-jobs.cjs`);
 
   const mkInput = (over) => ({
-    index: 0, type: 'text', name: '', id: '', placeholder: '', ariaLabel: '', formIndex: 0, visible: true, top: 0, ...over,
+    index: 0, type: 'text', name: '', id: '', placeholder: '', ariaLabel: '', role: '', cls: '', title: '', labelText: '', describedBy: '', formIndex: 0, visible: true, top: 0, ...over,
   });
   const mkButton = (over) => ({
-    index: 0, text: '', ariaLabel: '', type: 'submit', formIndex: 0, visible: true, top: 0, ...over,
+    index: 0, text: '', ariaLabel: '', title: '', type: 'submit', formIndex: 0, visible: true, top: 0, ...over,
   });
 
   // --- Pure selection ---
@@ -1866,11 +1866,64 @@ async function testPortalSearch() {
   };
   const selTwo = searchMod.selectSearchInput(twoBoxes);
   check('portal-search: nearest Search button wins, not the first in the DOM', selTwo?.button?.index === 1, selTwo);
+  // Form widening (2026-11-11 canary): a box labelled by role /
+  // class / <label> / aria-describedby qualifies even when its name
+  // and placeholder say nothing — Alorica's bling-ai box is a
+  // combobox described as "a search field", not named.
+  const combobox = {
+    inputs: [mkInput({ index: 0, name: 'keyword', role: 'combobox', ariaLabel: 'Search', formIndex: -1 })],
+    buttons: [],
+    forms: [],
+  };
+  check('portal-search: role=combobox + aria-label Search qualifies', searchMod.selectSearchInput(combobox)?.input?.index === 0, searchMod.selectSearchInput(combobox));
+  const classBox = {
+    inputs: [mkInput({ index: 0, name: 'q2', cls: 'job-search-input', formIndex: -1 })],
+    buttons: [],
+    forms: [],
+  };
+  check('portal-search: job-search class qualifies', searchMod.selectSearchInput(classBox)?.input?.index === 0, searchMod.selectSearchInput(classBox));
+  const labelBox = {
+    inputs: [mkInput({ index: 0, name: 'kw', labelText: 'Search Jobs', formIndex: -1 })],
+    buttons: [],
+    forms: [],
+  };
+  check('portal-search: <label> text qualifies', searchMod.selectSearchInput(labelBox)?.input?.index === 0, searchMod.selectSearchInput(labelBox));
+  const describedBox = {
+    inputs: [mkInput({ index: 0, name: 's', describedBy: 'This is a search field with an auto-suggest feature attached', formIndex: -1 })],
+    buttons: [],
+    forms: [],
+  };
+  check('portal-search: aria-describedby "search field" qualifies', searchMod.selectSearchInput(describedBox)?.input?.index === 0, searchMod.selectSearchInput(describedBox));
+  const locClass = {
+    inputs: [mkInput({ index: 0, name: 'loc', cls: 'location-field', placeholder: 'Search by Location', formIndex: -1 })],
+    buttons: [],
+    forms: [],
+  };
+  check('portal-search: location class still rejects the box', searchMod.selectSearchInput(locClass) === null, null);
+  const titleButton = {
+    inputs: [mkInput({ index: 0, name: 'keyword', placeholder: 'Search by Keyword', formIndex: -1, top: 0 })],
+    buttons: [mkButton({ index: 0, text: '', ariaLabel: '', title: 'Search', type: 'button', formIndex: -1, top: 5 })],
+    forms: [],
+  };
+  check('portal-search: submit button labelled by title only is picked', searchMod.selectSearchInput(titleButton)?.button?.index === 0, searchMod.selectSearchInput(titleButton));
   check('portal-search: 3 job links alone are NOT listings (trending-role cards)', searchMod.hasVisibleListings({ jobLinks: 3, resultsText: false }) === false, null);
   check('portal-search: 25 job links, no count, are NOT listings (Walmart homepage)', searchMod.hasVisibleListings({ jobLinks: 25, resultsText: false }) === false, null);
   check('portal-search: results count needs a job link', searchMod.hasVisibleListings({ jobLinks: 0, resultsText: true }) === false, null);
   check('portal-search: results count + 1 link counts', searchMod.hasVisibleListings({ jobLinks: 1, resultsText: true }) === true, null);
   check('portal-search: 2 links, no count, is not listings', searchMod.hasVisibleListings({ jobLinks: 2, resultsText: false }) === false, null);
+  check(
+    'portal-search: scan summary counts visible inputs and best score',
+    JSON.stringify(searchMod.summarizeScan({
+      inputs: [
+        mkInput({ index: 0, name: 'keyword', placeholder: 'Search by Keyword', formIndex: 0 }),
+        mkInput({ index: 1, name: 'location', placeholder: 'Search by Location', formIndex: 0 }),
+        mkInput({ index: 2, name: 'keyword', placeholder: 'Search by Keyword', visible: false }),
+      ],
+      buttons: [mkButton({ index: 0, text: 'Search', formIndex: 0 }), mkButton({ index: 1, text: 'Help', visible: false })],
+      forms: [{ action: '/jobs', method: 'get' }],
+    })) === JSON.stringify({ inputs: 3, visibleInputs: 2, bestScore: 7, buttons: 1 }),
+    null,
+  );
   // The REAL countJobListings against a stubbed document: a "0 jobs"
   // shell is NOT listings, even with job-looking nav links — the
   // Concentrix portal-direct bug (2026-11-11), where "Search results
@@ -2015,15 +2068,54 @@ async function testPortalSearch() {
     (await runSearch(noFormPage)) === 'no-form' && noFormPage.typedTerms.length === 0 && noFormPage.pressedKeys.length === 0,
     noFormPage.typedTerms,
   );
-  // Board-action form: refused, never submitted.
+  // Board-action form: refused, never submitted — and the toggle
+  // rescue never touches the board's submit button either.
   const boardFormPage = new FakePage({
     scanResult: { ...portalScan, forms: [{ action: 'https://boards.greenhouse.io/embed/job_board/js?for=x', method: 'get' }] },
     counts: [{ jobLinks: 0, resultsText: false }],
   });
   check(
     'portal-search: board form action never touched',
-    (await runSearch(boardFormPage)) === 'no-form' && boardFormPage.typedTerms.length === 0 && boardFormPage.pressedKeys.length === 0,
+    (await runSearch(boardFormPage)) === 'no-form' && boardFormPage.typedTerms.length === 0 && boardFormPage.pressedKeys.length === 0 && boardFormPage.buttonClicks === 0,
     boardFormPage.typedTerms,
+  );
+  // The search box lives behind a "Search jobs" toggle: the first
+  // scan finds no input, the toggle click reveals the box, the retry
+  // submits and finds listings. One toggle click, one Enter.
+  const togglePage = new FakePage({
+    scanResult: {
+      inputs: [],
+      buttons: [mkButton({ index: 0, text: 'Search jobs', type: 'button', formIndex: -1 })],
+      forms: [],
+    },
+    counts: [{ jobLinks: 0, resultsText: false }, { jobLinks: 5, resultsText: true }],
+    onEnter: (term, page) => page.setUrl('https://portal.example/careers/results'),
+    onButtonClick: (term, page) => {
+      page.scanResult = portalScan;
+    },
+  });
+  const toggleOutcome = await runSearch(togglePage);
+  check(
+    'portal-search: toggle click reveals the box, retry finds listings',
+    toggleOutcome === 'searched' &&
+      togglePage.buttonClicks === 1 &&
+      togglePage.typedTerms.length === 0 &&
+      togglePage.pressedKeys.filter((k) => k === 'Enter').length === 1,
+    { outcome: toggleOutcome, clicks: togglePage.buttonClicks, keys: togglePage.pressedKeys },
+  );
+  // A toggle that reveals nothing still reports no-form.
+  const toggleDeadPage = new FakePage({
+    scanResult: {
+      inputs: [],
+      buttons: [mkButton({ index: 0, text: 'Search jobs', type: 'button', formIndex: -1 })],
+      forms: [],
+    },
+    counts: [{ jobLinks: 0, resultsText: false }],
+  });
+  check(
+    'portal-search: dead toggle still reports no-form',
+    (await runSearch(toggleDeadPage)) === 'no-form' && toggleDeadPage.buttonClicks === 1,
+    toggleDeadPage.buttonClicks,
   );
   // Empty search yields listings: Enter alone submits, no term typed.
   const emptyWins = new FakePage({
@@ -2201,7 +2293,11 @@ async function testDeferredRender() {
   );
   check(
     'deferred-render: user-given careers link beats a guessed sibling',
-    jobsMod.renderTargetScore('https://jobs.cvshealth.com/', 'https://jobs.cvshealth.com/') === 2 &&
+    // A jobs-subdomain homepage IS the portal (6 = 4 homepage + 2
+    // user-given), so it outscores the /careers guess (2) on the
+    // same host — the guess is a path that usually 404s or
+    // redirects, the homepage is the search itself.
+    jobsMod.renderTargetScore('https://jobs.cvshealth.com/', 'https://jobs.cvshealth.com/') === 6 &&
       jobsMod.renderTargetScore('https://jobs.cvshealth.com/careers', 'https://jobs.cvshealth.com/') === 2,
     null,
   );
@@ -2260,6 +2356,164 @@ async function testDeferredRender() {
     'deferred-render: portal-direct renders the portal URL itself',
     renderedUrls[renderedUrls.length - 1] === 'https://jobs.concentrix.com/job-search/' && direct.leads.length === 1,
     renderedUrls,
+  );
+}
+
+async function testRenderTargetScoring() {
+  // Round-2 target scoring (2026-11-11 canary): the ATS-host bonus,
+  // the jobs-subdomain-homepage rule, and the detail-link signal in
+  // portal content — each hole in the 14-employer pass traces to
+  // one of these three.
+  const jobsMod = freshRequire(`${OUT}/find-jobs.cjs`);
+  // ATS bonus: the employer's real portal outscores a same-host
+  // marketing page. Board hosts never earn it.
+  check(
+    'target-scoring: ATS hosts earn +6, other hosts 0',
+    jobsMod.atsHostBonus('https://ats.rippling.com/liveops/jobs') === 6 &&
+      jobsMod.atsHostBonus('https://modsquad.wd5.myworkdayjobs.com/en-US/ModSquad') === 6 &&
+      jobsMod.atsHostBonus('https://recruiting.paylocity.com/recruiting/jobs/All/73b38a10/NexRep-LLC') === 6 &&
+      jobsMod.atsHostBonus('https://alorica-hire.bling-ai.com/alorica/career') === 6 &&
+      jobsMod.atsHostBonus('https://jobs.concentrix.com/job-search/') === 0 &&
+      jobsMod.atsHostBonus('https://boards.greenhouse.io/datagrail/jobs/7982580003') === 0,
+    null,
+  );
+  // The ATS bonus flips the actual canary losers: Rippling 8 vs
+  // Liveops marketing 5, Workday 9 vs ModSquad join-page 5.
+  check(
+    'target-scoring: ATS portal beats the marketing page that won the canary',
+    jobsMod.renderTargetScore('https://ats.rippling.com/liveops/jobs', '') + jobsMod.companyHostBonus('https://ats.rippling.com/liveops/jobs', 'Liveops') >
+      jobsMod.renderTargetScore('https://liveops.com/about-us/careers/', '') + jobsMod.companyHostBonus('https://liveops.com/about-us/careers/', 'Liveops') &&
+      jobsMod.renderTargetScore('https://modsquad.wd5.myworkdayjobs.com/en-US/ModSquad', '') + jobsMod.companyHostBonus('https://modsquad.wd5.myworkdayjobs.com/en-US/ModSquad', 'ModSquad') >
+      jobsMod.renderTargetScore('https://join.modsquad.com/careers/', '') + jobsMod.companyHostBonus('https://join.modsquad.com/careers/', 'ModSquad'),
+    null,
+  );
+  // Jobs-subdomain homepage: Teleperformance's homepage (4) outranks
+  // the /careers guess (2) on the same host.
+  check(
+    'target-scoring: jobs-subdomain homepage outranks the /careers guess',
+    jobsMod.renderTargetScore('https://jobs.teleperformance.com', '') === 4 &&
+      jobsMod.renderTargetScore('https://jobs.teleperformance.com/careers', '') === 2 &&
+      jobsMod.renderTargetScore('https://jobs.teleperformance.com/jobs', '') === 2,
+    null,
+  );
+  // Detail-link signal: two job-detail links make the page portal-like.
+  const twoDetail = `<html><body>
+<a href="/en/job/las-vegas/customer-service-representative/44028/103182764528">Customer Service Representative</a>
+<a href="/en/job/athens/dutch-customer-service/44028/103179030912">Dutch - Customer Service</a>
+</body></html>`;
+  const oneDetail = `<html><body>
+<a href="/en/job/las-vegas/customer-service-representative/44028/103182764528">Customer Service Representative</a>
+<a href="/en/customer-service">Customer service jobs</a>
+</body></html>`;
+  const junkLinks = `<html><body>
+<a href="/en/customer-service">Customer service jobs</a>
+<a href="/en/sales">Sales jobs</a>
+<a href="/en/work-from-home">Work from home jobs</a>
+</body></html>`;
+  check(
+    'target-scoring: two job-detail links score +5, one or none scores 0',
+    jobsMod.portalContentScore(twoDetail) === 5 &&
+      jobsMod.portalContentScore(oneDetail) === 0 &&
+      jobsMod.portalContentScore(junkLinks) === 0,
+    null,
+  );
+  // Href entity decoding: two spellings of one link (Foundever's
+  // &amp; / &#038; UTM variants) dedupe to a single candidate.
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u === 'https://found.example') {
+      return {
+        ok: true,
+        text: async () =>
+          `<html><body><a href="https://jobs.found.example/?utm_source=x&amp;utm_medium=y">Jobs</a><a href="https://jobs.found.example/?utm_source=x&#038;utm_medium=y">Jobs</a><a href="/careers">Careers</a></body></html>`,
+      };
+    }
+    return { ok: true, text: async () => '<html><body>No careers here.</body></html>' };
+  };
+  const found = await jobsMod.searchCompanyJobs(
+    { name: 'Found Co', website: 'https://found.example', careersUrl: '', isUSCompany: true },
+    'Customer support specialist',
+  );
+  check(
+    'target-scoring: entity-variant links dedupe to one tried URL',
+    found.triedUrls.filter((t) => t.startsWith('https://jobs.found.example/')).length === 1,
+    found.triedUrls,
+  );
+}
+
+async function testRenderRetry() {
+  // A no-form or dead first render retries the next-best target
+  // instead of spending the company on the wrong page (Sitel,
+  // Teleperformance, 2026-11-11 canary). Any other outcome stops.
+  const jobsMod = freshRequire(`${OUT}/find-jobs.cjs`);
+  const resumeText = 'Customer support specialist with Zendesk, chat support, and troubleshooting experience for SaaS customers';
+  const shellHtml = '<html><body><div id="root"></div></body></html>';
+  const listedHtml = `<html><body>
+<div class="job-listing"><h3>Customer Support Specialist</h3><p>Location: Remote</p><a href="/jobs/customer-support-specialist">Apply</a></div>
+</body></html>`;
+  globalThis.fetch = async () => ({ ok: true, text: async () => shellHtml });
+  const mkNoForm = (url) => ({ html: '', searchOutcome: 'no-form', searchMs: 100, renderedUrl: url, searchScan: { inputs: 0, visibleInputs: 0, bestScore: 0, buttons: 0 } });
+  // No-form on the /careers guess, listings on the /jobs guess.
+  let calls = [];
+  const stubRetry = async (url) => {
+    calls.push(url);
+    if (calls.length === 1) return mkNoForm(url);
+    return { html: listedHtml, searchOutcome: 'searched', searchMs: 200, renderedUrl: url };
+  };
+  const retried = await jobsMod.searchCompanyJobs(
+    { name: 'Retry Co', website: 'https://retry.example', careersUrl: '', isUSCompany: true },
+    resumeText,
+    { renderPage: stubRetry },
+  );
+  check(
+    'render-retry: no-form retries the next target and finds the role',
+    calls.length === 2 && calls[1] === 'https://retry.example/jobs' && retried.leads.length === 1 && retried.renderUsed === true && retried.searchOutcome === 'searched',
+    { calls, leads: retried.leads, searchOutcome: retried.searchOutcome },
+  );
+  // A null render retries too.
+  calls = [];
+  const stubNull = async (url) => {
+    calls.push(url);
+    if (calls.length === 1) return null;
+    return { html: listedHtml, searchOutcome: 'searched', searchMs: 200, renderedUrl: url };
+  };
+  const nullRetried = await jobsMod.searchCompanyJobs(
+    { name: 'Retry Co', website: 'https://retry.example', careersUrl: '', isUSCompany: true },
+    resumeText,
+    { renderPage: stubNull },
+  );
+  check(
+    'render-retry: null render retries the next target',
+    calls.length === 2 && nullRetried.leads.length === 1,
+    { calls, leads: nullRetried.leads },
+  );
+  // No-results stops after one render.
+  calls = [];
+  const stubNoResults = async (url) => {
+    calls.push(url);
+    return { html: shellHtml, searchOutcome: 'no-results', searchMs: 200, renderedUrl: url };
+  };
+  const stopped = await jobsMod.searchCompanyJobs(
+    { name: 'Retry Co', website: 'https://retry.example', careersUrl: '', isUSCompany: true },
+    resumeText,
+    { renderPage: stubNoResults },
+  );
+  check(
+    'render-retry: no-results stops after the first render',
+    calls.length === 1 && stopped.searchOutcome === 'no-results' && stopped.leads.length === 0,
+    { calls, searchOutcome: stopped.searchOutcome },
+  );
+  // Budget max 1 means no retry even on no-form.
+  calls = [];
+  const capped = await jobsMod.searchCompanyJobs(
+    { name: 'Retry Co', website: 'https://retry.example', careersUrl: '', isUSCompany: true },
+    resumeText,
+    { renderPage: stubRetry, renderBudget: { used: 0, max: 1 } },
+  );
+  check(
+    'render-retry: budget max 1 means no retry',
+    calls.length === 1 && capped.leads.length === 0 && capped.searchOutcome === 'no-form',
+    { calls, searchOutcome: capped.searchOutcome },
   );
 }
 
@@ -2533,6 +2787,64 @@ async function testJunkWalkAndRender() {
     'junk-walk: chunk lead carries the searched flag',
     out.leads.length === 1 && out.leads[0]?.searched === true,
     out.leads,
+  );
+}
+
+async function testTalentBrewAndRenderError() {
+  // TalentBrew (TTEC): class-less <a data-job-id> cards wrapping an h2
+  // title + .job-location span. Strategies A–C all miss them; Strategy D
+  // matches on the data-job-id marker and reads the span location.
+  const jobsMod = freshRequire(`${OUT}/find-jobs.cjs`);
+  const tbHtml = `<html><body><ul>
+  <li><a href="/en/job/las-vegas/customer-service-representative/44028/103182764528" data-job-id="103182764528">
+    <div class="sr-job-list-wrap"><h2 class="job-title-logo-spacing">Customer Service Representative</h2>
+    <span class="job-location logo-spacing">Las Vegas, Nevada</span></div></a></li>
+  <li><a href="/en/job/athens/dutch-customer-service-in-support-of-booking-com/44028/103179030912" data-job-id="103179030912">
+    <div class="sr-job-list-wrap"><h2 class="job-title-logo-spacing">Dutch - Customer Service in support of Booking.com</h2>
+    <span class="job-location logo-spacing">Athens, Greece</span></div></a></li>
+  <li><a href="/en/job/las-vegas/join-our-team/44028/103182764529" data-job-id="103182764529">
+    <div class="sr-job-list-wrap"><h2 class="job-title-logo-spacing">Join our team</h2>
+    <span class="job-location logo-spacing">Las Vegas, Nevada</span></div></a></li>
+</ul></body></html>`;
+  const tb = jobsMod.parseCareersPage(tbHtml, 'https://www.ttecjobs.com/en/search-jobs');
+  check('talentbrew: 2 real cards parsed (junk title dropped)', tb.length === 2, tb);
+  check('talentbrew: US card fields resolved', tb[0]?.title === 'Customer Service Representative' && tb[0]?.location === 'Las Vegas, Nevada' && tb[0]?.url === 'https://www.ttecjobs.com/en/job/las-vegas/customer-service-representative/44028/103182764528', tb[0]);
+  check('talentbrew: non-US card keeps its location', tb[1]?.location === 'Athens, Greece', tb[1]);
+  // Careers-like URLs: a jobs./careers. subdomain homepage counts (it
+  // IS the portal), a plain homepage does not.
+  check(
+    'careers-like: jobs/careers subdomain homepage counts, plain homepage does not',
+    jobsMod.isCareersLikeUrl('https://jobs.teleperformance.com', '') === true &&
+      jobsMod.isCareersLikeUrl('https://jobs.teleperformance.com/', '') === true &&
+      jobsMod.isCareersLikeUrl('https://careers.example.com', '') === true &&
+      jobsMod.isCareersLikeUrl('https://www.teleperformance.com', '') === false &&
+      jobsMod.isCareersLikeUrl('https://tele.example/careers', '') === true &&
+      jobsMod.isCareersLikeUrl('https://tele.example/careers', 'https://tele.example/careers') === true,
+    null,
+  );
+  // Render failure surfaces instead of vanishing: a stub renderer that
+  // dies returns its error on the result; a null renderer leaves it null.
+  const resumeText = 'Customer support specialist with Zendesk, chat support, and troubleshooting experience for SaaS customers';
+  globalThis.fetch = async () => ({ ok: true, text: async () => '<html><body>No careers here.</body></html>' });
+  const dead = await jobsMod.searchCompanyJobs(
+    { name: 'Dead Co', website: 'https://dead.example', careersUrl: 'https://dead.example/careers', isUSCompany: true },
+    resumeText,
+    { renderPage: async () => ({ html: '', searchOutcome: null, searchMs: 0, renderedUrl: '', renderError: 'render-failed' }) },
+  );
+  check(
+    'render-error: failed render reports attempted + error, zero postings',
+    dead.renderAttempted === true && dead.renderError === 'render-failed' && dead.postingsSeen === 0 && dead.leads.length === 0,
+    dead,
+  );
+  const nullRender = await jobsMod.searchCompanyJobs(
+    { name: 'Dead Co', website: 'https://dead.example', careersUrl: 'https://dead.example/careers', isUSCompany: true },
+    resumeText,
+    { renderPage: async () => null },
+  );
+  check(
+    'render-error: null render leaves error null',
+    nullRender.renderAttempted === true && nullRender.renderError === null,
+    nullRender,
   );
 }
 
@@ -2874,6 +3186,91 @@ async function testMatchingFixes() {
   );
 }
 
+async function testPaginationAndSearchScan() {
+  // Pagination: a real list page that links "Next" is followed with
+  // plain fetches (TalentBrew: 8/page over 38 pages; Concentrix JDQ:
+  // 10/page) — up to 3 extra pages, stopping on an empty page or a
+  // cycle. The search-scan summary rides the result so a live
+  // no-form can be diagnosed.
+  const jobsMod = freshRequire(`${OUT}/find-jobs.cjs`);
+  const resumeText = 'Customer support specialist with Zendesk, chat support, and troubleshooting experience for SaaS customers';
+  const page1 = `<html><body>
+<div class="job-listing"><h3>Customer Support Specialist</h3><p>Location: Remote</p><a href="/jobs/customer-support-specialist">Apply</a></div>
+<a class="next" href="/jobs&amp;p=2" rel="nofollow">Next</a>
+</body></html>`;
+  const page2 = `<html><body>
+<div class="job-listing"><h3>Customer Support Representative</h3><p>Location: Remote</p><a href="/jobs/customer-support-representative">Apply</a></div>
+<a class="next" href="/jobs?p=3" rel="nofollow">Next</a>
+</body></html>`;
+  const page3 = `<html><body><p>No jobs on this page.</p></body></html>`;
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u === 'https://pageco.example') return { ok: true, text: async () => page1 };
+    // The entity-decoded Next target is /jobs&p=2 (TalentBrew's own
+    // markup renders &amp;p=2) — NOT /jobs?p=2.
+    if (u === 'https://pageco.example/jobs&p=2') return { ok: true, text: async () => page2 };
+    if (u === 'https://pageco.example/jobs?p=3') return { ok: true, text: async () => page3 };
+    return { ok: true, text: async () => '<html><body>No careers here.</body></html>' };
+  };
+  const paged = await jobsMod.searchCompanyJobs(
+    { name: 'PageCo', website: 'https://pageco.example', careersUrl: '', isUSCompany: true },
+    resumeText,
+  );
+  check(
+    'pagination: Next link followed, both pages counted, empty page stops the walk',
+    paged.postingsSeen === 2 &&
+      paged.leads.length === 2 &&
+      paged.leads[0]?.title === 'Customer Support Specialist' &&
+      paged.leads[1]?.title === 'Customer Support Representative',
+    paged,
+  );
+  // A Next link back to a visited page ends the walk instead of
+  // looping: page 2 links home, which page 1 already was.
+  const cyclePage2 = `<html><body>
+<div class="job-listing"><h3>Customer Support Representative</h3><p>Location: Remote</p><a href="/jobs/customer-support-representative">Apply</a></div>
+<a class="next" href="/" rel="nofollow">Next</a>
+</body></html>`;
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u === 'https://cycleco.example') return { ok: true, text: async () => page1 };
+    if (u === 'https://cycleco.example/jobs&p=2') return { ok: true, text: async () => cyclePage2 };
+    return { ok: true, text: async () => '<html><body>No careers here.</body></html>' };
+  };
+  const cycled = await jobsMod.searchCompanyJobs(
+    { name: 'CycleCo', website: 'https://cycleco.example', careersUrl: '', isUSCompany: true },
+    resumeText,
+  );
+  check(
+    'pagination: a Next link back to a visited page ends the walk (no loop)',
+    cycled.postingsSeen === 2 && cycled.leads.length === 2,
+    cycled,
+  );
+  // The search-scan summary threads from the renderer to the
+  // result, so a live no-form carries its diagnosis.
+  const stubRenderScan = async (url) => ({
+    html: `<html><body>
+<div class="job-listing"><h3>Customer Support Specialist</h3><p>Location: Remote</p><a href="/jobs/customer-support-specialist">Apply</a></div>
+</body></html>`,
+    searchOutcome: 'no-form',
+    searchMs: 250,
+    renderedUrl: url,
+    searchScan: { inputs: 0, visibleInputs: 0, bestScore: 0, buttons: 2 },
+  });
+  globalThis.fetch = async () => ({ ok: true, text: async () => '<html><body>No careers here.</body></html>' });
+  const scanned = await jobsMod.searchCompanyJobs(
+    { name: 'Scan Co', website: 'https://scan.example', careersUrl: '', isUSCompany: true },
+    resumeText,
+    { renderPage: stubRenderScan },
+  );
+  check(
+    'search-scan: no-form scan summary rides the result',
+    scanned.searchOutcome === 'no-form' &&
+      JSON.stringify(scanned.searchScan) ===
+        JSON.stringify({ inputs: 0, visibleInputs: 0, bestScore: 0, buttons: 2 }),
+    scanned.searchScan,
+  );
+}
+
 await testFindCompanies();
 await testFindCompaniesTransientError();
 await testFindCompaniesDupeStretch();
@@ -2896,9 +3293,13 @@ await testFindJobsNonFrontend();
 await testRenderFallback();
 await testPortalSearch();
 await testDeferredRender();
+await testRenderTargetScoring();
+await testRenderRetry();
 await testJobCardAnchors();
 await testRealPostingGate();
 await testJunkWalkAndRender();
+await testTalentBrewAndRenderError();
+await testPaginationAndSearchScan();
 await testTestCompany();
 await testJazzhr();
 await testBusinessSiteFirst();

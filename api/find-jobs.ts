@@ -25,7 +25,7 @@ import {
   type VercelResponse,
 } from './finder-lib.js';
 import { renderPageHtml, type RenderPageFn, type RenderPageResult } from './render-page.js';
-import type { PortalSearchOutcome } from './render-search.js';
+import type { PortalSearchOutcome, SearchScanSummary } from './render-search.js';
 import type { Collection } from 'mongodb';
 
 const FETCH_TIMEOUT_MS = 6000;
@@ -634,11 +634,21 @@ export interface CompanySearchResult {
   renderAttempted: boolean;
   /** Milliseconds spent rendering for this company (0 when unused). */
   renderMs: number;
+  /** Why an attempted render produced nothing usable — e.g.
+   *  'browser-unavailable' (launch/timing) or 'render-failed'
+   *  (navigation/load threw inside the render). Null when the render
+   *  succeeded or no render was attempted. Surfaces failures that
+   *  used to vanish inside render-page.ts's bare null. */
+  renderError?: string | null;
   /** The portal-search outcome from the render fallback — what the
    *  search step actually did, so a zero-listing render can be told
    *  apart from a render that never searched. Null when no render ran
    *  or the render failed before the search step. */
   searchOutcome: PortalSearchOutcome | null;
+  /** Why the render's search found no box — the scan summary from
+   *  the rendered page (inputs seen, visible inputs, best score,
+   *  buttons). Null when no render ran or the search found its box. */
+  searchScan?: SearchScanSummary | null;
   /** Milliseconds spent inside the portal search step (0 when it never
    *  ran). */
   searchMs: number;
@@ -870,6 +880,34 @@ export function parseCareersPage(html: string, pageUrl: string): Posting[] {
     if (!APPLY_HREF.test(cardApply) && !cardLoc) continue;
     push(cardTitle, cardLoc, cardApply);
   }
+  // Strategy D: TalentBrew list anchors — <a data-job-id="…"> wrapping an
+  // <h2> title + a .job-location span (TTEC). The anchor carries NO class,
+  // so Strategy C's class test skips it, and Strategy A's splitter fires on
+  // the inner h2/span, shattering title from link. data-job-id is the
+  // TalentBrew marker; the h2 is the title; the .job-location span is the
+  // location (locationIn() returns '' here — no "Location:" prefix, no
+  // "Remote" word — so read the span directly).
+  const tbAnchorRe = /<a[^>]*href=["']([^"']+)["'][^>]*>([\s\S]{0,6000}?)<\/a>/gi;
+  let tm: RegExpExecArray | null;
+  while ((tm = tbAnchorRe.exec(clean)) !== null) {
+    const tbOpenTag = tm[0].slice(0, tm[0].indexOf('>') + 1);
+    // NOTE: href comes BEFORE data-job-id in the real markup
+    // (<a href="…" data-job-id="…">), so the marker must be tested on the
+    // open tag, not ordered before the href in the pattern.
+    if (!/\bdata-job-id=["']\d+["']/i.test(tbOpenTag)) continue;
+    const tbHeading = tm[2].match(/<h[234][^>]*>([\s\S]{0,200}?)<\/h[234]>/i);
+    if (!tbHeading) continue;
+    const tbTitle = cleanTitle(tbHeading[1]);
+    if (!titleOk(tbTitle)) continue;
+    const tbApply = resolvePageLink(tm[1], pageUrl);
+    if (!tbApply) continue;
+    const tbLocSpan = tm[2].match(
+      /<span[^>]*class="[^"]*job-location[^"]*"[^>]*>([\s\S]{0,120}?)<\/span>/i,
+    );
+    const tbLoc = tbLocSpan ? stripTags(tbLocSpan[1]).trim() : locationIn(tm[2]);
+    if (!APPLY_HREF.test(tbApply) && !tbLoc) continue;
+    push(tbTitle, tbLoc, tbApply);
+  }
   // Strategy B: View-details / Apply links with a title just before them.
   const viewRe = /<a[^>]*href=["']([^"']+)["'][^>]*>([\s\S]{0,80}?)<\/a>/gi;
   let vm: RegExpExecArray | null;
@@ -1024,7 +1062,11 @@ function careersLinksOnPage(html: string, pageUrl: string): string[] {
   const anchorRe = /<a[^>]*href=["']([^"']+)["'][^>]*>([\s\S]{0,200}?)<\/a>/gi;
   let m: RegExpExecArray | null;
   while ((m = anchorRe.exec(html)) !== null) {
-    const href = m[1].trim();
+    // Hrefs carry HTML entities (&amp;, &#038;) — without decoding,
+    // the same link appears as several different URLs and burns the
+    // 8-candidate cap (Foundever: 5 UTM/locale spellings of the one
+    // jobs.foundever.com link, 2026-11-11 canary).
+    const href = m[1].replace(/&amp;/gi, '&').replace(/&#0?38;/gi, '&').trim();
     if (!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:') || href.startsWith('javascript:')) continue;
     const text = stripTags(m[2]).trim();
     const hrefHits = /career|job/i.test(href);
@@ -1049,6 +1091,37 @@ function careersLinksOnPage(html: string, pageUrl: string): string[] {
  *  on the page is never followed. `rendered` is true when the HTML
  *  came from the browser fallback: page listings are then stamped
  *  'rendered' so provenance shows the render path produced them. */
+/** The "Next page" link of a job list, or null. Matches an anchor
+ *  whose text is exactly "Next" (allowing trailing glyphs like »),
+ *  rel="next", or class "next" — the TalentBrew shape is
+ *  `<a class="next" href="/search-jobs&p=2">Next</a>`. Same-host
+ *  only, never a board URL, never the page itself. */
+function nextPageUrl(html: string, pageUrl: string): string | null {
+  const anchorRe = /<a[^>]*href=["']([^"']+)["'][^>]*>([\s\S]{0,60}?)<\/a>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = anchorRe.exec(html)) !== null) {
+    const openTag = m[0].slice(0, m[0].indexOf('>') + 1);
+    const text = stripTags(m[2]).replace(/[^a-z]/gi, '').toLowerCase();
+    const isNext =
+      text === 'next' ||
+      /\brel=["']?next["']?/i.test(openTag) ||
+      /\bclass=["'][^"']*\bnext\b[^"']*["']/i.test(openTag);
+    if (!isNext) continue;
+    // hrefs carry HTML entities (&amp;) — resolvePageLink does not
+    // decode them, so &amp;p=2 would fetch a dead path.
+    const abs = resolvePageLink(m[1].replace(/&amp;/gi, '&'), pageUrl);
+    if (!abs || isBoardUrl(abs)) continue;
+    try {
+      if (new URL(abs).hostname !== new URL(pageUrl).hostname) continue;
+    } catch {
+      continue;
+    }
+    if (abs.replace(/\/+$/, '') === pageUrl.replace(/\/+$/, '')) continue;
+    return abs;
+  }
+  return null;
+}
+
 async function collectPagePostings(html: string, pageUrl: string, rendered: boolean): Promise<Posting[]> {
   const pagePostings: Posting[] = [];
   const seenKeys = new Set<string>();
@@ -1062,6 +1135,36 @@ async function collectPagePostings(html: string, pageUrl: string, rendered: bool
     }
   };
   addPostings(parseCareersPage(html, pageUrl), rendered ? 'rendered' : 'html');
+  // Pagination: a real list page that links "Next" has more roles
+  // behind it (TalentBrew: 8/page over 38 pages; Concentrix JDQ:
+  // 10/page over ~190). The list pages are server-rendered, so
+  // plain fetches suffice — no browser needed for pages 2+. Up to 3
+  // extra pages, stopping the moment a page adds nothing new, and
+  // never past 50 postings for one company. Bounded so one company
+  // can never eat the chunk's time budget; a Next link that points
+  // back at a visited page (or off-site, or onto a board) ends the
+  // walk. Only runs when page 1 yielded real postings, so a
+  // non-list page never paginates.
+  if (pagePostings.length > 0) {
+    const seenPages = new Set<string>([pageUrl.replace(/\/+$/, '')]);
+    let nextUrl = nextPageUrl(html, pageUrl);
+    let extraPages = 0;
+    while (nextUrl && extraPages < 3 && !seenPages.has(nextUrl.replace(/\/+$/, ''))) {
+      seenPages.add(nextUrl.replace(/\/+$/, ''));
+      let nextHtml: string;
+      try {
+        nextHtml = await fetchText(nextUrl);
+      } catch {
+        break;
+      }
+      const before = pagePostings.length;
+      addPostings(parseCareersPage(nextHtml, nextUrl), rendered ? 'rendered' : 'html');
+      extraPages += 1;
+      if (pagePostings.length === before) break; // empty page: the list is done
+      if (pagePostings.length >= 50) break; // company cap
+      nextUrl = nextPageUrl(nextHtml, nextUrl);
+    }
+  }
   const widgetSlug = jazzhrWidgetSlug(html);
   if (widgetSlug) {
     try {
@@ -1130,18 +1233,54 @@ async function collectPagePostings(html: string, pageUrl: string, rendered: bool
  *  the careers link the user gave (worth more than a guessed sibling
  *  path). Equal scores break toward the earliest candidate in walk
  *  order, so /careers still beats /jobs when both are guesses. */
+/** Known applicant-tracking-system hosts. A candidate on one of these
+ *  is the employer's real job portal, not a marketing page that merely
+ *  links to one: Liveops' Rippling board, ModSquad's Workday, NexRep's
+ *  Paylocity, and Alorica's bling-ai portal all lost the render to a
+ *  same-host marketing page (5 vs 2) because the ATS host scored
+ *  nothing (2026-11-11 canary). Board hosts (Greenhouse, Lever,
+ *  Ashby, JazzHR, ApplyToJob) are deliberately NOT here — isBoardUrl
+ *  already refuses them as sources, and they must never earn a
+ *  portal bonus. */
+const ATS_HOST_SIGNS = [
+  'myworkdayjobs', 'rippling', 'paylocity', 'smartrecruiters', 'icims',
+  'taleo', 'successfactors', 'eightfold', 'phenom', 'brassring', 'adp',
+  'ultipro', 'breezy', 'workable', 'fountain', 'talentbrew', 'radancy',
+  'avature', 'jobvite', 'recruitee', 'clearcompany', 'dayforce',
+  'peoplefluent', 'lumesse', 'harri', 'hiringthing', 'teamtailor',
+  'personio', 'jobadder', 'bling-ai',
+];
+
+export function atsHostBonus(u: string): number {
+  try {
+    const host = new URL(u).hostname.toLowerCase();
+    return ATS_HOST_SIGNS.some((s) => host.includes(s)) ? 6 : 0;
+  } catch {
+    return 0;
+  }
+}
+
 export function renderTargetScore(u: string, careersUrl: string): number {
   let score = 0;
   try {
-    const path = new URL(u).pathname.toLowerCase();
+    const parsed = new URL(u);
+    const path = parsed.pathname.toLowerCase();
     if (/job-search|search-results|\/results(\/|$)/.test(path)) score += 5;
     else if (/search/.test(path)) score += 4;
     else if (/jobs?|careers?/.test(path)) score += 2;
+    // A jobs./careers. subdomain's bare homepage IS the portal
+    // (jobs.teleperformance.com, jobs.foundever.com) — it outranks
+    // the /careers and /jobs guesses on the same host, which usually
+    // fail the same way the homepage fetch did (Teleperformance: the
+    // render went to a /careers guess that RSTs, never to the portal
+    // homepage). A /job-search/ path still outscores it (+5).
+    const firstLabel = parsed.hostname.split('.')[0].toLowerCase();
+    if ((firstLabel === 'jobs' || firstLabel === 'careers') && path === '/') score += 4;
   } catch {
     // Unparseable URL — scores only the careers-link bonus below.
   }
   if (careersUrl && u === careersUrl) score += 2;
-  return score;
+  return score + atsHostBonus(u);
 }
 
 /** Signals in a fetched page's own HTML that it IS the portal — not
@@ -1170,6 +1309,25 @@ export function portalContentScore(html: string): number {
   }
   if (jazzhrWidgetSlug(html) || greenhouseEmbedSlug(html) || isolvedIframeUrl(html)) score += 5;
   if (/job-card|jobsData|job-list|job_list|jobList/i.test(html)) score += 3;
+  // Two or more links to job-detail pages: the page IS a job list,
+  // even when the extractors found nothing on it (an unparsed shape
+  // — the TTEC case before Strategy D). One link proves nothing (a
+  // "Featured role" promo); two is a list. Fragment / mailto /
+  // javascript hrefs are not links to a page.
+  let detailLinks = 0;
+  for (const m of html.matchAll(/href\s*=\s*["']([^"']+)["']/gi)) {
+    const href = m[1].trim();
+    if (/^(#|mailto:|tel:|javascript:)/i.test(href)) continue;
+    try {
+      if (isJobDetailUrl(new URL(href, 'https://example.com').href)) {
+        detailLinks += 1;
+        if (detailLinks >= 2) break;
+      }
+    } catch {
+      // Unparseable href — not a detail link.
+    }
+  }
+  if (detailLinks >= 2) score += 5;
   return score;
 }
 
@@ -1194,15 +1352,22 @@ export function companyHostBonus(u: string, companyName: string): number {
   }
 }
 
-/** A URL worth rendering: the careers link the user gave, or a path
- *  that names careers/jobs. The bare homepage no longer renders on
- *  path alone — but it earns candidacy when its page content scores
- *  (portalContentScore: a job-search input or an embedded widget),
- *  because a JS homepage can BE the portal. */
-function isCareersLikeUrl(u: string, careersUrl: string): boolean {
+/** A URL worth rendering: the careers link the user gave, a path
+ *  that names careers/jobs, or a jobs./careers. subdomain homepage.
+ *  The bare homepage no longer renders on path alone — but it earns
+ *  candidacy when its page content scores (portalContentScore: a
+ *  job-search input or an embedded widget), because a JS homepage can
+ *  BE the portal. The subdomain rule covers the fetch-failed case,
+ *  where there is no page content to score: jobs.teleperformance.com
+ *  IS the portal by construction, and its bare path '/' would
+ *  otherwise never qualify. */
+export function isCareersLikeUrl(u: string, careersUrl: string): boolean {
   if (careersUrl && u === careersUrl) return true;
   try {
-    return /career|job/i.test(new URL(u).pathname);
+    const parsed = new URL(u);
+    if (/career|job/i.test(parsed.pathname)) return true;
+    const firstLabel = parsed.hostname.split('.')[0] || '';
+    return /^(jobs|careers)$/i.test(firstLabel);
   } catch {
     return false;
   }
@@ -1250,15 +1415,30 @@ export async function searchCompanyJobs(
     for (const u of [website, `${base}/careers`, `${base}/jobs`]) {
       if (!candidates.includes(u)) candidates.push(u);
     }
+    // Jobs-subdomain website (jobs.teleperformance.com): when the
+    // subdomain fails outright, the apex homepage is the only other
+    // fetchable page on the business's own domain — its nav is the
+    // route to the portal (possibly on a different host).
+    try {
+      const host = new URL(website).hostname.toLowerCase();
+      if (/^(jobs|careers)\./.test(host)) {
+        const apex = `https://${host.split('.').slice(1).join('.')}`;
+        if (!candidates.includes(apex) && !isBoardUrl(apex)) candidates.push(apex);
+      }
+    } catch {
+      // Unparseable website — no apex to add.
+    }
   }
-  const renderBudget = opts.renderBudget ?? { used: 0, max: 1 };
+  const renderBudget = opts.renderBudget ?? { used: 0, max: 2 };
   const renderDeadlineMs = opts.renderDeadlineMs ?? Date.now() + RENDER_WINDOW_MS;
   let anyFetchOk = false;
   let renderUsed = false;
   let renderAttempted = false;
   let renderMs = 0;
+  let renderError: string | null = null;
   let renderTextSample = '';
   let searchOutcome: PortalSearchOutcome | null = null;
+  let searchScan: SearchScanSummary | null = null;
   let searchMs = 0;
   let renderedUrl = '';
   // Deferred rendering: the plain-HTML walk runs FIRST and the render
@@ -1288,7 +1468,15 @@ export async function searchCompanyJobs(
       anyFetchOk = true;
     } catch {
       if (isCareersLikeUrl(u, careersUrl)) {
-        zeroYieldTargets.push({ url: u, score: renderTargetScore(u, careersUrl) });
+        // Score on path AND host, like the fetched branch: a
+        // jobs./careers. subdomain homepage scores 0 on path alone,
+        // so without the host bonus it would always lose to the
+        // /careers and /jobs guesses (2 each) — and the render would
+        // go to a guess that fails the same way instead of the portal.
+        zeroYieldTargets.push({
+          url: u,
+          score: renderTargetScore(u, careersUrl) + companyHostBonus(u, company.name),
+        });
       }
       continue;
     }
@@ -1309,7 +1497,9 @@ export async function searchCompanyJobs(
         renderUsed,
         renderAttempted,
         renderMs,
+        renderError,
         searchOutcome,
+        searchScan,
         searchMs,
         renderedUrl,
         renderTextSample,
@@ -1338,38 +1528,43 @@ export async function searchCompanyJobs(
       }
     }
   }
-  // The walk found nothing in plain HTML. One render, on the best
-  // target, while budget and deadline last. A failed render just
-  // leaves the company at zero listings — the outcome fields still
-  // say what happened.
-  if (
-    zeroYieldTargets.length > 0 &&
-    opts.renderPage &&
-    renderBudget.used < renderBudget.max &&
-    Date.now() < renderDeadlineMs
-  ) {
-    let target = zeroYieldTargets[0].url;
-    let bestScore = zeroYieldTargets[0].score;
-    for (const t of zeroYieldTargets.slice(1)) {
-      if (t.score > bestScore) {
-        target = t.url;
-        bestScore = t.score;
+  // The walk found nothing in plain HTML. Render the best target,
+  // while budget and deadline last — and RETRY the next-best target
+  // when the render dies or the portal search finds no form: the
+  // best-scored target is not always the portal (Sitel's render went
+  // to the Foundever marketing homepage; Teleperformance's went to a
+  // /careers guess that RSTs), and a no-form render on the wrong page
+  // must not spend the whole budget. Any other outcome stops the
+  // loop: the search ran on the best target, so a different page is
+  // unlikely to do better. A failed render just leaves the company
+  // at zero listings — the outcome fields still say what happened.
+  if (zeroYieldTargets.length > 0 && opts.renderPage) {
+    // Best score first; the sort is stable, so ties keep walk order
+    // (the user-given careers link first).
+    const targets = [...zeroYieldTargets].sort((a, b) => b.score - a.score);
+    for (const { url: target } of targets) {
+      if (renderBudget.used >= renderBudget.max || Date.now() >= renderDeadlineMs) break;
+      renderBudget.used += 1;
+      renderAttempted = true;
+      const started = Date.now();
+      let rendered: RenderPageResult | null = null;
+      try {
+        rendered = await opts.renderPage(target, portalSearchTerm(resumeText));
+      } catch {
+        rendered = null;
       }
-    }
-    renderBudget.used += 1;
-    renderAttempted = true;
-    const started = Date.now();
-    let rendered: RenderPageResult | null = null;
-    try {
-      rendered = await opts.renderPage(target, portalSearchTerm(resumeText));
-    } catch {
-      rendered = null;
-    }
-    renderMs += Date.now() - started;
-    if (rendered) {
+      renderMs += Date.now() - started;
+      if (!rendered) {
+        // The renderer died before returning anything — the next
+        // target may still load (a host that RSTs one path may serve
+        // another). No outcome to record, so the loop continues.
+        continue;
+      }
       searchOutcome = rendered.searchOutcome;
+      searchScan = rendered.searchScan ?? null;
       searchMs = rendered.searchMs;
       renderedUrl = rendered.renderedUrl;
+      renderError = rendered.renderError ?? null;
       if (rendered.html) {
         renderTextSample = sampleRenderedText(rendered.html);
         // Resolve the rendered page's links against the URL the
@@ -1399,13 +1594,23 @@ export async function searchCompanyJobs(
             renderUsed,
             renderAttempted,
             renderMs,
+            renderError,
             searchOutcome,
+            searchScan,
             searchMs,
             renderedUrl,
             renderTextSample,
           };
         }
       }
+      // Retryable: the render failed outright, or the portal search
+      // found no box on this page — try the next-best target. Any
+      // other outcome (searched, no-results, has-listings with an
+      // unparsed shape, submit-failed, board-redirect) means the
+      // search ran on the best target; stop.
+      const failedRender = !rendered.html && (renderError !== null || searchOutcome === null);
+      if (failedRender || searchOutcome === 'no-form') continue;
+      break;
     }
   }
   return {
@@ -1418,7 +1623,9 @@ export async function searchCompanyJobs(
     renderUsed,
     renderAttempted,
     renderMs,
+    renderError,
     searchOutcome,
+    searchScan,
     searchMs,
     renderedUrl,
     renderTextSample,

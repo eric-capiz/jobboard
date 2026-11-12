@@ -49,9 +49,13 @@ import chromium from '@sparticuz/chromium-min';
 import puppeteer, { type Browser, type Page } from 'puppeteer-core';
 import { isBoardUrl } from './finder-lib.js';
 import {
+  scanSearchForm,
+  summarizeScan,
   tryPortalSearch,
   waitForDomStable,
   type PortalSearchOutcome,
+  type SearchFormInfo,
+  type SearchScanSummary,
 } from './render-search.js';
 
 /** The Chromium binary pack for x86_64, pinned to the loader version
@@ -75,12 +79,24 @@ export interface RenderPageResult {
    *  the caller can tell "search ran and found nothing" apart from
    *  "the search never ran". */
   searchOutcome: PortalSearchOutcome | null;
+  /** Why the search found no box — the scan summary from the
+   *  rendered page (inputs seen, visible inputs, best score,
+   *  buttons). Present only when the search ended no-form, so a
+   *  live no-form can be told apart: no inputs vs. unqualifying
+   *  inputs vs. board action. */
+  searchScan?: SearchScanSummary;
   /** Milliseconds spent inside the portal search step (0 when it
    *  never ran). */
   searchMs: number;
   /** The page URL after load + search — the results page when the
    *  search navigated. '' when no page was ever loaded. */
   renderedUrl: string;
+  /** Why the render failed, when it did — 'browser-unavailable'
+   *  (launch timed out or no browser) or 'render-failed' (navigation
+   *  or load threw). Undefined when the render succeeded or the page
+   *  was reached. The caller surfaces this instead of a bare null so
+   *  a fast render death can be told apart from 'never attempted'. */
+  renderError?: string;
 }
 
 export type RenderPageFn = (
@@ -157,9 +173,14 @@ export async function renderPageHtml(url: string, searchTerm: string = '', timeo
   let page: Page | null = null;
   try {
     browser = await withTimeout(getBrowser(), remain());
-    if (!browser || remain() <= 0) return null;
+    if (!browser || remain() <= 0) {
+      return { html: '', searchOutcome: null, searchMs: 0, renderedUrl: '', renderError: 'browser-unavailable' };
+    }
     page = await browser.newPage();
-    await page.setUserAgent('Mozilla/5.0 (JobBoard Finder)');
+    // A standard Chrome UA matching the pinned engine (Chromium
+    // 153): the old 'JobBoard Finder' UA advertised a bot outright,
+    // and WAFs that sniff UA/version mismatches reject the session.
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36');
     // The listings are text: block the heavyweight resource types so
     // slow boards settle faster. Stylesheets stay — some boards gate
     // their render on CSS load.
@@ -182,6 +203,35 @@ export async function renderPageHtml(url: string, searchTerm: string = '', timeo
     if (isBoardUrl(page.url())) {
       return { html: '', searchOutcome: null, searchMs: 0, renderedUrl: page.url() };
     }
+    // Cookie banners cover some portals' search boxes (Foundever's
+    // render is banner-only text until accepted) and can intercept
+    // the click on the box itself. Best-effort "Accept cookies"
+    // clicks, up to two passes — some banners stack a second consent
+    // dialog behind the first — then a short settle. Never throws; a
+    // page without a banner just skips it.
+    if (remain() > 8000) {
+      try {
+        for (let pass = 0; pass < 2 && remain() > 3000; pass++) {
+          const accepted = await page.evaluate(() => {
+            const btns = Array.from(document.querySelectorAll('button'));
+            const accept = btns.find((b) => {
+              const r = b.getBoundingClientRect();
+              if (r.width <= 0 || r.height <= 0) return false;
+              return /^(accept( all)?( cookies)?|allow all( cookies)?|accept & close|i agree|alle akzeptieren|tout accepter|aceptar( todo| las cookies)?)/i.test(
+                (b.innerText || '').trim(),
+              );
+            });
+            if (!accept) return false;
+            accept.click();
+            return true;
+          });
+          if (!accepted) break;
+          await waitForDomStable(page, remain, 2000, 500);
+        }
+      } catch {
+        // The banner clicks are best-effort; the search step runs anyway.
+      }
+    }
     // Search-portal step: the page may be an empty search shell that
     // shows no jobs until a search is submitted (Walmart, FedEx, CVS
     // ...). The step runs on this same page only — it never navigates
@@ -190,12 +240,27 @@ export async function renderPageHtml(url: string, searchTerm: string = '', timeo
     const searchStart = Date.now();
     const searchOutcome = await tryPortalSearch(page, searchTerm, deadline);
     const searchMs = Date.now() - searchStart;
+    // No-form diagnosis: what the scan actually saw on the page, so
+    // a live no-form can be told apart (no inputs vs. unqualifying
+    // inputs vs. board action). Only computed on no-form — the
+    // common paths need no extra evaluate.
+    let searchScan: SearchScanSummary | undefined;
+    if (searchOutcome === 'no-form') {
+      try {
+        searchScan = summarizeScan((await page.evaluate(scanSearchForm)) as SearchFormInfo);
+      } catch {
+        searchScan = undefined;
+      }
+    }
     if (searchOutcome === 'board-redirect') {
       return { html: '', searchOutcome, searchMs, renderedUrl: page.url() };
     }
-    return { html: await page.content(), searchOutcome, searchMs, renderedUrl: page.url() };
+    return { html: await page.content(), searchOutcome, searchMs, renderedUrl: page.url(), searchScan };
   } catch {
-    return null;
+    // A failed render still reports WHY instead of a bare null, so the
+    // caller can tell a fast render death (host reset, launch failure)
+    // apart from a render that never ran.
+    return { html: '', searchOutcome: null, searchMs: 0, renderedUrl: '', renderError: 'render-failed' };
   } finally {
     try {
       await page?.close();
