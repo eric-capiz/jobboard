@@ -639,8 +639,15 @@ async function clickSearchToggle(
     return isSearchActionAllowed(action, page.url()) && !isSiteSearchAction(action, page.url());
   };
   const label = (b: SearchButtonDescriptor): string => buttonLabel(b).trim();
+  // The entry button is not always labelled "Search": Foundever's
+  // portal gates its search behind "Find a job in your country"
+  // (a country picker — the search form is display:none until a
+  // country is picked, 15 inputs, 0 visible, 2026-11-12 canary).
+  // "Find a job" (singular) is the entry; the bare /\bsearch\b/
+  // fallback would also catch a site-search toggle, so the
+  // entry-phrase tier runs first.
   const pick =
-    info.buttons.find((b) => b.visible && allowed(b) && /search jobs|find jobs/i.test(label(b))) ??
+    info.buttons.find((b) => b.visible && allowed(b) && /search jobs|find jobs|find a job/i.test(label(b))) ??
     info.buttons.find((b) => b.visible && allowed(b) && /\bsearch\b/i.test(label(b))) ??
     null;
   if (!pick) return null;

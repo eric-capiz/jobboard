@@ -2151,6 +2151,28 @@ async function testPortalSearch() {
     (await runSearch(toggleDeadPage)) === 'no-form' && toggleDeadPage.buttonClicks === 1,
     toggleDeadPage.buttonClicks,
   );
+  // The entry button can be a country picker, not a search box:
+  // Foundever's portal gates its search behind "Find a job in your
+  // country" (the form is display:none until a country is picked).
+  // The toggle must fire on the singular "Find a job" phrasing.
+  const countryTogglePage = new FakePage({
+    scanResult: {
+      inputs: [],
+      buttons: [mkButton({ index: 0, text: 'Find a job in your country', type: 'button', formIndex: -1 })],
+      forms: [],
+    },
+    counts: [{ jobLinks: 0, resultsText: false }, { jobLinks: 5, resultsText: true }],
+    onEnter: (term, page) => page.setUrl('https://portal.example/careers/results'),
+    onButtonClick: (term, page) => {
+      page.scanResult = portalScan;
+    },
+  });
+  const countryToggleOutcome = await runSearch(countryTogglePage);
+  check(
+    'portal-search: "Find a job in your country" toggle fires and the retry finds listings',
+    countryToggleOutcome === 'searched' && countryTogglePage.buttonClicks === 1,
+    { outcome: countryToggleOutcome, clicks: countryTogglePage.buttonClicks },
+  );
   // Empty search yields listings: Enter alone submits, no term typed.
   const emptyWins = new FakePage({
     scanResult: portalScan,
@@ -3517,6 +3539,58 @@ async function testRound7() {
   );
 }
 
+async function testRound8() {
+  // Batch 8 (2026-11-12 round-7 canary vs 3a7f91f2): Foundever's
+  // render shows clicks 1 with the banner still up, and the
+  // labels list alone cannot say WHAT was clicked; bannerPresent
+  // is text-based, so residual copy reads as "banner up" after a
+  // working click. Two new diagnostics ride the attempt record.
+  const jobsMod = freshRequire(`${OUT}/find-jobs.cjs`);
+  const resumeText =
+    'Customer service representative with phone support experience, technical support, troubleshooting, billing questions, and help desk work for members';
+  const listHtml = `<html><body>
+<div class="job-listing"><h3>Customer Support Specialist</h3><p>Location: Remote</p><a href="/jobs/customer-support-specialist">Apply</a></div>
+<div class="job-listing"><h3>Member Services Representative</h3><p>Location: Remote</p><a href="/jobs/member-services-representative">Apply</a></div>
+</body></html>`;
+  globalThis.fetch = async () => ({ ok: true, text: async () => '<html><body>No careers here.</body></html>' });
+  const stubDiag = async (url) => ({
+    html: listHtml, searchOutcome: 'has-listings', searchMs: 300, renderedUrl: url,
+    cookieClicks: 1, bannerPresent: true, bannerButtons: ['A:Manage your cookie preferences'],
+    cookieClickedLabel: 'Accept All Cookies', bannerVisible: false,
+  });
+  const res = await jobsMod.searchCompanyJobs(
+    { name: 'Diag Co', website: 'https://diag.example', careersUrl: 'https://diag.example/careers', isUSCompany: true },
+    resumeText,
+    { renderPage: stubDiag },
+  );
+  check(
+    'banner-diag: clicked label + visible flag ride the attempt record',
+    res.renderAttempts.length >= 1 &&
+      res.renderAttempts[0]?.cookieClickedLabel === 'Accept All Cookies' &&
+      res.renderAttempts[0]?.bannerVisible === false &&
+      res.renderAttempts[0]?.bannerPresent === true &&
+      res.renderAttempts[0]?.cookieClicks === 1,
+    res.renderAttempts,
+  );
+  // A render that never clicked reports null / false, not garbage.
+  const stubNone = async (url) => ({
+    html: listHtml, searchOutcome: 'has-listings', searchMs: 300, renderedUrl: url,
+    cookieClicks: 0, bannerPresent: false, bannerButtons: [],
+  });
+  const resNone = await jobsMod.searchCompanyJobs(
+    { name: 'Diag Co', website: 'https://diag.example', careersUrl: 'https://diag.example/careers', isUSCompany: true },
+    resumeText,
+    { renderPage: stubNone },
+  );
+  check(
+    'banner-diag: no click reports null label and no visible banner',
+    resNone.renderAttempts.length >= 1 &&
+      resNone.renderAttempts[0]?.cookieClickedLabel === null &&
+      resNone.renderAttempts[0]?.bannerVisible === false,
+    resNone.renderAttempts,
+  );
+}
+
 async function testMatchingFixes() {
   // The 0/3004 fix round: synonym groups replace the hard title gate,
   // location becomes three-way (ok / review / reject), and JSON-LD on
@@ -3973,6 +4047,7 @@ await testRound4();
 await testRound5();
 await testRound6();
 await testRound7();
+await testRound8();
 await testPaginationAndSearchScan();
 await testTestCompany();
 await testJazzhr();

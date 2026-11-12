@@ -124,6 +124,19 @@ export interface RenderPageResult {
    *  showing the button's label means the match pattern missed it;
    *  an empty list means the button genuinely was not in the DOM. */
   bannerButtons?: string[];
+  /** The label of the element the accept step last clicked (null
+   *  when nothing was ever clicked). Foundever's render shows
+   *  clicks 1 with the banner still up — this says whether the
+   *  click hit the real accept button or another accept-like
+   *  element. */
+  cookieClickedLabel?: string | null;
+  /** Whether a cookie banner is VISIBLY covering the page at the
+   *  end of the render (an element carrying banner text with a
+   *  non-zero box). bannerPresent is text-based: the banner's copy
+   *  can stay in the DOM after the banner hides, so text alone
+   *  cannot say the banner is up. When present is true but visible
+   *  is false, the click worked and the text is residual. */
+  bannerVisible?: boolean;
 }
 
 export type RenderPageFn = (
@@ -201,6 +214,8 @@ export async function renderPageHtml(url: string, searchTerm: string = '', timeo
   let cookieClicks = 0;
   // Labels the accept step last saw (kept across passes).
   let lastAcceptLabels: string[] = [];
+  // Label of the element the accept step last clicked.
+  let lastClickedLabel: string | null = null;
   try {
     browser = await withTimeout(getBrowser(), remain());
     if (!browser || remain() <= 0) {
@@ -231,7 +246,7 @@ export async function renderPageHtml(url: string, searchTerm: string = '', timeo
     // clicks, up to two passes — some banners stack a second consent
     // dialog behind the first. Never throws; a page without a banner
     // just skips it.
-    const tryCookieAccept = async (pg: Page): Promise<{ clicked: boolean; labels: string[] }> => {
+    const tryCookieAccept = async (pg: Page): Promise<{ clicked: boolean; labels: string[]; clickedLabel: string | null }> => {
       try {
         return await pg.evaluate(() => {
           // Buttons can hide in shadow roots (OneTrust renders its
@@ -300,16 +315,21 @@ export async function renderPageHtml(url: string, searchTerm: string = '', timeo
             .filter((s) => s.length > 'BUTTON:'.length);
           const nearMiss = allLabels.filter((s) => /accept|cookie|consent|agree|allow|opt.?in|got it/i.test(s));
           const labels = [...new Set([...nearMiss.slice(0, 15), ...allLabels.slice(0, 8)])];
-          if (!accept) return { clicked: false, labels };
+          if (!accept) return { clicked: false, labels, clickedLabel: null };
           accept.click();
-          return { clicked: true, labels };
+          // What was clicked, not just what was seen: Foundever's
+          // render shows clicks 1 with the banner still up, and the
+          // labels list alone cannot say whether the click hit the
+          // real accept button or another accept-like element.
+          return { clicked: true, labels, clickedLabel: textOf(accept).replace(/\s+/g, ' ').slice(0, 60) };
         }).then((result) => {
           if (result.clicked) cookieClicks += 1;
           lastAcceptLabels = result.labels;
+          lastClickedLabel = result.clickedLabel;
           return result;
         });
       } catch {
-        return { clicked: false, labels: [] };
+        return { clicked: false, labels: [], clickedLabel: null };
       }
     };
     // Dismiss a cookie banner: click the accept button (up to two
@@ -406,6 +426,33 @@ export async function renderPageHtml(url: string, searchTerm: string = '', timeo
       return { html: '', searchOutcome, searchMs, renderedUrl: page.url(), cookieClicks };
     }
     const html = await page.content();
+    // Visibility, not just text: the banner's copy can stay in the
+    // DOM after the banner hides (Foundever: banner text in the
+    // sample with a click already landed). An element carrying the
+    // banner phrases with a non-zero visible box means the banner is
+    // really up; text alone does not.
+    let bannerVisible = false;
+    try {
+      bannerVisible = (await page.evaluate(() => {
+        const phrases = /we use cookies|cookie preferences|accept (all )?cookies|this site uses cookies|we value your privacy/i;
+        const els = Array.from(document.querySelectorAll('body *'));
+        for (const el of els) {
+          const t = (el as HTMLElement).innerText || '';
+          if (t.length === 0 || t.length > 500 || !phrases.test(t)) continue;
+          const r = el.getBoundingClientRect();
+          if (r.width <= 0 || r.height <= 0) continue;
+          try {
+            if (getComputedStyle(el).visibility === 'hidden') continue;
+          } catch {
+            // No computed style — the box is enough.
+          }
+          return true;
+        }
+        return false;
+      })) as boolean;
+    } catch {
+      bannerVisible = false;
+    }
     return {
       html,
       searchOutcome,
@@ -415,6 +462,8 @@ export async function renderPageHtml(url: string, searchTerm: string = '', timeo
       cookieClicks,
       bannerPresent: bannerTextPresent(html),
       bannerButtons: lastAcceptLabels,
+      cookieClickedLabel: lastClickedLabel,
+      bannerVisible,
     };
   } catch {
     // A failed render still reports WHY instead of a bare null, so the
