@@ -664,6 +664,83 @@ async function clickSearchToggle(
   return 'toggled';
 }
 
+/** The country-picker rescue: the search box lives behind a
+ *  country choice. Foundever's portal gates its search behind
+ *  "Find a job in your country"; the toggle opens a picker, and
+ *  the picker reveals one low-scoring input (a country filter)
+ *  but no job search box (15 inputs, 1 visible, bestScore 2,
+ *  2026-11-12 canary). One click on the United States entry — a
+ *  button or a link — then the caller re-scans. The label is
+ *  matched exactly (a bare "United States" entry), so a footer
+ *  locale link that happens to say "United States" is the same
+ *  portal's own country flow, not a board. Bounded by the same
+ *  budget as a search attempt. */
+/** In-page finder for the country entry (named so the offline
+ *  test can drive it with canned data). Self-contained: no
+ *  imports, no closures over module state. */
+export function findCountryEntry(): { index: number; label: string } | null {
+  const els = Array.from(document.querySelectorAll('button, a')) as HTMLElement[];
+  for (let i = 0; i < els.length; i++) {
+    const el = els[i];
+    const r = el.getBoundingClientRect();
+    if (r.width <= 0 || r.height <= 0) continue;
+    const t = (el.innerText || '').trim();
+    if (/^(united states( of america)?|usa|u\.s\.a?\.?)$/i.test(t)) {
+      return { index: i, label: t };
+    }
+  }
+  return null;
+}
+
+/** In-page handle getter for the country entry (named so the
+ *  offline test can tell its clicks apart from toggle clicks). */
+function countryEntryElement(idx: number): Element | null {
+  return document.querySelectorAll('button, a')[idx] ?? null;
+}
+
+async function clickCountryEntry(
+  page: SearchablePage,
+  remainMs: () => number,
+  onCountry?: (label: string) => void,
+): Promise<'picked' | 'board' | null> {
+  if (remainMs() < 6000) return null;
+  let entry: { index: number; label: string } | null;
+  try {
+    entry = (await page.evaluate(findCountryEntry)) as { index: number; label: string } | null;
+  } catch {
+    return null;
+  }
+  if (!entry) return null;
+  const startUrl = page.url();
+  const startLen = await textLength(page);
+  let handle: SearchableHandle | null = null;
+  try {
+    handle = await page.evaluateHandle(countryEntryElement, entry.index);
+  } catch {
+    return null;
+  }
+  const el = handle?.asElement() ?? null;
+  if (!el) return null;
+  try {
+    // Real mouse click, like the toggle and the submit: a
+    // synthetic .click() may not register on a React-controlled
+    // picker.
+    await el.click();
+  } catch {
+    return null;
+  } finally {
+    try {
+      await handle?.dispose();
+    } catch {
+      // Disposal is housekeeping, never load-bearing.
+    }
+  }
+  onCountry?.(entry.label);
+  await waitForChange(page, remainMs, startUrl, startLen, 4000);
+  if (isBoardUrl(page.url())) return 'board';
+  return 'picked';
+}
+
 /** One search attempt on the CURRENT page: re-scan (a previous submit
  *  may have navigated), pick the box, refuse board actions, submit by
  *  typing + Enter, and — only if that changes nothing and a submit
@@ -711,6 +788,7 @@ export async function tryPortalSearch(
   searchTerm: string,
   deadlineMs: number,
   onToggle?: (label: string) => void,
+  onCountry?: (label: string) => void,
 ): Promise<PortalSearchOutcome> {
   const remainMs = (): number => deadlineMs - Date.now();
   // A search needs at least ~6s: scan + submit + results wait. Less
@@ -728,9 +806,24 @@ export async function tryPortalSearch(
     if (!toggled) return 'no-form';
     const retry = await attemptSearch(page, '', remainMs);
     if (retry === 'board') return 'board-redirect';
-    if (retry === 'no-form') return 'no-form';
     if (retry === 'failed') return 'submit-failed';
-    if (await listingsNow(page)) return 'searched';
+    if (retry === 'no-form') {
+      // The toggle revealed a country picker, not a search box
+      // (Foundever/Sitel). One click on the United States entry,
+      // then one more search attempt; if it reveals nothing, still
+      // no-form. If the pick reveals the box but the empty search
+      // shows nothing, fall through to the resume-term retry below.
+      const picked = await clickCountryEntry(page, remainMs, onCountry);
+      if (picked === 'board') return 'board-redirect';
+      if (!picked) return 'no-form';
+      const afterPick = await attemptSearch(page, '', remainMs);
+      if (afterPick === 'board') return 'board-redirect';
+      if (afterPick === 'failed') return 'submit-failed';
+      if (afterPick === 'no-form') return 'no-form';
+      if (await listingsNow(page)) return 'searched';
+    } else if (await listingsNow(page)) {
+      return 'searched';
+    }
     // The toggle revealed the box and the empty search ran, but
     // showed nothing — fall through to the resume-term retry below.
     if (!searchTerm || remainMs() < 6000) return 'no-results';

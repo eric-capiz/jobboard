@@ -2009,6 +2009,9 @@ async function testPortalSearch() {
       this.countQueue = [...(opts.counts || [])];
       this.onEnter = opts.onEnter || null;
       this.onButtonClick = opts.onButtonClick || null;
+      this.countryEntry = opts.countryEntry ?? null;
+      this.onCountryClick = opts.onCountryClick || null;
+      this.countryClicks = 0;
       this.failEnter = !!opts.failEnter;
       this.calls = [];
       this.typedTerms = [];
@@ -2044,16 +2047,22 @@ async function testPortalSearch() {
           ? this.countQueue.shift()
           : { jobLinks: 0, resultsText: false };
       }
+      if (name === 'findCountryEntry') return this.countryEntry;
       return 1000;
     }
     async evaluateHandle(fn, ...args) {
+      const isCountry = String(fn).includes('country');
       const isButton = String(fn).includes('button');
-      this.calls.push({ fn: 'evaluateHandle:' + (isButton ? 'button' : 'input'), args });
+      this.calls.push({ fn: 'evaluateHandle:' + (isCountry ? 'country' : isButton ? 'button' : 'input'), args });
       const self = this;
       return {
         asElement: () => ({
           click: async () => {
-            if (isButton) {
+            if (isCountry) {
+              self.buttonClicks += 1;
+              self.countryClicks += 1;
+              if (self.onCountryClick) self.onCountryClick(self.currentTerm, self);
+            } else if (isButton) {
               self.buttonClicks += 1;
               if (self.onButtonClick) self.onButtonClick(self.currentTerm, self);
             } else {
@@ -2193,6 +2202,69 @@ async function testPortalSearch() {
     'portal-search: the toggle click label is reported to the caller',
     reportedToggle === 'Find a job in your country' && reportPage.buttonClicks === 1,
     { reportedToggle, clicks: reportPage.buttonClicks },
+  );
+  // The toggle reveals a country picker, not a search box: the
+  // retry still finds no form, the "United States" entry is
+  // clicked, the box appears, and the search finds listings.
+  // Foundever/Sitel live shape (15 inputs, 1 visible, bestScore 2
+  // after the toggle).
+  const pickerScan = {
+    inputs: [],
+    buttons: [mkButton({ index: 0, text: 'United States', type: 'button', formIndex: -1 })],
+    forms: [],
+  };
+  let reportedCountry = null;
+  const countryPage = new FakePage({
+    scanResult: {
+      inputs: [],
+      buttons: [mkButton({ index: 0, text: 'Find a job in your country', type: 'button', formIndex: -1 })],
+      forms: [],
+    },
+    counts: [{ jobLinks: 0, resultsText: false }, { jobLinks: 5, resultsText: true }],
+    onEnter: (term, page) => page.setUrl('https://portal.example/careers/results'),
+    onButtonClick: (term, page) => {
+      page.scanResult = pickerScan;
+    },
+    countryEntry: { index: 0, label: 'United States' },
+    onCountryClick: (term, page) => {
+      page.scanResult = portalScan;
+    },
+  });
+  const countryOutcome = await searchMod.tryPortalSearch(
+    countryPage,
+    'customer service',
+    Date.now() + 30000,
+    () => {},
+    (label) => {
+      reportedCountry = label;
+    },
+  );
+  check(
+    'portal-search: country pick after the toggle reveals the box and the search finds listings',
+    countryOutcome === 'searched' &&
+      countryPage.buttonClicks === 2 &&
+      countryPage.countryClicks === 1 &&
+      reportedCountry === 'United States',
+    { outcome: countryOutcome, clicks: countryPage.buttonClicks, countryClicks: countryPage.countryClicks, reportedCountry },
+  );
+  // No US entry in the picker: still no-form, no crash.
+  const noCountryPage = new FakePage({
+    scanResult: {
+      inputs: [],
+      buttons: [mkButton({ index: 0, text: 'Find a job in your country', type: 'button', formIndex: -1 })],
+      forms: [],
+    },
+    counts: [{ jobLinks: 0, resultsText: false }],
+    onButtonClick: (term, page) => {
+      page.scanResult = pickerScan;
+    },
+    countryEntry: null,
+  });
+  check(
+    'portal-search: picker with no US entry still reports no-form',
+    (await searchMod.tryPortalSearch(noCountryPage, 'customer service', Date.now() + 30000)) === 'no-form' &&
+      noCountryPage.countryClicks === 0,
+    { countryClicks: noCountryPage.countryClicks },
   );
   // Empty search yields listings: Enter alone submits, no term typed.
   const emptyWins = new FakePage({
@@ -3660,6 +3732,49 @@ async function testRound9() {
   );
 }
 
+async function testRound11() {
+  // Batch 11 (2026-11-12 round-10 canary vs 0055509d): Sitel's
+  // toggle fires on both attempts but the picker reveals one
+  // unqualifying input — the search needs a country pick after
+  // the toggle. The pick label rides the attempt record.
+  const jobsMod = freshRequire(`${OUT}/find-jobs.cjs`);
+  const resumeText =
+    'Customer service representative with phone support experience, technical support, troubleshooting, billing questions, and help desk work for members';
+  globalThis.fetch = async () => ({ ok: true, text: async () => '<html><body>No careers here.</body></html>' });
+  const stubPick = async (url) => ({
+    html: '', searchOutcome: 'no-form', searchMs: 900, renderedUrl: url,
+    cookieClicks: 0, bannerPresent: true, bannerButtons: ['BUTTON:Find a job in your country'],
+    cookieClickedLabel: null, bannerVisible: true,
+    searchToggleClicked: 'Find a job in your country', searchCountryClicked: 'United States',
+  });
+  const res = await jobsMod.searchCompanyJobs(
+    { name: 'Pick Co', website: 'https://pick.example', careersUrl: 'https://pick.example/careers', isUSCompany: true },
+    resumeText,
+    { renderPage: stubPick },
+  );
+  check(
+    'country-diag: the country pick label rides the attempt record',
+    res.renderAttempts.length >= 1 &&
+      res.renderAttempts[0]?.searchCountryClicked === 'United States' &&
+      res.renderAttempts[0]?.searchToggleClicked === 'Find a job in your country',
+    res.renderAttempts,
+  );
+  const stubNone = async (url) => ({
+    html: '', searchOutcome: 'no-form', searchMs: 900, renderedUrl: url,
+    cookieClicks: 0, bannerPresent: false, bannerButtons: [],
+  });
+  const resNone = await jobsMod.searchCompanyJobs(
+    { name: 'Pick Co', website: 'https://pick.example', careersUrl: 'https://pick.example/careers', isUSCompany: true },
+    resumeText,
+    { renderPage: stubNone },
+  );
+  check(
+    'country-diag: no country pick reports a null label',
+    resNone.renderAttempts.length >= 1 && resNone.renderAttempts[0]?.searchCountryClicked === null,
+    resNone.renderAttempts,
+  );
+}
+
 async function testMatchingFixes() {
   // The 0/3004 fix round: synonym groups replace the hard title gate,
   // location becomes three-way (ok / review / reject), and JSON-LD on
@@ -4118,6 +4233,7 @@ await testRound6();
 await testRound7();
 await testRound8();
 await testRound9();
+await testRound11();
 await testPaginationAndSearchScan();
 await testTestCompany();
 await testJazzhr();

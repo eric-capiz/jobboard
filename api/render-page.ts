@@ -168,6 +168,10 @@ export interface RenderPageResult {
    *  matched). Distinguishes "no toggle fired" from "the toggle
    *  revealed a picker, not a search box" (Sitel's country picker). */
   searchToggleClicked?: string | null;
+  /** The label of the country entry the search step clicked, if
+   *  any (null when the step never needed a country pick, or no US
+   *  entry matched). */
+  searchCountryClicked?: string | null;
 }
 
 export type RenderPageFn = (
@@ -461,13 +465,36 @@ export async function renderPageHtml(url: string, searchTerm: string = '', timeo
     // the scan. The click hides the banner synchronously, so no
     // reload is needed — the search runs on the now-visible form.
     if (remain() > 1000) await tryCookieAccept(page);
+    // Late-banner wait: the banner can inject AFTER the early and
+    // post-settle passes have run (Foundever: clicks 0 in most runs,
+    // 1 in one — the button is findable, just late). If it is
+    // visibly up and time remains, poll for the accept button a few
+    // more times before the search. Bounded: stops when under 8s
+    // remain, so the search keeps its 6s. No reload after a click
+    // here — the search runs on the clicked page.
+    if (remain() > 10000) {
+      for (let i = 0; i < 4 && remain() > 8000; i++) {
+        let up = false;
+        try {
+          up = (await page.evaluate(bannerVisibleInPage)) as boolean;
+        } catch {
+          up = false;
+        }
+        if (!up) break;
+        if ((await tryCookieAccept(page)).clicked) break;
+        await new Promise((r) => setTimeout(r, 700));
+      }
+    }
     const searchStart = Date.now();
     // The label of the search toggle the step clicked, if any (a
     // country-picker entry, not a search box, still counts: Sitel's
     // no-form may mean the toggle revealed a picker, not nothing).
     let searchToggleClicked: string | null = null;
+    let searchCountryClicked: string | null = null;
     const searchOutcome = await tryPortalSearch(page, searchTerm, deadline, (label) => {
       searchToggleClicked = label;
+    }, (label) => {
+      searchCountryClicked = label;
     });
     const searchMs = Date.now() - searchStart;
     // No-form diagnosis: what the scan actually saw on the page, so
@@ -483,7 +510,7 @@ export async function renderPageHtml(url: string, searchTerm: string = '', timeo
       }
     }
     if (searchOutcome === 'board-redirect') {
-      return { html: '', searchOutcome, searchMs, renderedUrl: page.url(), cookieClicks, searchToggleClicked };
+      return { html: '', searchOutcome, searchMs, renderedUrl: page.url(), cookieClicks, searchToggleClicked, searchCountryClicked };
     }
     const html = await page.content();
     // Visibility, not just text: the banner's copy can stay in the
@@ -509,6 +536,7 @@ export async function renderPageHtml(url: string, searchTerm: string = '', timeo
       cookieClickedLabel: lastClickedLabel,
       bannerVisible,
       searchToggleClicked,
+      searchCountryClicked,
     };
   } catch {
     // A failed render still reports WHY instead of a bare null, so the
