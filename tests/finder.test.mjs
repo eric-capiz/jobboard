@@ -4118,9 +4118,14 @@ async function testRound6() {
     resumeText,
     { renderPage: stubNoMatch },
   );
+  // (Round 18: the loop now stops after ONE has-listings render
+  // whose postings all reject — the fallback is the first render's
+  // postings, and the second render is saved. The check's intent —
+  // the all-rejected render's postings still come back — is
+  // unchanged; only the renders spent changed, 2 -> 1.)
   check(
     'all-nomatch: an all-rejected render still returns its postings as the fallback',
-    nex.postingsSeen === 4 && nex.leads.length === 0 && nex.renderAttempts.length === 2,
+    nex.postingsSeen === 4 && nex.leads.length === 0 && nex.renderAttempts.length === 1,
     { postingsSeen: nex.postingsSeen, leads: nex.leads.length, attempts: nex.renderAttempts.length },
   );
 }
@@ -4265,7 +4270,15 @@ async function testRound7() {
   const stubLoop = async (url) => {
     loopCalls.push(url);
     if (url.includes('about-careers')) {
-      return { html: teleValuesHtml, searchOutcome: 'has-listings', searchMs: 300, renderedUrl: url, cookieClicks: 0, bannerPresent: false, bannerButtons: [] };
+      // The values page reports 'no-form', not 'has-listings': the
+      // real detector requires a POSITIVE results-count line for
+      // has-listings (hasVisibleListings = resultsText && jobLinks
+      // >= 1), and a values page carries no count line — the live TP
+      // values page reported 'no-form' (2026-11-12 canary). A stub
+      // that returns 'has-listings' here would contradict the
+      // detector; the check still pins the intent (a junk first
+      // render does not stop the loop) on the realistic path.
+      return { html: teleValuesHtml, searchOutcome: 'no-form', searchMs: 300, renderedUrl: url, cookieClicks: 0, bannerPresent: false, bannerButtons: [] };
     }
     return { html: teleListHtml, searchOutcome: 'has-listings', searchMs: 300, renderedUrl: url, cookieClicks: 0, bannerPresent: false, bannerButtons: [] };
   };
@@ -5255,6 +5268,238 @@ async function testRound17() {
   );
 }
 
+async function testRound18() {
+  // Batch 18 (2026-11-12 round-18 canary vs 59d112cb): Omni's gate
+  // clicked a blog article title, Working Solutions' gate clicked an
+  // FAQ question, NexRep's render tail drifted to a register page,
+  // and Teleperformance / Working Solutions list markup parses to 0.
+  const jobsMod = freshRequire(`${OUT}/find-jobs.cjs`);
+  const searchMod = freshRequire(`${OUT}/render-search.cjs`);
+  const tcMod = freshRequire(`${OUT}/test-company.cjs`);
+  const resumeText =
+    'Customer service representative with phone support experience, technical support, troubleshooting, billing questions, and help desk work for members';
+
+  // --- Opener shape guard: headlines/questions are not openers ---
+  // Live evidence (omni-interactions.json, working-solutions.json):
+  // "What Does 'Choose Your Schedule' Mean at Omni?" (8 words,
+  // starts What) and "CAN I APPLY IF I LIVE IN A COUNTRY OTHER THAN
+  // THE UNITED STATES OR CANADA?" (15 words, starts Can) both
+  // matched the opener words and navigated the render onto an
+  // article/FAQ page.
+  const mkGateButton = (over) => ({
+    kind: 'button', index: 0, label: '', ariaLabel: '', href: '', containerRole: '', containerClass: false,
+    role: 'button', visible: true, options: [], ...over,
+  });
+  check(
+    'round18: an 8-word blog title starting with What is NOT an opener; "Select your country" still is',
+    searchMod.selectGateAction(
+      {
+        controls: [
+          mkGateButton({ index: 0, label: 'What Does “Choose Your Schedule” Mean at Omni?', href: 'https://portal.example/gba/what-does-choose-your-schedule-mean-at-omni/' }),
+          mkGateButton({ index: 1, label: 'Select your country' }),
+        ],
+      },
+      'customer service',
+      false,
+      'https://portal.example/',
+    )?.label === 'Select your country',
+    null,
+  );
+  check(
+    'round18: a 15-word FAQ question starting with Can is NOT an opener; "Select your country" still is',
+    searchMod.selectGateAction(
+      {
+        controls: [
+          mkGateButton({ index: 0, label: 'HOW DO I APPLY TO WORKING SOLUTIONS?' }),
+          mkGateButton({ index: 1, label: 'CAN I APPLY IF I LIVE IN A COUNTRY OTHER THAN THE UNITED STATES OR CANADA?' }),
+          mkGateButton({ index: 2, label: 'WHAT IS WORKING SOLUTIONS?' }),
+          mkGateButton({ index: 3, label: 'Select your country' }),
+        ],
+      },
+      'customer service',
+      false,
+      'https://portal.example/jobs/',
+    )?.label === 'Select your country',
+    null,
+  );
+  check(
+    'round18: "Find a job in your country" (exactly 6 words) is still an opener; a 7-word imperative is not',
+    searchMod.selectGateAction(
+      { controls: [mkGateButton({ index: 0, label: 'Find a job in your country' })] },
+      'customer service',
+      false,
+      'https://portal.example/careers',
+    )?.target === 'open' &&
+      searchMod.selectGateAction(
+        { controls: [mkGateButton({ index: 0, label: 'Choose your location to see jobs near you' })] },
+        'customer service',
+        false,
+        'https://portal.example/careers',
+      ) === null,
+    null,
+  );
+  check(
+    'round18: "Choose your country" and "Department" are still openers',
+    searchMod.selectGateAction(
+      { controls: [mkGateButton({ index: 0, label: 'Choose your country' })] },
+      'customer service',
+      false,
+      'https://portal.example/careers',
+    )?.target === 'open' &&
+      searchMod.selectGateAction(
+        { controls: [mkGateButton({ index: 0, label: 'Department' })] },
+        'customer service',
+        false,
+        'https://portal.example/careers',
+      )?.target === 'open',
+    null,
+  );
+
+  // --- Site search is not a job search (round 18) -----------------
+  // Omni's corporate-careers page carries a header site search
+  // (form action="/", placeholder "Search jobs"); the +5 put it
+  // ahead of the /join/ portal and burned a render on a no-form
+  // marketing page (2026-11-12 canary). A form whose action is the
+  // site root earns no portal credit; the same form with a results
+  // action still does, and a bare input with no form is untouched.
+  const siteSearchHtml = `<html><body><form action="/" method="get"><input type="search" name="s" placeholder="Search jobs"><button>Search</button></form></body></html>`;
+  const jobSearchHtml = `<html><body><form action="/search" method="get"><input type="search" name="s" placeholder="Search jobs"><button>Search</button></form></body></html>`;
+  const bareSearchHtml = `<html><body><input type="search" name="s" placeholder="Search jobs"></body></html>`;
+  check(
+    'round18: a site-search form (action="/") earns no portal credit; a results-action form and a bare input still do',
+    jobsMod.portalContentScore(siteSearchHtml) === 0 &&
+      jobsMod.portalContentScore(jobSearchHtml) === 5 &&
+      jobsMod.portalContentScore(bareSearchHtml) === 5,
+    {
+      site: jobsMod.portalContentScore(siteSearchHtml),
+      job: jobsMod.portalContentScore(jobSearchHtml),
+      bare: jobsMod.portalContentScore(bareSearchHtml),
+    },
+  );
+
+  // --- isJunkTitle: talent-pool CTAs are not roles ---------------
+  // Live evidence (nexrep.json): "Share Your Information" parsed as
+  // a posting and inflated postingsSeen to 4.
+  check(
+    'round18: "Share Your Information" / "Introduce Yourself" / "Submit Your Application" are junk; real roles are not',
+    jobsMod.isJunkTitle('Share Your Information') === true &&
+      jobsMod.isJunkTitle('Introduce Yourself') === true &&
+      jobsMod.isJunkTitle('Submit Your Application') === true &&
+      jobsMod.isJunkTitle('Customer Support Specialist') === false &&
+      jobsMod.isJunkTitle('SharePoint Administrator') === false &&
+      jobsMod.isJunkTitle('Quality Specialist') === false,
+    null,
+  );
+
+  // --- Render loop: stop after has-listings + all-no-match --------
+  // Live evidence (nexrep.json): the Paylocity list rendered
+  // 'has-listings' with its 4 roles surfaced (all no-match), and the
+  // loop spent its second render on the careers page, whose gate
+  // drifted to a register form. A page that reported 'has-listings'
+  // IS the list — the loop must stop there. A page that reported any
+  // other outcome with all-no-match postings must still continue
+  // (Teleperformance's values page, which reported 'no-form').
+  const shellHtml = '<html><body><div id="root"></div></body></html>';
+  const nonCsHtml = `<html><body>
+<div class="job-listing"><h3>Quality Specialist</h3><p>Location: Remote</p><a href="/jobs/quality-specialist">Apply</a></div>
+<div class="job-listing"><h3>Resource Specialist</h3><p>Location: Remote</p><a href="/jobs/resource-specialist">Apply</a></div>
+<div class="job-listing"><h3>Real Time Analyst</h3><p>Location: Remote</p><a href="/jobs/real-time-analyst">Apply</a></div>
+<div class="job-listing"><h3>Payroll Administrator</h3><p>Location: Remote</p><a href="/jobs/payroll-administrator">Apply</a></div>
+</body></html>`;
+  const csHtml = `<html><body>
+<div class="job-listing"><h3>Customer Support Specialist</h3><p>Location: Remote</p><a href="/jobs/customer-support-specialist">Apply</a></div>
+</body></html>`;
+  globalThis.fetch = async () => ({ ok: true, text: async () => shellHtml });
+  let calls = [];
+  const stubHasListings = async (url) => {
+    calls.push(url);
+    return { html: nonCsHtml, searchOutcome: 'has-listings', searchMs: 200, renderedUrl: url };
+  };
+  const stopped = await jobsMod.searchCompanyJobs(
+    { name: 'Stop Co', website: 'https://stop.example', careersUrl: '', isUSCompany: true },
+    resumeText,
+    { renderPage: stubHasListings, renderBudget: { used: 0, max: 2 } },
+  );
+  check(
+    'round18: has-listings + all-no-match stops after one render (no second target spent)',
+    calls.length === 1 &&
+      stopped.searchOutcome === 'has-listings' &&
+      stopped.postingsSeen === 4 &&
+      stopped.leads.length === 0 &&
+      stopped.renderAttempts.length === 1 &&
+      stopped.sourcePage === 'https://stop.example/careers',
+    { calls, searchOutcome: stopped.searchOutcome, postingsSeen: stopped.postingsSeen, attempts: stopped.renderAttempts },
+  );
+  calls = [];
+  const stubSearched = async (url) => {
+    calls.push(url);
+    if (calls.length === 1) return { html: nonCsHtml, searchOutcome: 'searched', searchMs: 200, renderedUrl: url };
+    return { html: csHtml, searchOutcome: 'searched', searchMs: 200, renderedUrl: url };
+  };
+  const continued = await jobsMod.searchCompanyJobs(
+    { name: 'Continue Co', website: 'https://continue.example', careersUrl: '', isUSCompany: true },
+    resumeText,
+    { renderPage: stubSearched, renderBudget: { used: 0, max: 2 } },
+  );
+  check(
+    'round18: searched + all-no-match still tries the next target and finds the role (values-page rule)',
+    calls.length === 2 && continued.leads.length === 1 && continued.searchOutcome === 'searched',
+    { calls, leads: continued.leads },
+  );
+
+  // --- Probe outline: the detector/extractor gap, made visible ----
+  // A TP-shaped list the strategies DO parse, and a shell the
+  // extractor finds nothing on: the outline must show the anchors
+  // and containers in the first case and an empty parse in the second.
+  const tpShapedHtml = `<html><body>
+<p>Results 1 – 10 of 34</p>
+<div class="job-tiles">
+  <div class="job-tile"><a class="job-tile-link" href="/en-us/careers/job-opportunities/customer-service-representative/">Customer Service Representative</a><span class="location">Remote, US</span></div>
+  <div class="job-tile"><a class="job-tile-link" href="/en-us/careers/job-opportunities/bilingual-customer-service-associate/">Bilingual Customer Service Associate</a><span class="location">Remote, US</span></div>
+</div>
+<script>window.__DATA__ = {"jobs": [{"title": "Customer Service Representative"}]};</script>
+</body></html>`;
+  const tpOutline = tcMod.buildMarkupOutline(tpShapedHtml, 'https://tp.example/en-us/careers/job-opportunities/');
+  check(
+    'round18: probe outline lists the job anchors + containers + count line on a parseable list',
+    tpOutline.anchorCount === 2 &&
+      tpOutline.detailAnchors.length === 2 &&
+      tpOutline.containers.some((c) => /job-tiles/.test(c.cls)) &&
+      tpOutline.countLines.length >= 1 &&
+      tpOutline.parsedPostings === 2 &&
+      tpOutline.scriptHint.length > 0,
+    tpOutline,
+  );
+  const emptyOutline = tcMod.buildMarkupOutline(
+    '<html><body><h1>Careers</h1><p>Welcome to our team page.</p></body></html>',
+    'https://empty.example/careers',
+  );
+  check(
+    'round18: probe outline is empty on a page with no job markup',
+    emptyOutline.anchorCount === 0 &&
+      emptyOutline.detailLinkCount === 0 &&
+      emptyOutline.parsedPostings === 0 &&
+      emptyOutline.containers.length === 0,
+    emptyOutline,
+  );
+  // Probe branch wiring: with the render disabled (this suite), the
+  // probe returns render-null instead of a markup outline.
+  const resProbe = mkRes();
+  await tcMod.default(
+    mkReq('POST', {
+      company: { name: 'Probe Co', website: '', careersUrl: 'https://probe.example/careers' },
+      resumeText,
+      probe: true,
+    }, { 'x-sync-key': 'testkey' }),
+    resProbe,
+  );
+  check(
+    'round18: probe mode answers with probe:true + render-null when the render is disabled',
+    resProbe.body?.probe === true && resProbe.body?.renderError === 'render-null' && resProbe.body?.markup === null,
+    resProbe.body,
+  );
+}
+
 async function testPaginationAndSearchScan() {
   // Pagination: a real list page that links "Next" is followed with
   // plain fetches (TalentBrew: 8/page over 38 pages; Concentrix JDQ:
@@ -5377,6 +5622,7 @@ await testRound8();
 await testRound9();
 await testRound11();
 await testRound17();
+await testRound18();
 await testPaginationAndSearchScan();
 await testTestCompany();
 await testJazzhr();

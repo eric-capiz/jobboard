@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>MockOmni — Home (blog-title gate)</title></head>
+<body>
+<!-- Round 18, fixture F3 — the live Omni homepage shape (2026-11-12
+     canary, v59D112CB): a marketing homepage with NO search box, per-country
+     "Find a Contract" links, and a blog article link whose title matches
+     the gate-opener words ("Choose Your Schedule" ~ "choose your"). The
+     live render clicked that title as a gate opener and navigated to the
+     article; /join/ never rendered. The country links carry /careers/
+     hrefs (two job-detail URLs -> portalContentScore +5), so this page
+     outranks /join/ as the first render target, exactly like live. -->
+<header>
+  <nav>
+    <a href="/omni-blog.html">Omni</a>
+    <a href="/omni-blog.html">Clients</a>
+    <a href="/omni-blog.html">Gig Workers</a>
+    <a href="/omni-join.html">Join Our Team</a>
+    <a href="/omni-leadership.html">Meet Our Leadership Team</a>
+  </nav>
+  <p>Locations — United States <a href="/careers/contract-us.html">Do You Qualify?</a> <a href="/careers/contract-us.html">Find a Contract</a> <a href="/omni-faqs.html">FAQs</a></p>
+  <p>Puerto Rico <a href="/careers/contract-pr.html">Do You Qualify?</a> <a href="/careers/contract-pr.html">Find a Contract</a> <a href="/omni-faqs.html">FAQs</a></p>
+</header>
+<main>
+  <h1>Work from anywhere</h1>
+  <p>Join thousands of gig workers delivering customer experiences from home.</p>
+  <h2>From the blog</h2>
+  <p><a href="/omni-blog-article.html">What Does &ldquo;Choose Your Schedule&rdquo; Mean at Omni?</a></p>
+</main>
+</body>
+</html>

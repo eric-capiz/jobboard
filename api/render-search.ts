@@ -1131,6 +1131,17 @@ export function selectGateAction(
   // and a bare "Area"/"Division" label is as likely a nav item as
   // a filter. The choose/select/pick phrasing still covers a gate
   // opener that names its field ("Choose your division").
+  // An opener is a SHORT imperative/label, never a headline or a
+  // question: a 9-word blog title ("What Does 'Choose Your
+  // Schedule' Mean at Omni?") and a 15-word FAQ question ("CAN I
+  // APPLY IF I LIVE IN A COUNTRY OTHER THAN THE UNITED STATES OR
+  // CANADA?") both matched the gate words and navigated the render
+  // onto an article/FAQ page (Omni + Working Solutions, 2026-11-12
+  // canary). A real opener is at most 6 words ("Find a job in your
+  // country" is exactly 6) and never starts with a question word.
+  // The word count runs on the label itself (label, else aria-label)
+  // — the concatenated text would double-count a control that
+  // carries both and block a legitimate 6-word opener.
   for (const c of scan.controls) {
     if (c.kind !== 'button' || !c.visible) continue;
     const text = `${c.label} ${c.ariaLabel}`.trim();
@@ -1138,6 +1149,10 @@ export function selectGateAction(
     if (excluded(text)) continue;
     if (/search jobs|find jobs|find a job/i.test(text) && gateOpened) continue;
     if (/^(meet|our|about|learn|view|explore|read|see|discover|join|contact|get)\b/i.test(text)) continue;
+    const openerLabel = normalizeGateLabel(c.label || c.ariaLabel);
+    const openerWords = openerLabel.split(/\s+/).filter(Boolean);
+    if (openerWords.length > 6) continue;
+    if (/^(what|how|why|when|where|which|who|whom|whose|can|could|should|would|will|do|does|did|is|are|was|were|may|might)\b/i.test(openerLabel)) continue;
     if (
       /\b(country|region|location|language|department|choose your|select your|pick your)\b/i.test(
         text,

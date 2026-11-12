@@ -14,7 +14,11 @@
     ['Quality Specialist', '/job/Quality-Specialist-Remote/5001/'],
     ['Resource Specialist', '/job/Resource-Specialist-Remote/5002/'],
     ['Real Time Analyst', '/job/Real-Time-Analyst-Remote/5003/'],
-    ['Payroll Administrator', '/job/Payroll-Administrator-Remote/5004/']
+    // Live NexRep shape (2026-11-12 canary): the 4th Paylocity item
+    // is "Share Your Information", a talent-pool signup link — not a
+    // role. It parsed as a posting and inflated postingsSeen to 4;
+    // the isJunkTitle CTA rule must drop it, leaving 3.
+    ['Share Your Information', '/job/Share-Your-Information-Remote/5004/']
   ];
   var list = document.createElement('div');
   // The class names are built dynamically so the literals 'job-list'

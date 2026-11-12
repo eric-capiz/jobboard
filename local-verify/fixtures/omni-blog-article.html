@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>MockOmni — What Does “Choose Your Schedule” Mean at Omni?</title></head>
+<body>
+<!-- Round 18, fixture F3 — the blog article page the live gate detoured
+     onto. It carries two "See open roles" links whose hrefs count for
+     countJobListings (they contain "careers") but are NOT job-detail
+     URLs (isJobDetailUrl is false for /about-careers/), so the page reads
+     as 'searched' via jobLinksNow while the extractor finds 0 postings
+     — the live 'searched', 0-postings signature. -->
+<header>
+  <nav><a href="/omni-blog.html">Home</a></nav>
+  <h1>What Does &ldquo;Choose Your Schedule&rdquo; Mean at Omni?</h1>
+</header>
+<main>
+  <p>At Omni, gig workers pick the hours that work for them. No fixed shifts, no minimums.</p>
+  <p><a href="/about-careers/">See open roles</a></p>
+  <p><a href="/our-careers/">See open roles</a></p>
+</main>
+</body>
+</html>

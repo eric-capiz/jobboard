@@ -69,6 +69,33 @@
  *      fast deaths must be free, the same-target retry must fire,
  *      and the loop must reach the later target inside a max-2
  *      budget (Teleperformance's RST shape).
+ *   F3. omni-blog.html — Omni homepage with no search box, per-country
+ *      "Find a Contract" links, and a blog article link whose title
+ *      matches the opener words ("What Does 'Choose Your Schedule'
+ *      Mean at Omni?"). The live gate clicked that title as an
+ *      opener and navigated onto the article; /join/ never rendered.
+ *      The guard must never pick it: the homepage ends no-form and
+ *      the loop retries the join portal.
+ *   F4. ws-faq.html — Working Solutions jobs homepage with an FAQ
+ *      accordion whose 15-word question matches the opener word
+ *      "country", ahead of the real country dropdown in the DOM. The
+ *      live gate clicked the FAQ question; the guard must skip all
+ *      three FAQ questions (question-word starts + word caps) and
+ *      drive the country dropdown instead. The FAQ click is an
+ *      accordion toggle (no navigation, like live), so the driver
+ *      case proves the end state; the suite test is the
+ *      before/after on the opener itself.
+ *   I3. nexrep-tail.html — NexRep careers page with a "Work from
+ *      Home" link (in a dropdown-menu container) to a register page,
+ *      plus the Paylocity list. After the Paylocity list renders
+ *      'has-listings' with its roles surfaced, the loop must NOT
+ *      spend its second render on this page — the live tail drifted
+ *      to the register form and the outcome read 'no-form' with the
+ *      register URL.
+ *   P. probe mode — calls the test-company handler with probe:true
+ *      against tp-jobs.html and checks the markup outline end to
+ *      end (the 4 job anchors, the extractor's parsed count, the
+ *      results-count line).
  *
  * Run: esbuild local-verify/driver.ts --bundle --platform=node
  *        --format=cjs --external:mongodb --outfile=/tmp/local-driver.cjs
@@ -80,6 +107,7 @@
 import { readFileSync } from 'node:fs';
 import { searchCompanyJobs, portalSearchTerm } from '../api/find-jobs.js';
 import { renderPageHtml, type RenderPageResult } from '../api/render-page.js';
+import testCompanyHandler from '../api/test-company.js';
 
 const RESUME = readFileSync(
   '/home/hatch/workspace/jobboard/sweep-2026-11-11-cs-v4/resume.txt',
@@ -268,10 +296,14 @@ async function main(): Promise<void> {
   check('H: render was used', h.renderUsed === true, h.renderUsed);
 
   // ---- Fixture I: NexRep (board-linked non-CS roles — 0 leads is correct) ----
+  // Round 18: the 4th Paylocity item is "Share Your Information", a
+  // talent-pool signup link (live 2026-11-12 canary) — junk, not a
+  // role — so 3 postings is the correct count, not 4.
   const i = await runCase('MockNexRep', `${BASE}/nexrep.html`);
   summarize('I', i);
-  check('I: 4 postings seen (Paylocity-style board reached from the walk)', i.postingsSeen === 4, i.postingsSeen);
-  check('I: 0 leads is correct (Quality/Resource/Real Time/Payroll are not CS)', (i.leads ?? []).length === 0, i.leads);
+  check('I: 3 postings seen (Paylocity-style board reached from the walk; Share Your Information is junk)', i.postingsSeen === 3, i.postingsSeen);
+  check('I: 0 leads is correct (Quality/Resource/Real Time are not CS)', (i.leads ?? []).length === 0, i.leads);
+  check('I: "Share Your Information" never surfaces as a posting', !(i.screened?.rejected ?? []).some((r) => r.title === 'Share Your Information'), i.screened?.rejected);
 
   // ---- Fixture J: Working Solutions (non-CS roles — 0 leads is correct) ----
   const j = await runCase('MockWS', `${BASE}/ws.html`);
@@ -332,11 +364,18 @@ async function main(): Promise<void> {
   // ---- Fixture I2: NexRep JS portal (Paylocity-shaped list URL) ----
   const i2 = await runCase('MockNexRepJS', `${BASE}/nexrep-js.html`);
   summarize('I2', i2);
-  check('I2: 4 postings seen (JS shell surfaced by the render)', i2.postingsSeen === 4, i2.postingsSeen);
-  check('I2: 0 leads is correct (Quality/Resource/Real Time/Payroll are not CS)', (i2.leads ?? []).length === 0, i2.leads);
+  check('I2: 3 postings seen (JS shell surfaced by the render; Share Your Information is junk)', i2.postingsSeen === 3, i2.postingsSeen);
+  check('I2: 0 leads is correct (Quality/Resource/Real Time are not CS)', (i2.leads ?? []).length === 0, i2.leads);
   check('I2: the Paylocity-shaped list URL is the first render target', (i2.renderTargets ?? [])[0]?.url.includes('/recruiting/jobs/All/') === true, i2.renderTargets);
   check('I2: source page is the Paylocity-shaped list URL', typeof i2.sourcePage === 'string' && i2.sourcePage.includes('/recruiting/jobs/All/'), i2.sourcePage);
   check('I2: render was used', i2.renderUsed === true, i2.renderUsed);
+  // Round 18 tail: the Paylocity list reported 'has-listings' with its
+  // roles surfaced, so the loop must NOT spend its second render on
+  // the careers page — the outcome stays 'has-listings' on the
+  // Paylocity URL (live: 'no-form' with the register URL).
+  check('I2: search outcome is has-listings (the list page, not the tail)', i2.searchOutcome === 'has-listings', i2.searchOutcome);
+  check('I2: rendered URL stays on the Paylocity list (no drift to the careers page)', typeof i2.renderedUrl === 'string' && i2.renderedUrl.includes('/recruiting/jobs/All/'), i2.renderedUrl);
+  check('I2: exactly one render attempt (the second render is not spent)', (i2.renderAttempts ?? []).length === 1, i2.renderAttempts);
 
   // ---- Fixture T: Teleperformance flaky render (fast deaths are free) ----
   // A stub renderer that dies fast twice on the entry target, then
@@ -368,6 +407,102 @@ async function main(): Promise<void> {
   check('T: first two calls hit the same target (the free same-target retry)', tTargets[0] === tTargets[1] && tTargets[0] === `${BASE}/tp-flaky.html`, tTargets);
   check('T: third call reached the next target (tp-flaky-b.html)', (tTargets[2] ?? '').includes('tp-flaky-b.html'), tTargets);
   check('T: 3 leads from the served results', tLeads.length === 3, tLeads);
+
+  // ---- Fixture F3: Omni blog-title gate (round 18) ----
+  // Homepage with no search box: the search step finds no form, so the
+  // gate loop is where the live render clicked the blog article title
+  // as an opener and navigated onto the article. The guard must never
+  // pick it: the homepage ends no-form and the loop retries the join
+  // portal instead.
+  const f3 = await runCase('MockOmniBlog', `${BASE}/omni-blog.html`);
+  const f3Leads = f3.leads ?? [];
+  summarize('F3', f3);
+  check('F3: search outcome is searched (via the join portal)', f3.searchOutcome === 'searched', f3.searchOutcome);
+  check('F3: landed on the join portal search results', typeof f3.renderedUrl === 'string' && f3.renderedUrl.includes('omni-search.html'), f3.renderedUrl);
+  check('F3: 3 US leads (Retention is Virginia on-site)', f3Leads.length === 3 && f3Leads.some((l) => l.title === 'Remote Customer Service Representative' && l.matchScore === 70), f3Leads);
+  check('F3: gate log never shows the blog article title', !(f3.renderAttempts ?? []).some((x) => (x.searchGateClicked ?? '').includes('Choose Your Schedule')), f3.renderAttempts);
+  check('F3: the homepage rendered first (it outranks /join/ on content)', (f3.renderAttempts ?? [])[0]?.target?.includes('omni-blog.html') === true, f3.renderAttempts);
+  check('F3: the first attempt ended no-form (no blog detour)', (f3.renderAttempts ?? [])[0]?.outcome === 'no-form', f3.renderAttempts);
+  check('F3: exactly two render attempts (homepage no-form, then join)', (f3.renderAttempts ?? []).length === 2, f3.renderAttempts);
+
+  // ---- Fixture F4: Working Solutions FAQ gate (round 18) ----
+  // Jobs homepage with an FAQ accordion whose 15-word question matches
+  // the opener word "country", ahead of the real country dropdown in
+  // the DOM. The live gate clicked the FAQ question; the guard must
+  // skip all three FAQ questions (question-word starts + word caps)
+  // and drive the country dropdown instead. The FAQ click is an
+  // accordion toggle (no navigation, like live), so the suite test is
+  // the before/after on the opener itself — this case proves the end
+  // state: the US list, 3 leads, gate log ending on the US pick.
+  const f4 = await runCase('MockWSFaq', `${BASE}/ws-faq.html`);
+  const f4Leads = f4.leads ?? [];
+  summarize('F4', f4);
+  check('F4: search outcome is searched', f4.searchOutcome === 'searched', f4.searchOutcome);
+  check('F4: landed on the US results page', typeof f4.renderedUrl === 'string' && f4.renderedUrl.includes('ws-faq-us.html'), f4.renderedUrl);
+  check('F4: 3 US leads', f4Leads.length === 3 && f4Leads.some((l) => l.title === 'Remote Customer Service Representative' && l.matchScore === 70), f4Leads);
+  check('F4: gate log never shows any FAQ question', !(f4.renderAttempts ?? []).some((x) => /CAN I APPLY|HOW DO I APPLY|WHAT IS WORKING/i.test(x.searchGateClicked ?? '')), f4.renderAttempts);
+  check('F4: gate log shows the "United States" pick', (f4.renderAttempts ?? []).some((x) => x.searchGateClicked === 'United States'), f4.renderAttempts);
+
+  // ---- Fixture I3: NexRep register drift (round 18) ----
+  // Careers page with a "Work from Home" link to a register page, plus
+  // the Paylocity list. After the list renders 'has-listings' with its
+  // roles surfaced, the loop must NOT spend its second render here —
+  // the live tail drifted to the register form and the outcome read
+  // 'no-form' with the register URL.
+  const i3 = await runCase('MockNexRepTail', `${BASE}/nexrep-tail.html`);
+  summarize('I3', i3);
+  check('I3: 3 postings seen (Paylocity list; Share Your Information is junk)', i3.postingsSeen === 3, i3.postingsSeen);
+  check('I3: 0 leads is correct (Quality/Resource/Real Time are not CS)', (i3.leads ?? []).length === 0, i3.leads);
+  check('I3: search outcome is has-listings (the list page, not the tail)', i3.searchOutcome === 'has-listings', i3.searchOutcome);
+  check('I3: rendered URL stays on the Paylocity list (no register drift)', typeof i3.renderedUrl === 'string' && i3.renderedUrl.includes('/recruiting/jobs/All/'), i3.renderedUrl);
+  check('I3: exactly one render attempt (the careers page is never rendered)', (i3.renderAttempts ?? []).length === 1, i3.renderAttempts);
+  check('I3: gate log never shows "Work from Home"', !(i3.renderAttempts ?? []).some((x) => x.searchGateClicked === 'Work from Home'), i3.renderAttempts);
+
+  // ---- Fixture P: probe mode end-to-end (round 18) ----
+  // The test-company probe renders tp-jobs.html directly and returns
+  // the markup outline: the 4 job anchors must show up, with the
+  // extractor's own parsed count agreeing.
+  process.env.SYNC_KEY = 'test-key';
+  const probeReq = {
+    method: 'POST',
+    headers: { 'x-sync-key': 'test-key' },
+    body: {
+      company: { name: 'MockTPProbe', website: `${BASE}/tp-jobs.html`, careersUrl: `${BASE}/tp-jobs.html` },
+      resumeText: RESUME,
+      probe: true,
+    },
+  } as unknown as Parameters<typeof testCompanyHandler>[0];
+  let probeStatus = 0;
+  let probeBody: {
+    probe?: boolean;
+    searchOutcome?: string | null;
+    markup?: { anchors?: { text: string }[]; parsedPostings?: number; countLines?: string[] } | null;
+  } | null = null;
+  const probeRes = {
+    status: (c: number) => {
+      probeStatus = c;
+      return probeRes;
+    },
+    json: (o: NonNullable<typeof probeBody>) => {
+      probeBody = o;
+      return probeRes;
+    },
+  } as unknown as Parameters<typeof testCompanyHandler>[1];
+  await testCompanyHandler(probeReq, probeRes);
+  const pMarkup = probeBody?.markup ?? null;
+  // eslint-disable-next-line no-console
+  console.log(
+    `P probe: status=${probeStatus} outcome=${probeBody?.searchOutcome} anchors=${JSON.stringify(pMarkup?.anchors?.map((a) => a.text))} parsed=${pMarkup?.parsedPostings} countLines=${JSON.stringify(pMarkup?.countLines)}`,
+  );
+  check('P: probe answers 200 with probe:true', probeStatus === 200 && probeBody?.probe === true, { probeStatus, probeBody });
+  check('P: probe search outcome is searched (the US pick ran)', probeBody?.searchOutcome === 'searched', probeBody?.searchOutcome);
+  check(
+    'P: probe outline lists the 4 TP job anchors',
+    (pMarkup?.anchors ?? []).length === 4 && (pMarkup?.anchors ?? []).some((a) => a.text === 'Customer Service Representative'),
+    pMarkup?.anchors,
+  );
+  check('P: probe outline parsed count agrees with the extractor (4)', pMarkup?.parsedPostings === 4, pMarkup?.parsedPostings);
+  check('P: probe outline carries the results-count line', (pMarkup?.countLines ?? []).some((l) => /of 4/.test(l)), pMarkup?.countLines);
 
   // eslint-disable-next-line no-console
   console.log(failures === 0 ? 'LOCAL-RENDER-ALL-PASS' : `LOCAL-RENDER-${failures}-FAILURES`);

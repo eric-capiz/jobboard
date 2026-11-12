@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>MockNexRep — Careers (register drift)</title></head>
+<body>
+<!-- Round 18, fixture I3 — the live NexRep tail (2026-11-12 canary,
+     v59D112CB): after the Paylocity list rendered 'has-listings' with
+     its 4 roles (all no-match), the loop spent its second render on
+     this careers page, where the gate picked "Work from Home" and
+     navigated to marketplacedev.nexrepapps.com/register — so the final
+     outcome read 'no-form' with the register URL even though the
+     postings were the Paylocity ones. The "Work from Home" link sits
+     in a dropdown-menu container (inPicker), so the remote pick fires
+     without a prior opener — the live shape. -->
+<header>
+  <nav><a href="/nexrep-tail.html">Careers at NexRep</a></nav>
+</header>
+<h1>Agent Opportunities</h1>
+<p>NexRep agents work from home across the US. Our roles are posted on our hiring portal:</p>
+<p><a href="/recruiting/jobs/All/73b38a10-35d0-4c94-a004-b534bb49e176/NexRep-LLC.html">Click here to see and apply for current NexRep career opportunities</a></p>
+<div class="dropdown-menu">
+  <a href="/marketplace-register.html">Work from Home</a>
+</div>
+</body>
+</html>

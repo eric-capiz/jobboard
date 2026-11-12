@@ -20,7 +20,11 @@
     <span class="location">Remote, US</span>
   </div>
   <div class="job-card">
-    <a href="/job/Payroll-Administrator-Remote/5004/">Payroll Administrator</a>
+    <!-- Live NexRep shape (2026-11-12 canary): the 4th Paylocity item
+         is "Share Your Information", a talent-pool signup link — not a
+         role. It parsed as a posting and inflated postingsSeen to 4;
+         the isJunkTitle CTA rule must drop it, leaving 3. -->
+    <a href="/job/Share-Your-Information-Remote/5004/">Share Your Information</a>
     <span class="location">Remote, US</span>
   </div>
 </div>

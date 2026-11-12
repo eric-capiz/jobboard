@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>MockWorkingSolutions — Remote Agent Jobs (FAQ gate)</title></head>
+<body>
+<!-- Round 18, fixture F4 — the live Working Solutions jobs-homepage
+     shape (2026-11-12 canary, v59D112CB): a WordPress jobs homepage with
+     a header site search, an FAQ accordion whose question buttons match
+     the gate-opener words ("CAN I APPLY IF I LIVE IN A COUNTRY OTHER
+     THAN THE UNITED STATES OR CANADA?" — 15 words, matches "country"),
+     and a real "Select your country" dropdown behind it. The live gate
+     clicked the FAQ question instead of the country dropdown. The FAQ
+     buttons toggle an answer in place (no navigation), exactly like
+     live (the render stayed on the jobs homepage). -->
+<header>
+  <h1>Remote Agent Jobs</h1>
+  <form action="/ws-faq.html" method="get" role="search">
+    <input type="search" name="s" placeholder="Search" aria-label="Search">
+    <button type="submit">Search</button>
+  </form>
+</header>
+<main>
+  <h2>Frequently asked questions</h2>
+  <div class="faq">
+    <button type="button" class="faq-q" data-answer="a1">HOW DO I APPLY TO WORKING SOLUTIONS?</button>
+    <div id="a1" style="display:none"><p>Click Apply Now and complete the application.</p></div>
+    <button type="button" class="faq-q" data-answer="a2">CAN I APPLY IF I LIVE IN A COUNTRY OTHER THAN THE UNITED STATES OR CANADA?</button>
+    <div id="a2" style="display:none"><p>At this time we only accept agents in the United States and Canada.</p></div>
+    <button type="button" class="faq-q" data-answer="a3">WHAT IS WORKING SOLUTIONS?</button>
+    <div id="a3" style="display:none"><p>Working Solutions connects independent contractors with clients.</p></div>
+  </div>
+  <button id="country-btn" type="button" aria-haspopup="true" aria-expanded="false">Select your country</button>
+  <div id="country-menu" class="dropdown-menu" style="display:none">
+    <button type="button" data-href="/ws-faq-us.html">United States</button>
+    <button type="button" data-href="/ws-faq-other.html">Canada</button>
+  </div>
+  <p><a href="/ws-faq-us.html">Apply Now</a></p>
+</main>
+<script>
+  document.querySelectorAll('.faq-q').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var a = document.getElementById(b.getAttribute('data-answer'));
+      a.style.display = a.style.display === 'block' ? 'none' : 'block';
+    });
+  });
+  document.getElementById('country-btn').addEventListener('click', function () {
+    var menu = document.getElementById('country-menu');
+    var open = menu.style.display === 'block';
+    menu.style.display = open ? 'none' : 'block';
+    this.setAttribute('aria-expanded', open ? 'false' : 'true');
+  });
+  document.querySelectorAll('#country-menu button').forEach(function (b) {
+    b.addEventListener('click', function () { window.location.href = b.getAttribute('data-href'); });
+  });
+</script>
+</body>
+</html>

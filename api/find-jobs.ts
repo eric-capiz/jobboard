@@ -926,6 +926,13 @@ export function isJunkTitle(title: string): boolean {
   // 2026-11-12 local round). A real role title is never exactly
   // one of these words.
   if (/^(next|previous|prev|back|more|load more|show more|view all)$/i.test(t)) return true;
+  // A talent-pool / signup CTA is never a role: Paylocity's "Share
+  // Your Information" (a link to join the talent pool) parsed as a
+  // posting and inflated NexRep's postingsSeen to 4 (2026-11-12
+  // canary). Same shape: Workday's "Introduce Yourself", and any
+  // "submit/upload your CV" pool link. A real role title never
+  // starts with one of these phrases.
+  if (/^(share your (information|info|details)|submit your (information|info|application)|upload your (cv|resume|information|profile)|introduce yourself)\b/i.test(t)) return true;
   // A real job title never starts with one of these verbs.
   if (/^(join|become|apply)\b/i.test(t)) return true;
   // Category labels: 'Jobs near you', 'Jobs for veterans ...',
@@ -1600,13 +1607,26 @@ export function renderTargetScore(u: string, careersUrl: string): number {
  *  cheap regex pass over the raw HTML: no parsing, no extra fetches. */
 export function portalContentScore(html: string): number {
   let score = 0;
+  // A site search is not a job search: a form whose action is the
+  // site root (WordPress-style /?s= search) must not credit the page
+  // as a portal — Omni's corporate-careers page carries exactly such
+  // a header search (action="/", placeholder "Search jobs"), and the
+  // +5 put it ahead of the /join/ portal, burning a render on a
+  // no-form marketing page (2026-11-12 canary). Strip those forms
+  // before the input test; a job-search form submits to a results
+  // endpoint, never to "/". (An empty/missing action is left alone:
+  // submitting to the current URL IS the job search on a portal page.)
+  const withoutSiteSearch = html.replace(
+    /<form[^>]*\baction\s*=\s*["']\/["'][^>]*>[\s\S]*?<\/form\s*>/gi,
+    ' ',
+  );
   if (
     /<input[^>]*\b(name|id|placeholder|aria-label|class)\s*=\s*["'][^"']*(keyword|job[^"']*search|search[^"']*(job|career|position|title|role)|career[^"']*search)/i.test(
-      html,
+      withoutSiteSearch,
     )
   ) {
     score += 5;
-  } else if (/<input[^>]*\bname\s*=\s*["']q["']/i.test(html)) {
+  } else if (/<input[^>]*\bname\s*=\s*["']q["']/i.test(withoutSiteSearch)) {
     // A bare q input on a careers page is the job search, not a
     // site search — the careers walk only ever sees careers pages.
     score += 3;
@@ -2125,8 +2145,20 @@ export async function searchCompanyJobs(
           // at once). Remember it as the render fallback and try
           // the next target; a page with a lead, or a real role
           // rejected only on location, still returns at once.
+          // EXCEPT when the page reported 'has-listings': its own
+          // results-count line says listings ARE on it, and the
+          // roles on it are the company's roles — trying the next
+          // target only re-reads a different page (NexRep: the
+          // careers page after the Paylocity list, whose gate drifts
+          // to a register form, 2026-11-12 canary). A marketing /
+          // teaser page never reports 'has-listings' (no
+          // results-count line — TP's values page reported
+          // 'no-form', same canary), so the fallback-and-continue
+          // rule still applies to every other outcome. Stopping here
+          // also saves the second render.
           if (screened.leads.length === 0 && screened.rejectedLocation === 0) {
             if (!fallbackPostings && !renderFallback) renderFallback = { postings: pagePostings, url: target };
+            if (searchOutcome === 'has-listings') break;
             continue;
           }
           return {
