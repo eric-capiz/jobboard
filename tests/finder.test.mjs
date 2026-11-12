@@ -3210,6 +3210,170 @@ async function testRound5() {
   );
 }
 
+async function testRound6() {
+  // Batch 6 (2026-11-12 canary vs 3aaab611): a page whose postings
+  // all die as no-match is not the list — in the WALK or in the
+  // RENDER (Teleperformance's values page parsed two junk
+  // "postings" and the walk returned it as "the list" while the real
+  // portal was never rendered); a marketing sentence is junk; the
+  // accept step reports the button labels it could see
+  // (Foundever/Sitel).
+  const jobsMod = freshRequire(`${OUT}/find-jobs.cjs`);
+  const resumeText =
+    'Customer service representative with phone support experience, technical support, troubleshooting, billing questions, and help desk work for members';
+
+  // --- isJunkTitle: a sentence is junk ---------------------------
+  // Teleperformance's values page parsed as a posting titled 'We
+  // believe that all employees need to be treated with respect,
+  // dignity, and acceptance.' — a 15-word sentence ending in a
+  // period. The word count guards abbreviations: 'Customer Service
+  // Rep.' is three words and a real title.
+  check(
+    'gate-sentence: a marketing sentence ending in a period is junk',
+    jobsMod.isJunkTitle('We believe that all employees need to be treated with respect, dignity, and acceptance.') === true &&
+      jobsMod.isJunkTitle('Driven by values. United by culture.') === true,
+    null,
+  );
+  check(
+    'gate-sentence: a short title ending in an abbreviation period is still real',
+    jobsMod.isJunkTitle('Customer Service Rep.') === false &&
+      jobsMod.isJunkTitle('Customer Support Specialist') === false,
+    null,
+  );
+
+  // --- Walk + render: an all-no-match page does not stop the walk
+  // and does not stop the render ----------------------------------
+  // Teleperformance's live sequence, replayed: the opportunities
+  // page carries one teaser, the values page parses two junk
+  // "postings" ('Jamaica', 'Our Culture'), and the values page
+  // scores 10 as a render target (job-list markers + two detail
+  // links) — it OUTRANKS the jobs homepage (6), so the render goes
+  // there first. Both the walk and the render must pass it by and
+  // reach the real portal; the accept-step labels ride the attempt
+  // record on the way.
+  const teleTeaserHtml = `<html><body>
+<div class="job-listing"><h3>Customer Support Specialist</h3><p>Location: Remote</p><a href="/jobs/customer-support-specialist">Apply</a></div>
+</body></html>`;
+  const teleValuesHtml = `<html><body>
+<div class="job-listing"><a href="/en-us/careers/jamaica/">Jamaica</a></div>
+<div class="job-listing"><a href="/en-us/careers/our-culture/">Our Culture</a></div>
+</body></html>`;
+  const teleListHtml = `<html><body>
+<div class="job-listing"><h3>Customer Support Specialist</h3><p>Location: Remote</p><a href="/jobs/customer-support-specialist">Apply</a></div>
+<div class="job-listing"><h3>Member Services Representative</h3><p>Location: Remote</p><a href="/jobs/member-services-representative">Apply</a></div>
+<div class="job-listing"><h3>Call Center Agent</h3><p>Location: Remote</p><a href="/jobs/call-center-agent">Apply</a></div>
+</body></html>`;
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u === 'https://jobs.tele.example' || u === 'https://jobs.tele.example/careers' || u === 'https://jobs.tele.example/jobs') {
+      throw new Error('RST');
+    }
+    if (u === 'https://tele.example') {
+      return { ok: true, text: async () => `<html><body><a href="/en-us/careers/job-opportunities/">See all jobs</a><a href="/en-us/careers/our-values-and-philosophy/">Our values</a></body></html>` };
+    }
+    if (u === 'https://tele.example/en-us/careers/job-opportunities/') return { ok: true, text: async () => teleTeaserHtml };
+    if (u === 'https://tele.example/en-us/careers/our-values-and-philosophy/') return { ok: true, text: async () => teleValuesHtml };
+    return { ok: true, text: async () => '<html><body>No careers here.</body></html>' };
+  };
+  const renderedCalls = [];
+  const stubValuesFirst = async (url) => {
+    renderedCalls.push(url);
+    if (url.includes('our-values')) {
+      return { html: teleValuesHtml, searchOutcome: 'has-listings', searchMs: 300, renderedUrl: url, cookieClicks: 0, bannerPresent: false, bannerButtons: ['BUTTON:Accept All Cookies', 'A:Privacy Policy'] };
+    }
+    return { html: teleListHtml, searchOutcome: 'has-listings', searchMs: 300, renderedUrl: url, cookieClicks: 1, bannerPresent: true, bannerButtons: ['BUTTON:Accept All Cookies'] };
+  };
+  const tele = await jobsMod.searchCompanyJobs(
+    { name: 'Teleperformance', website: 'https://jobs.tele.example', careersUrl: '', isUSCompany: true },
+    resumeText,
+    { renderPage: stubValuesFirst },
+  );
+  check(
+    'all-nomatch: the junk values page does not stop the walk or the render; the portal wins',
+    renderedCalls.length === 2 &&
+      renderedCalls[0].includes('our-values') &&
+      renderedCalls[1] === 'https://jobs.tele.example' &&
+      tele.postingsSeen === 3 &&
+      tele.leads.length >= 2 &&
+      tele.renderUsed === true &&
+      tele.sourcePage === 'https://jobs.tele.example',
+    { renderedCalls, postingsSeen: tele.postingsSeen, leads: tele.leads.length, sourcePage: tele.sourcePage },
+  );
+  check(
+    'banner-buttons: the accept-step labels ride the attempt record',
+    tele.renderAttempts.length === 2 &&
+      (tele.renderAttempts[0]?.bannerButtons ?? []).includes('BUTTON:Accept All Cookies') &&
+      tele.renderAttempts[1]?.cookieClicks === 1 &&
+      tele.renderAttempts[1]?.bannerPresent === true,
+    tele.renderAttempts,
+  );
+  // Same company, the render finds nothing at all: the remembered
+  // walk teaser (a real lead) still returns — it beats the
+  // rendered page's junk.
+  const stubDead = async (url) => {
+    renderedCalls.push(url);
+    return { html: '', searchOutcome: 'no-form', searchMs: 100, renderedUrl: url, cookieClicks: 0, bannerPresent: false, bannerButtons: [] };
+  };
+  renderedCalls.length = 0;
+  const teleDead = await jobsMod.searchCompanyJobs(
+    { name: 'Teleperformance', website: 'https://jobs.tele.example', careersUrl: '', isUSCompany: true },
+    resumeText,
+    { renderPage: stubDead },
+  );
+  check(
+    'all-nomatch: with a dead render the walk teaser still returns as the fallback',
+    teleDead.postingsSeen === 1 &&
+      teleDead.sourcePage === 'https://tele.example/en-us/careers/job-opportunities/' &&
+      teleDead.leads.length === 1,
+    { postingsSeen: teleDead.postingsSeen, sourcePage: teleDead.sourcePage, leads: teleDead.leads.length },
+  );
+
+  // --- Walk: a list rejected only on location still returns early
+  // (TTEC's Athens roles) — it IS the list, just the wrong place.
+  const athensHtml = `<html><body>
+<div class="job-listing"><h3>Customer Service Representative</h3><p>Location: Athens, Greece</p><a href="/jobs/customer-service-representative">Apply</a></div>
+<div class="job-listing"><h3>Customer Support Specialist</h3><p>Location: Athens, Greece</p><a href="/jobs/customer-support-specialist">Apply</a></div>
+</body></html>`;
+  globalThis.fetch = async () => ({ ok: true, text: async () => athensHtml });
+  const athens = await jobsMod.searchCompanyJobs(
+    { name: 'Athens Co', website: 'https://athens.example', careersUrl: '', isUSCompany: true },
+    resumeText,
+    {},
+  );
+  check(
+    'all-nomatch: a list rejected only on location still returns early, unrendered',
+    athens.renderAttempted === false &&
+      athens.postingsSeen === 2 &&
+      athens.sourcePage === 'https://athens.example' &&
+      athens.leads.length === 0,
+    { renderAttempted: athens.renderAttempted, postingsSeen: athens.postingsSeen, sourcePage: athens.sourcePage },
+  );
+
+  // --- Render fallback: no walk postings, every render target
+  // all-no-match — the rendered postings still come back, so
+  // postingsSeen is not lost (NexRep's 4 correct rejections).
+  const noMatchHtml = `<html><body>
+<div class="job-listing"><h3>Quality Specialist</h3><p>Location: Remote</p><a href="/jobs/quality-specialist">Apply</a></div>
+<div class="job-listing"><h3>Field Service Technician</h3><p>Location: Remote</p><a href="/jobs/field-service-technician">Apply</a></div>
+<div class="job-listing"><h3>Sales Manager</h3><p>Location: Remote</p><a href="/jobs/sales-manager">Apply</a></div>
+<div class="job-listing"><h3>Accounting Analyst</h3><p>Location: Remote</p><a href="/jobs/accounting-analyst">Apply</a></div>
+</body></html>`;
+  globalThis.fetch = async () => ({ ok: true, text: async () => '<html><body>No careers here.</body></html>' });
+  const stubNoMatch = async (url) => ({
+    html: noMatchHtml, searchOutcome: 'has-listings', searchMs: 300, renderedUrl: url, cookieClicks: 0, bannerPresent: false, bannerButtons: [],
+  });
+  const nex = await jobsMod.searchCompanyJobs(
+    { name: 'Nex Co', website: 'https://nex.example', careersUrl: '', isUSCompany: true },
+    resumeText,
+    { renderPage: stubNoMatch },
+  );
+  check(
+    'all-nomatch: an all-rejected render still returns its postings as the fallback',
+    nex.postingsSeen === 4 && nex.leads.length === 0 && nex.renderAttempts.length === 2,
+    { postingsSeen: nex.postingsSeen, leads: nex.leads.length, attempts: nex.renderAttempts.length },
+  );
+}
+
 async function testMatchingFixes() {
   // The 0/3004 fix round: synonym groups replace the hard title gate,
   // location becomes three-way (ok / review / reject), and JSON-LD on
@@ -3664,6 +3828,7 @@ await testJunkWalkAndRender();
 await testTalentBrewAndRenderError();
 await testRound4();
 await testRound5();
+await testRound6();
 await testPaginationAndSearchScan();
 await testTestCompany();
 await testJazzhr();

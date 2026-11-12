@@ -696,6 +696,10 @@ export interface CompanySearchResult {
      *  was clicked). */
     cookieClicks: number;
     bannerPresent: boolean;
+    /** The visible button/link labels the accept step last saw on
+     *  this target — what the accept step could see while the banner
+     *  was up. */
+    bannerButtons: string[];
   }[];
   /** The render targets in the order the loop tried them (best score
    *  first), with their scores — so a live canary can say whether a
@@ -792,6 +796,13 @@ export function isJunkTitle(title: string): boolean {
   // A question is a CTA, never a role: 'Ready to Build Better
   // Customer Operations?', 'Looking for your next opportunity?'.
   if (/\?\s*$/.test(t)) return true;
+  // A sentence is marketing copy, never a role: Teleperformance's
+  // values page parses as a posting titled 'We believe that all
+  // employees need to be treated with respect, dignity, and
+  // acceptance.' — a 15-word sentence ending in a period. The word
+  // count guards abbreviations: 'Customer Service Rep.' is three
+  // words and a real title; a six-word sentence is not.
+  if (/\.\s*$/.test(t) && t.split(/\s+/).length >= 6) return true;
   // A real job title never starts with one of these verbs.
   if (/^(join|become|apply)\b/i.test(t)) return true;
   // Category labels: 'Jobs near you', 'Jobs for veterans ...',
@@ -1588,6 +1599,7 @@ export async function searchCompanyJobs(
     renderedUrl: string;
     cookieClicks: number;
     bannerPresent: boolean;
+    bannerButtons: string[];
   }[] = [];
   let renderTargets: { url: string; score: number }[] = [];
   // A single posting on a non-list page, remembered while the walk
@@ -1596,6 +1608,13 @@ export async function searchCompanyJobs(
   // real portal holds hundreds, 2026-11-12 canary). Returned only
   // when neither the walk nor the render finds a real list.
   let fallbackPostings: { postings: Posting[]; url: string } | null = null;
+  // A rendered page whose postings all die as no-match, remembered
+  // the same way — the render loop no longer returns such a page as
+  // "the list" (it continues to the next target), and these postings
+  // come back if every target is junk. Only set when the walk
+  // remembered nothing: a walk teaser is a real lead, and it wins
+  // over a rendered page's junk.
+  let renderFallback: { postings: Posting[]; url: string } | null = null;
   // Deferred rendering: the plain-HTML walk runs FIRST and the render
   // fires only after it, on the single most promising zero-yielding
   // candidate. Rendering the first zero-yielding candidate mid-walk
@@ -1665,30 +1684,42 @@ export async function searchCompanyJobs(
         if (!fallbackPostings) fallbackPostings = { postings: pagePostings, url: u };
       } else {
         const screened = screenPostings(company.name, pagePostings, resumeText, company.isUSCompany ?? false);
-        return {
-          leads: screened.leads,
-          postingsSeen: pagePostings.length,
-          sourcePage: u,
-          triedUrls,
-          fetchOk: true,
-          screened: {
-            rejectedNoMatch: screened.rejectedNoMatch,
-            rejectedLocation: screened.rejectedLocation,
-            reviewLocation: screened.reviewLocation,
-            rejected: screened.rejected,
-          },
-          renderUsed,
-          renderAttempted,
-          renderMs,
-          renderError,
-          searchOutcome,
-          searchScan,
-          searchMs,
-          renderedUrl,
-          renderTextSample,
-          renderAttempts,
-          renderTargets,
-        };
+        // A page whose postings ALL die as no-match is not the list
+        // — either the extractor misread the page (Teleperformance's
+        // values page: two junk "postings", 2026-11-12 canary) or the
+        // roles genuinely don't match. Either way the render deserves
+        // its chance, and the remembered postings come back as the
+        // fallback if it finds nothing. A page with a lead — or a
+        // real role rejected only on location (TTEC's Athens roles) —
+        // IS the list: return it at once, as before.
+        if (screened.leads.length === 0 && screened.rejectedLocation === 0) {
+          if (!fallbackPostings) fallbackPostings = { postings: pagePostings, url: u };
+        } else {
+          return {
+            leads: screened.leads,
+            postingsSeen: pagePostings.length,
+            sourcePage: u,
+            triedUrls,
+            fetchOk: true,
+            screened: {
+              rejectedNoMatch: screened.rejectedNoMatch,
+              rejectedLocation: screened.rejectedLocation,
+              reviewLocation: screened.reviewLocation,
+              rejected: screened.rejected,
+            },
+            renderUsed,
+            renderAttempted,
+            renderMs,
+            renderError,
+            searchOutcome,
+            searchScan,
+            searchMs,
+            renderedUrl,
+            renderTextSample,
+            renderAttempts,
+            renderTargets,
+          };
+        }
       }
     }
     // Zero REAL postings — the page stays eligible for the render.
@@ -1755,6 +1786,7 @@ export async function searchCompanyJobs(
         renderedUrl: rendered?.renderedUrl ?? '',
         cookieClicks: rendered?.cookieClicks ?? 0,
         bannerPresent: rendered?.bannerPresent ?? false,
+        bannerButtons: rendered?.bannerButtons ?? [],
       });
       if (!rendered) {
         // The renderer died before returning anything — the next
@@ -1780,6 +1812,18 @@ export async function searchCompanyJobs(
         if (pagePostings.length > 0) {
           renderUsed = true;
           const screened = screenPostings(company.name, pagePostings, resumeText, company.isUSCompany ?? false);
+          // The walk's rule, mirrored here: a rendered page whose
+          // postings ALL die as no-match is not the list either
+          // (Teleperformance's values page scores 10 as a render
+          // target — its job-list markers + two detail links outrank
+          // the jobs homepage at 6 — and the loop used to return it
+          // at once). Remember it as the render fallback and try
+          // the next target; a page with a lead, or a real role
+          // rejected only on location, still returns at once.
+          if (screened.leads.length === 0 && screened.rejectedLocation === 0) {
+            if (!fallbackPostings && !renderFallback) renderFallback = { postings: pagePostings, url: target };
+            continue;
+          }
           return {
             // Stamp the search flag: these listings came out of a
             // portal search submit, not the plain walk.
@@ -1819,17 +1863,20 @@ export async function searchCompanyJobs(
     }
   }
   // Neither the walk nor the render found a real list — fall back
-  // to the single teaser posting remembered during the walk (a real
-  // posting, just not the list). It beats returning nothing: a
-  // company with one featured role and a portal the render could not
-  // read still surfaces its role. Only reached when no list page and
-  // no render yielded postings.
-  if (fallbackPostings) {
-    const screened = screenPostings(company.name, fallbackPostings.postings, resumeText, company.isUSCompany ?? false);
+  // to the remembered postings (a walk teaser, a real posting just
+  // not the list, wins over a rendered page's junk; a rendered
+  // page's all-rejected postings come back only when the walk
+  // remembered nothing). It beats returning nothing: a company with
+  // one featured role and a portal the render could not read still
+  // surfaces its role. Only reached when no list page and no render
+  // yielded postings.
+  const fb = fallbackPostings ?? renderFallback;
+  if (fb) {
+    const screened = screenPostings(company.name, fb.postings, resumeText, company.isUSCompany ?? false);
     return {
       leads: screened.leads,
-      postingsSeen: fallbackPostings.postings.length,
-      sourcePage: fallbackPostings.url,
+      postingsSeen: fb.postings.length,
+      sourcePage: fb.url,
       triedUrls,
       fetchOk: anyFetchOk,
       screened: {

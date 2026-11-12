@@ -118,6 +118,12 @@ export interface RenderPageResult {
    *  present means the click landed but the banner came back. */
   cookieClicks?: number;
   bannerPresent?: boolean;
+  /** The visible button/link labels the accept step last saw
+   *  (TAG:text, capped). Empty when the accept step never ran or
+   *  saw nothing. A 0-click attempt with a banner up and this list
+   *  showing the button's label means the match pattern missed it;
+   *  an empty list means the button genuinely was not in the DOM. */
+  bannerButtons?: string[];
 }
 
 export type RenderPageFn = (
@@ -193,6 +199,8 @@ export async function renderPageHtml(url: string, searchTerm: string = '', timeo
   let browser: Browser | null = null;
   let page: Page | null = null;
   let cookieClicks = 0;
+  // Labels the accept step last saw (kept across passes).
+  let lastAcceptLabels: string[] = [];
   try {
     browser = await withTimeout(getBrowser(), remain());
     if (!browser || remain() <= 0) {
@@ -223,19 +231,37 @@ export async function renderPageHtml(url: string, searchTerm: string = '', timeo
     // clicks, up to two passes — some banners stack a second consent
     // dialog behind the first. Never throws; a page without a banner
     // just skips it.
-    const tryCookieAccept = async (pg: Page): Promise<boolean> => {
+    const tryCookieAccept = async (pg: Page): Promise<{ clicked: boolean; labels: string[] }> => {
       try {
         return await pg.evaluate(() => {
-          const btns = Array.from(document.querySelectorAll('button, a, [role="button"]')) as HTMLElement[];
+          // Buttons can hide in shadow roots (OneTrust renders its
+          // banner inside one on some portals): querySelectorAll
+          // does not cross shadow boundaries, so walk the tree and
+          // collect from every open shadow root, or the button is
+          // invisible to the scan even while its text shows in the
+          // page (Foundever: banner copy in the sample, 0 clicks).
+          const collectButtons = (root: Document | ShadowRoot): HTMLElement[] => {
+            const out = Array.from(root.querySelectorAll('button, a, [role="button"]')) as HTMLElement[];
+            root.querySelectorAll('*').forEach((el) => {
+              const sr = (el as HTMLElement).shadowRoot;
+              if (sr) out.push(...collectButtons(sr));
+            });
+            return out;
+          };
+          const btns = collectButtons(document);
           const isVisible = (b: HTMLElement): boolean => {
             const r = b.getBoundingClientRect();
             return r.width > 0 && r.height > 0;
           };
           const textOf = (b: HTMLElement): string => (b.innerText || '').trim();
-          // Tier 1: the strict accept — the whole label, anchored at
-          // both ends. The old prefix-only pattern matched "Acceptable
-          // Use Policy" (a footer link): it starts with "Accept", so
-          // find() returned the footer link and the banner stayed up.
+          // Tier 1: the strict accept — anchored at the start, and
+          // the match must end at a word boundary. The old
+          // prefix-only pattern matched "Acceptable Use Policy" (a
+          // footer link starts with "Accept"); the round-5 '\s*$'
+          // anchor over-tightened the other way and missed labels
+          // with a trailing glyph. '\b' excludes "Acceptable" (the
+          // 't' is followed by 'a', no boundary) while still
+          // matching "Accept All Cookies ›".
           // Tier 2: a contains-match for the same idea in other
           // languages ("Alle Cookies akzeptieren" — Foundever's
           // German banner — does not start with "Alle akzeptieren",
@@ -247,7 +273,7 @@ export async function renderPageHtml(url: string, searchTerm: string = '', timeo
           const strict = btns.find(
             (b) =>
               isVisible(b) &&
-              /^(accept( all)?( cookies)?|allow all( cookies)?|accept & close|i agree|alle akzeptieren|tout accepter|aceptar( todo| las cookies)?)\s*$/i.test(
+              /^(accept( all)?( cookies)?|allow all( cookies)?|accept & close|i agree|alle akzeptieren|tout accepter|aceptar( todo| las cookies)?)\b/i.test(
                 textOf(b),
               ),
           );
@@ -259,15 +285,25 @@ export async function renderPageHtml(url: string, searchTerm: string = '', timeo
               /accept|akzeptieren|tout accepter|aceptar/i.test(textOf(b)),
           );
           const accept = strict ?? loose ?? null;
-          if (!accept) return false;
+          // Diagnostic: what the accept step could see — the visible
+          // button/link labels, so a live 0-click with a banner up
+          // can be told apart (button present but mismatched vs.
+          // genuinely absent). Capped; the caller keeps the latest.
+          const labels = btns
+            .filter(isVisible)
+            .map((b) => `${b.tagName}:${textOf(b).replace(/\s+/g, ' ').slice(0, 60)}`)
+            .filter((s) => s.length > 'BUTTON:'.length)
+            .slice(0, 15);
+          if (!accept) return { clicked: false, labels };
           accept.click();
-          return true;
-        }).then((clicked) => {
-          if (clicked) cookieClicks += 1;
-          return clicked;
+          return { clicked: true, labels };
+        }).then((result) => {
+          if (result.clicked) cookieClicks += 1;
+          lastAcceptLabels = result.labels;
+          return result;
         });
       } catch {
-        return false;
+        return { clicked: false, labels: [] };
       }
     };
     // Dismiss a cookie banner: click the accept button (up to two
@@ -282,7 +318,7 @@ export async function renderPageHtml(url: string, searchTerm: string = '', timeo
     const dismissBanner = async (pg: Page): Promise<boolean> => {
       let clicked = false;
       for (let pass = 0; pass < 2 && remain() > 3000; pass++) {
-        if (!(await tryCookieAccept(pg))) break;
+        if (!(await tryCookieAccept(pg)).clicked) break;
         clicked = true;
         await waitForDomStable(pg, remain, 2000, 500);
       }
@@ -294,7 +330,7 @@ export async function renderPageHtml(url: string, searchTerm: string = '', timeo
       }
       await waitForDomStable(pg, remain, 3000, 500);
       for (let pass = 0; pass < 2 && remain() > 3000; pass++) {
-        if (!(await tryCookieAccept(pg))) break;
+        if (!(await tryCookieAccept(pg)).clicked) break;
         await waitForDomStable(pg, remain, 2000, 500);
       }
       return true;
@@ -338,6 +374,13 @@ export async function renderPageHtml(url: string, searchTerm: string = '', timeo
     // ...). The step runs on this same page only — it never navigates
     // anywhere the page itself doesn't take it, and a board redirect
     // out of it returns an empty result, like the load redirect above.
+    // A FINAL accept attempt right before the search — no reload
+    // after it. Consent banners can inject late (Foundever's banner
+    // text appears in the final sample while all earlier passes saw
+    // nothing), and a last click is what clears the search box for
+    // the scan. The click hides the banner synchronously, so no
+    // reload is needed — the search runs on the now-visible form.
+    if (remain() > 1000) await tryCookieAccept(page);
     const searchStart = Date.now();
     const searchOutcome = await tryPortalSearch(page, searchTerm, deadline);
     const searchMs = Date.now() - searchStart;
@@ -365,6 +408,7 @@ export async function renderPageHtml(url: string, searchTerm: string = '', timeo
       searchScan,
       cookieClicks,
       bannerPresent: bannerTextPresent(html),
+      bannerButtons: lastAcceptLabels,
     };
   } catch {
     // A failed render still reports WHY instead of a bare null, so the
