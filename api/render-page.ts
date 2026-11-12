@@ -289,11 +289,17 @@ export async function renderPageHtml(url: string, searchTerm: string = '', timeo
           // button/link labels, so a live 0-click with a banner up
           // can be told apart (button present but mismatched vs.
           // genuinely absent). Capped; the caller keeps the latest.
-          const labels = btns
+          // Accept-like labels come FIRST: the banner is usually
+          // last in the DOM, so a flat first-15 cap truncates before
+          // reaching it (Sitel: 15 nav labels, banner up, 0 clicks,
+          // and no accept label in the list). The first few overall
+          // labels follow so the page is still recognizable.
+          const allLabels = btns
             .filter(isVisible)
             .map((b) => `${b.tagName}:${textOf(b).replace(/\s+/g, ' ').slice(0, 60)}`)
-            .filter((s) => s.length > 'BUTTON:'.length)
-            .slice(0, 15);
+            .filter((s) => s.length > 'BUTTON:'.length);
+          const nearMiss = allLabels.filter((s) => /accept|cookie|consent|agree|allow|opt.?in|got it/i.test(s));
+          const labels = [...new Set([...nearMiss.slice(0, 15), ...allLabels.slice(0, 8)])];
           if (!accept) return { clicked: false, labels };
           accept.click();
           return { clicked: true, labels };

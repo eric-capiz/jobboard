@@ -3245,12 +3245,14 @@ async function testRound6() {
   // and does not stop the render ----------------------------------
   // Teleperformance's live sequence, replayed: the opportunities
   // page carries one teaser, the values page parses two junk
-  // "postings" ('Jamaica', 'Our Culture'), and the values page
-  // scores 10 as a render target (job-list markers + two detail
-  // links) — it OUTRANKS the jobs homepage (6), so the render goes
-  // there first. Both the walk and the render must pass it by and
-  // reach the real portal; the accept-step labels ride the attempt
-  // record on the way.
+  // "postings" ('Jamaica', 'Our Culture'). The values page would
+  // score 10 as a render target (job-list markers + two detail
+  // links) and outrank the jobs homepage (9) — but the round-7
+  // walked-with-postings penalty (-10) drops it to 3, so the render
+  // goes to the portal first and the list wins at once. (The
+  // render-loop continue past a junk page is covered by the round-7
+  // loop test below, where the junk page was walked with ZERO
+  // postings and so carries no penalty.)
   const teleTeaserHtml = `<html><body>
 <div class="job-listing"><h3>Customer Support Specialist</h3><p>Location: Remote</p><a href="/jobs/customer-support-specialist">Apply</a></div>
 </body></html>`;
@@ -3276,7 +3278,7 @@ async function testRound6() {
     return { ok: true, text: async () => '<html><body>No careers here.</body></html>' };
   };
   const renderedCalls = [];
-  const stubValuesFirst = async (url) => {
+  const stubPortalList = async (url) => {
     renderedCalls.push(url);
     if (url.includes('our-values')) {
       return { html: teleValuesHtml, searchOutcome: 'has-listings', searchMs: 300, renderedUrl: url, cookieClicks: 0, bannerPresent: false, bannerButtons: ['BUTTON:Accept All Cookies', 'A:Privacy Policy'] };
@@ -3286,13 +3288,12 @@ async function testRound6() {
   const tele = await jobsMod.searchCompanyJobs(
     { name: 'Teleperformance', website: 'https://jobs.tele.example', careersUrl: '', isUSCompany: true },
     resumeText,
-    { renderPage: stubValuesFirst },
+    { renderPage: stubPortalList },
   );
   check(
     'all-nomatch: the junk values page does not stop the walk or the render; the portal wins',
-    renderedCalls.length === 2 &&
-      renderedCalls[0].includes('our-values') &&
-      renderedCalls[1] === 'https://jobs.tele.example' &&
+    renderedCalls.length === 1 &&
+      renderedCalls[0] === 'https://jobs.tele.example' &&
       tele.postingsSeen === 3 &&
       tele.leads.length >= 2 &&
       tele.renderUsed === true &&
@@ -3301,10 +3302,10 @@ async function testRound6() {
   );
   check(
     'banner-buttons: the accept-step labels ride the attempt record',
-    tele.renderAttempts.length === 2 &&
+    tele.renderAttempts.length === 1 &&
       (tele.renderAttempts[0]?.bannerButtons ?? []).includes('BUTTON:Accept All Cookies') &&
-      tele.renderAttempts[1]?.cookieClicks === 1 &&
-      tele.renderAttempts[1]?.bannerPresent === true,
+      tele.renderAttempts[0]?.cookieClicks === 1 &&
+      tele.renderAttempts[0]?.bannerPresent === true,
     tele.renderAttempts,
   );
   // Same company, the render finds nothing at all: the remembered
@@ -3371,6 +3372,148 @@ async function testRound6() {
     'all-nomatch: an all-rejected render still returns its postings as the fallback',
     nex.postingsSeen === 4 && nex.leads.length === 0 && nex.renderAttempts.length === 2,
     { postingsSeen: nex.postingsSeen, leads: nex.leads.length, attempts: nex.renderAttempts.length },
+  );
+}
+
+async function testRound7() {
+  // Batch 7 (2026-11-12 round-6 canary vs 308821c4): the render
+  // burned both attempts on marketing pages (Teleperformance's
+  // opportunities/values pages score 15 and outrank the
+  // fetch-failed jobs homepage at 9); Kelly's 'Help & Support'
+  // nav item linked to /career-advice parsed as a posting and
+  // scored 60 — a false-positive lead.
+  const jobsMod = freshRequire(`${OUT}/find-jobs.cjs`);
+  const resumeText =
+    'Customer service representative with phone support experience, technical support, troubleshooting, billing questions, and help desk work for members';
+
+  // --- isJobDetailUrl: a category slug is not a detail -----------
+  // The last segment starts with a job-marker word and the rest is
+  // a topic, not a role. 'career-details' survives (a later token
+  // is a detail word); 'career-advice' does not.
+  check(
+    'gate-category: category slugs are not job-detail URLs',
+    jobsMod.isJobDetailUrl('https://www.kellyservices.us/career-advice') === false &&
+      jobsMod.isJobDetailUrl('https://tele.example/en-us/careers/job-opportunities/') === false &&
+      jobsMod.isJobDetailUrl('https://example.com/careers/job-search') === false &&
+      jobsMod.isJobDetailUrl('https://example.com/jobs/job-coach') === false,
+    null,
+  );
+  check(
+    'gate-category: real detail URLs still survive',
+    jobsMod.isJobDetailUrl('https://houserx.example/career-details') === true &&
+      jobsMod.isJobDetailUrl('https://example.com/jobs/customer-support-specialist') === true &&
+      jobsMod.isJobDetailUrl('https://tele.example/en-us/careers/jamaica/') === true &&
+      jobsMod.isJobDetailUrl('https://example.com/open-roles/senior-product-designer-remote') === true,
+    null,
+  );
+  // End to end: Kelly's /careers page with the 'Help & Support'
+  // nav item parses WITHOUT it — the false-positive lead is gone.
+  const kellyHtml = `<html><body>
+<div class="job-listing"><a href="/career-advice">Help &amp; Support</a></div>
+<div class="job-listing"><h3>Forklift-Standup</h3><p>Location: Remote</p><a href="/jobs/forklift-standup">Apply</a></div>
+</body></html>`;
+  const kellyParsed = jobsMod.parseCareersPage(kellyHtml, 'https://www.kellyservices.us');
+  check(
+    'gate-category: Help & Support nav item no longer parses as a posting',
+    kellyParsed.length === 1 && kellyParsed[0]?.title === 'Forklift-Standup',
+    kellyParsed,
+  );
+
+  // --- Render-target ordering: a walked-with-postings page ranks
+  // below an unread portal (Teleperformance) ----------------------
+  // Replays the round-6 canary: the walk reads the opportunities
+  // (teaser) and values (2 junk) pages, the jobs homepage fetch
+  // fails. The marketing pages score 15 raw; the -10 penalty drops
+  // them below the jobs homepage (9), so the render goes to the
+  // portal first.
+  const teleTeaserHtml = `<html><body>
+<div class="job-listing"><h3>Customer Support Specialist</h3><p>Location: Remote</p><a href="/jobs/customer-support-specialist">Apply</a></div>
+</body></html>`;
+  const teleValuesHtml = `<html><body>
+<div class="job-listing"><a href="/en-us/careers/jamaica/">Jamaica</a></div>
+<div class="job-listing"><a href="/en-us/careers/our-culture/">Our Culture</a></div>
+</body></html>`;
+  const teleListHtml = `<html><body>
+<div class="job-listing"><h3>Customer Support Specialist</h3><p>Location: Remote</p><a href="/jobs/customer-support-specialist">Apply</a></div>
+<div class="job-listing"><h3>Member Services Representative</h3><p>Location: Remote</p><a href="/jobs/member-services-representative">Apply</a></div>
+<div class="job-listing"><h3>Call Center Agent</h3><p>Location: Remote</p><a href="/jobs/call-center-agent">Apply</a></div>
+</body></html>`;
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u === 'https://jobs.tele.example' || u === 'https://jobs.tele.example/careers' || u === 'https://jobs.tele.example/jobs') {
+      throw new Error('RST');
+    }
+    if (u === 'https://tele.example') {
+      return { ok: true, text: async () => `<html><body><a href="/en-us/careers/job-opportunities/">See all jobs</a><a href="/en-us/careers/our-values-and-philosophy/">Our values</a></body></html>` };
+    }
+    if (u === 'https://tele.example/en-us/careers/job-opportunities/') return { ok: true, text: async () => teleTeaserHtml };
+    if (u === 'https://tele.example/en-us/careers/our-values-and-philosophy/') return { ok: true, text: async () => teleValuesHtml };
+    return { ok: true, text: async () => '<html><body>No careers here.</body></html>' };
+  };
+  const renderedCalls = [];
+  const stubList = async (url) => {
+    renderedCalls.push(url);
+    return { html: teleListHtml, searchOutcome: 'has-listings', searchMs: 300, renderedUrl: url, cookieClicks: 0, bannerPresent: false, bannerButtons: [] };
+  };
+  const tele = await jobsMod.searchCompanyJobs(
+    { name: 'Teleperformance', website: 'https://jobs.tele.example', careersUrl: '', isUSCompany: true },
+    resumeText,
+    { renderPage: stubList },
+  );
+  check(
+    'target-order: the unread jobs homepage outranks the walked marketing pages',
+    renderedCalls.length === 1 &&
+      renderedCalls[0] === 'https://jobs.tele.example' &&
+      tele.renderTargets[0]?.url === 'https://jobs.tele.example' &&
+      tele.leads.length >= 2,
+    { renderedCalls, targets: tele.renderTargets, leads: tele.leads.length },
+  );
+
+  // --- Render-loop continue, unpenalized junk page --------------
+  // A marketing page the walk read with ZERO postings carries no
+  // penalty (its listings may be JS-only), so it can still outrank
+  // the portal — and the round-6 loop rule must pass it by when
+  // the render finds only junk there. The page's job-listing divs
+  // link to vetoed category slugs, so the walk parses 0 postings
+  // from it, but its search input + markers still score it 10,
+  // above the fetch-failed jobs homepage (9).
+  const loopMarketingHtml = `<html><body>
+<input name="keyword" placeholder="Search jobs">
+<div class="job-listing"><a href="/careers/job-opportunities/">See opportunities</a></div>
+<div class="job-listing"><a href="/career-advice/">Career advice</a></div>
+</body></html>`;
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u === 'https://jobs.loop.example' || u === 'https://jobs.loop.example/careers' || u === 'https://jobs.loop.example/jobs') {
+      throw new Error('RST');
+    }
+    if (u === 'https://loop.example') {
+      return { ok: true, text: async () => `<html><body><a href="/about-careers/">About careers</a></body></html>` };
+    }
+    if (u === 'https://loop.example/about-careers/') return { ok: true, text: async () => loopMarketingHtml };
+    return { ok: true, text: async () => '<html><body>No careers here.</body></html>' };
+  };
+  const loopCalls = [];
+  const stubLoop = async (url) => {
+    loopCalls.push(url);
+    if (url.includes('about-careers')) {
+      return { html: teleValuesHtml, searchOutcome: 'has-listings', searchMs: 300, renderedUrl: url, cookieClicks: 0, bannerPresent: false, bannerButtons: [] };
+    }
+    return { html: teleListHtml, searchOutcome: 'has-listings', searchMs: 300, renderedUrl: url, cookieClicks: 0, bannerPresent: false, bannerButtons: [] };
+  };
+  const loop = await jobsMod.searchCompanyJobs(
+    { name: 'Loop Co', website: 'https://jobs.loop.example', careersUrl: '', isUSCompany: true },
+    resumeText,
+    { renderPage: stubLoop },
+  );
+  check(
+    'target-order: a junk first render does not stop the loop; the portal wins second',
+    loopCalls.length === 2 &&
+      loopCalls[0].includes('about-careers') &&
+      loopCalls[1] === 'https://jobs.loop.example' &&
+      loop.postingsSeen === 3 &&
+      loop.leads.length >= 2,
+    { loopCalls, postingsSeen: loop.postingsSeen, leads: loop.leads.length },
   );
 }
 
@@ -3829,6 +3972,7 @@ await testTalentBrewAndRenderError();
 await testRound4();
 await testRound5();
 await testRound6();
+await testRound7();
 await testPaginationAndSearchScan();
 await testTestCompany();
 await testJazzhr();

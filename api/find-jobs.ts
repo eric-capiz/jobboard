@@ -837,6 +837,22 @@ export function isJobDetailUrl(rawUrl: string): boolean {
   if (segs.length === 0) return false; // portal root: a list, not a job
   const last = segs[segs.length - 1];
   if (LIST_PATH_WORDS.test(last)) return false;
+  // A category slug: the last segment starts with a job-marker word
+  // ('job-', 'career-', 'jobs-', 'careers-') and the rest is a
+  // topic, not a role ('career-advice', 'job-opportunities',
+  // 'job-search'). Kelly's 'Help & Support' nav item links to
+  // /career-advice, and the old 'career'-substring rule called it a
+  // job — it scored 60 and became a lead (2026-11-12 round-6
+  // canary). A segment that starts with a marker word is a detail
+  // only when a later token is a detail word ('career-details'
+  // survives; 'career-advice' does not). The marker-substring rule
+  // below still admits role slugs under a /jobs/ or /careers/ path.
+  if (/^(job|jobs|career|careers)-/i.test(last)) {
+    const rest = last.split('-').slice(1);
+    if (!rest.some((t) => /^(detail|details|job|position|opening|posting|role|apply|vacancy)$/i.test(t))) {
+      return false;
+    }
+  }
   // A job marker anywhere in the path: /jobs/frontend-developer,
   // /careers/frontend, /career-details, /position/123.
   if (/job|career|position|opening|posting|vacancy|apply|detail|role/i.test(u.pathname)) return true;
@@ -1632,6 +1648,17 @@ export async function searchCompanyJobs(
     url: string;
     score: number;
   }
+  // Pages the walk already fetched and parsed postings from.
+  // Re-rendering one is low-value — the walk proved its SSR
+  // content — so it ranks below an unread page. Without the
+  // penalty Teleperformance's marketing pages score 15 (search
+  // input + job-list markers + detail links) and outrank the
+  // fetch-failed jobs homepage (9), so both render attempts burn
+  // on marketing pages and the portal is never reached
+  // (2026-11-12 round-6 canary). A page the walk read with ZERO
+  // postings is NOT penalized: its listings may be JS-only, and
+  // the render is how they surface (ModSquad's Workday shell).
+  const readWithPostings = new Set<string>();
   const zeroYieldTargets: RenderCandidate[] = [];
   for (let i = 0; i < candidates.length; i++) {
     const u = candidates[i];
@@ -1661,6 +1688,7 @@ export async function searchCompanyJobs(
     }
     const pagePostings = await collectPagePostings(html, u, false);
     if (pagePostings.length > 0) {
+      readWithPostings.add(u);
       // A single posting is a teaser, not the list — UNLESS it is
       // the whole list. The old rule trusted isListLikeUrl alone,
       // but a teaser CAN live on a list-like path: Teleperformance's
@@ -1736,7 +1764,8 @@ export async function searchCompanyJobs(
         score:
           renderTargetScore(u, careersUrl) +
           contentScore +
-          companyHostBonus(u, company.name),
+          companyHostBonus(u, company.name) -
+          (readWithPostings.has(u) ? 10 : 0),
       });
     }
     let at = i + 1;
