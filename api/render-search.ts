@@ -371,6 +371,25 @@ export function isSearchActionAllowed(action: string, pageUrl: string): boolean 
   }
 }
 
+/** A form action that submits to a bare site search, not a jobs
+ *  portal: the action names a different page whose path has no
+ *  job/career/search word (WordPress ?s= site search submits to the
+ *  homepage '/'). The box that qualified is the site's header search,
+ *  not the portal's job search — submitting it wastes the render on a
+ *  site search (Omni: ?s=service+customer, no-results) and strands
+ *  the real portal unrendered. An empty action (same-page JS submit)
+ *  is NOT site search — most real portals submit in place. */
+export function isSiteSearchAction(action: string, pageUrl: string): boolean {
+  if (!action) return false;
+  try {
+    const target = new URL(action, pageUrl);
+    if (target.href === new URL(pageUrl).href) return false;
+    return !/job|career|search|opening|position|role|result|listing/i.test(target.pathname + target.search);
+  } catch {
+    return false;
+  }
+}
+
 /** Diagnostics for a no-form render: how many inputs the scan saw,
  *  how many were visible, and the best input score — so a live
  *  no-form can be told apart: "no inputs at all" (empty shell) vs
@@ -613,7 +632,7 @@ async function clickSearchToggle(
   const allowed = (b: SearchButtonDescriptor): boolean => {
     if (b.formIndex < 0) return true;
     const action = info.forms[b.formIndex]?.action ?? '';
-    return isSearchActionAllowed(action, page.url());
+    return isSearchActionAllowed(action, page.url()) && !isSiteSearchAction(action, page.url());
   };
   const label = (b: SearchButtonDescriptor): string => buttonLabel(b).trim();
   const pick =
@@ -647,6 +666,7 @@ async function attemptSearch(
   const sel = selectSearchInput(info);
   if (!sel) return 'no-form';
   if (sel.formAction && !isSearchActionAllowed(sel.formAction, page.url())) return 'no-form';
+  if (sel.formAction && isSiteSearchAction(sel.formAction, page.url())) return 'no-form';
   // Baselines are captured BEFORE the submit — a client-side router
   // can navigate during the submit itself, and capturing after would
   // miss the change and burn the whole wait cap.

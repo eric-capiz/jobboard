@@ -1848,6 +1848,16 @@ async function testPortalSearch() {
     null,
   );
   check(
+    'portal-search: site-search action refused, jobs/search actions allowed',
+    searchMod.isSiteSearchAction('/', 'https://portal.example/careers') === true &&
+      searchMod.isSiteSearchAction('/jobs', 'https://portal.example/careers') === false &&
+      searchMod.isSiteSearchAction('', 'https://portal.example/careers') === false &&
+      searchMod.isSiteSearchAction('/search-jobs', 'https://portal.example/careers') === false &&
+      searchMod.isSiteSearchAction('/results', 'https://portal.example/careers') === false &&
+      searchMod.isSiteSearchAction('/listing', 'https://portal.example/careers') === false,
+    null,
+  );
+  check(
     'portal-search: same-page action allowed',
     searchMod.isSearchActionAllowed('/jobs', 'https://portal.example/careers') === true &&
       searchMod.isSearchActionAllowed('', 'https://portal.example/careers') === true,
@@ -2078,6 +2088,20 @@ async function testPortalSearch() {
     'portal-search: board form action never touched',
     (await runSearch(boardFormPage)) === 'no-form' && boardFormPage.typedTerms.length === 0 && boardFormPage.pressedKeys.length === 0 && boardFormPage.buttonClicks === 0,
     boardFormPage.typedTerms,
+  );
+  // Site-search form (WordPress ?s=): the box qualifies on its own
+  // signals, but its action submits to the site root, not a jobs
+  // page — refused like a board action, never submitted (Omni:
+  // ?s=service+customer, no-results, on the wrong page). The toggle
+  // rescue never touches its submit button either.
+  const siteSearchPage = new FakePage({
+    scanResult: { ...portalScan, forms: [{ action: '/', method: 'get' }] },
+    counts: [{ jobLinks: 0, resultsText: false }],
+  });
+  check(
+    'portal-search: site-search form action refused, never submitted',
+    (await runSearch(siteSearchPage)) === 'no-form' && siteSearchPage.typedTerms.length === 0 && siteSearchPage.pressedKeys.length === 0 && siteSearchPage.buttonClicks === 0,
+    siteSearchPage.typedTerms,
   );
   // The search box lives behind a "Search jobs" toggle: the first
   // scan finds no input, the toggle click reveals the box, the retry
@@ -2439,6 +2463,48 @@ async function testRenderTargetScoring() {
     found.triedUrls.filter((t) => t.startsWith('https://jobs.found.example/')).length === 1,
     found.triedUrls,
   );
+  // Non-English locale param: the de_DE variant loses 4, en_US keeps 4.
+  check(
+    'target-scoring: non-English locale variant penalized, en_US kept',
+    jobsMod.renderTargetScore('https://jobs.foundever.com/?utm_source=x&locale=de_DE', '') === 0 &&
+      jobsMod.renderTargetScore('https://jobs.foundever.com/?utm_source=x&locale=en_US', '') === 4 &&
+      jobsMod.renderTargetScore('https://jobs.foundever.com/?utm_source=x&locale=es_ES', '') === 0,
+    null,
+  );
+  // ATS eligibility: a Workday URL whose path has no job word is
+  // still a render candidate by host alone (ModSquad, 2026-11-12) —
+  // without this the ATS bonus never fires, because the page is
+  // never a candidate.
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u === 'https://mod.example') {
+      return {
+        ok: true,
+        text: async () =>
+          `<html><body><a href="https://mod.wd5.myworkdayjobs.com/en-US/ModSquad">Careers</a></body></html>`,
+      };
+    }
+    return { ok: true, text: async () => '<html><body><div id="root"></div></body></html>' };
+  };
+  const workdayRendered = [];
+  const workdayStub = async (url) => {
+    workdayRendered.push(url);
+    return { html: `<html><body>
+<div class="job-listing"><h3>Customer Support Specialist</h3><p>Location: Remote</p><a href="/jobs/customer-support-specialist">Apply</a></div>
+</body></html>`, searchOutcome: 'searched', searchMs: 200, renderedUrl: url };
+  };
+  const workday = await jobsMod.searchCompanyJobs(
+    { name: 'ModSquad', website: 'https://mod.example', careersUrl: '', isUSCompany: true },
+    'Customer support specialist with Zendesk, chat support, and troubleshooting experience for SaaS customers',
+    { renderPage: workdayStub },
+  );
+  check(
+    'target-scoring: Workday URL renders by ATS host alone, finds the role',
+    workdayRendered.length === 1 &&
+      workdayRendered[0] === 'https://mod.wd5.myworkdayjobs.com/en-US/ModSquad' &&
+      workday.leads.length === 1,
+    { rendered: workdayRendered, leads: workday.leads },
+  );
 }
 
 async function testRenderRetry() {
@@ -2514,6 +2580,40 @@ async function testRenderRetry() {
     'render-retry: budget max 1 means no retry',
     calls.length === 1 && capped.leads.length === 0 && capped.searchOutcome === 'no-form',
     { calls, searchOutcome: capped.searchOutcome },
+  );
+}
+
+async function testRejectedTelemetry() {
+  // A "4 postings, 0 leads" result must say WHICH titles died and
+  // why — NexRep, 2026-11-12 (4 Paylocity postings, all
+  // rejectedNoMatch, titles invisible in the response).
+  const jobsMod = freshRequire(`${OUT}/find-jobs.cjs`);
+  const out = jobsMod.screenPostings(
+    'Test Co',
+    [
+      { title: 'Loan Analyst', location: 'Remote', url: 'https://example.com/jobs/loan-analyst', description: '', postedDate: '' },
+      { title: 'Customer Support Specialist', location: 'Remote', url: 'https://example.com/jobs/support-specialist', description: '', postedDate: '' },
+    ],
+    'Customer support specialist with Zendesk experience',
+    true,
+  );
+  check(
+    'rejected-telemetry: no-match title rides the screened result',
+    out.rejectedNoMatch === 1 &&
+      out.leads.length === 1 &&
+      out.rejected.length === 1 &&
+      out.rejected[0]?.title === 'Loan Analyst' &&
+      out.rejected[0]?.reason === 'no-match',
+    out.rejected,
+  );
+  // The rejected list caps at 10.
+  const many = Array.from({ length: 12 }, (_, i) => ({
+    title: `Loan Analyst ${i}`, location: 'Remote', url: `https://example.com/jobs/loan-${i}`, description: '', postedDate: '',
+  }));
+  check(
+    'rejected-telemetry: rejected list caps at 10',
+    jobsMod.screenPostings('Test Co', many, 'Customer support specialist', true).rejected.length === 10,
+    null,
   );
 }
 
@@ -3295,6 +3395,7 @@ await testPortalSearch();
 await testDeferredRender();
 await testRenderTargetScoring();
 await testRenderRetry();
+await testRejectedTelemetry();
 await testJobCardAnchors();
 await testRealPostingGate();
 await testJunkWalkAndRender();

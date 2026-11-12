@@ -181,6 +181,10 @@ export async function renderPageHtml(url: string, searchTerm: string = '', timeo
     // 153): the old 'JobBoard Finder' UA advertised a bot outright,
     // and WAFs that sniff UA/version mismatches reject the session.
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36');
+    // Locale-detecting portals default to the browser's language;
+    // state English explicitly so a US employer's portal renders its
+    // en_US variant (Foundever defaulted to de_DE, 2026-11-12).
+    await page.setExtraHTTPHeaders({ 'Accept-Language': 'en-US,en;q=0.9' });
     // The listings are text: block the heavyweight resource types so
     // slow boards settle faster. Stylesheets stay — some boards gate
     // their render on CSS load.
@@ -213,14 +217,28 @@ export async function renderPageHtml(url: string, searchTerm: string = '', timeo
       try {
         for (let pass = 0; pass < 2 && remain() > 3000; pass++) {
           const accepted = await page.evaluate(() => {
-            const btns = Array.from(document.querySelectorAll('button'));
-            const accept = btns.find((b) => {
+            const btns = Array.from(document.querySelectorAll('button, a')) as HTMLElement[];
+            const isVisible = (b: HTMLElement): boolean => {
               const r = b.getBoundingClientRect();
-              if (r.width <= 0 || r.height <= 0) return false;
-              return /^(accept( all)?( cookies)?|allow all( cookies)?|accept & close|i agree|alle akzeptieren|tout accepter|aceptar( todo| las cookies)?)/i.test(
-                (b.innerText || '').trim(),
-              );
-            });
+              return r.width > 0 && r.height > 0;
+            };
+            const textOf = (b: HTMLElement): string => (b.innerText || '').trim();
+            // Tier 1: the strict English accept. Tier 2: a
+            // contains-match for the same idea in other languages
+            // ("Alle Cookies akzeptieren" — Foundever's German banner
+            // — does not start with "Alle akzeptieren", so the
+            // anchored pattern misses it).
+            const strict = btns.find(
+              (b) =>
+                isVisible(b) &&
+                /^(accept( all)?( cookies)?|allow all( cookies)?|accept & close|i agree|alle akzeptieren|tout accepter|aceptar( todo| las cookies)?)/i.test(
+                  textOf(b),
+                ),
+            );
+            const loose = btns.find(
+              (b) => isVisible(b) && /accept|akzeptieren|tout accepter|aceptar/i.test(textOf(b)),
+            );
+            const accept = strict ?? loose ?? null;
             if (!accept) return false;
             accept.click();
             return true;

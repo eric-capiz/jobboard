@@ -625,7 +625,7 @@ export interface CompanySearchResult {
   /** The screening funnel for this company: how many postings died on
    *  no resume match, on location, and how many survived only as
    *  review-only (uncertain location). */
-  screened: { rejectedNoMatch: number; rejectedLocation: number; reviewLocation: number };
+  screened: { rejectedNoMatch: number; rejectedLocation: number; reviewLocation: number; rejected: { title: string; location: string; reason: 'no-match' | 'location' }[] };
   /** True when listings came from the browser render fallback. */
   renderUsed: boolean;
   /** True when a render was ATTEMPTED for this company, even when it
@@ -1276,6 +1276,19 @@ export function renderTargetScore(u: string, careersUrl: string): number {
     // homepage). A /job-search/ path still outscores it (+5).
     const firstLabel = parsed.hostname.split('.')[0].toLowerCase();
     if ((firstLabel === 'jobs' || firstLabel === 'careers') && path === '/') score += 4;
+    // A non-English locale param (locale=de_DE, lang=es) marks a
+    // page that serves another country's jobs — the US portal is the
+    // en variant. Foundever's render went to the de_DE variant and
+    // its German banner + German search box defeated the English
+    // signals. Penalize, don't forbid: a locale page can still win
+    // when it is the only candidate.
+    const locale =
+      parsed.searchParams.get('locale') ||
+      parsed.searchParams.get('lang') ||
+      parsed.searchParams.get('language') ||
+      '';
+    const lang = locale.split(/[-_]/)[0].toLowerCase();
+    if (lang && lang !== 'en') score -= 4;
   } catch {
     // Unparseable URL — scores only the careers-link bonus below.
   }
@@ -1467,7 +1480,12 @@ export async function searchCompanyJobs(
       html = await fetchText(u);
       anyFetchOk = true;
     } catch {
-      if (isCareersLikeUrl(u, careersUrl)) {
+      // A fetch-failed candidate is still renderable when it is
+      // careers-like by path/host — or an ATS portal by host: a
+      // Workday URL (/en-US/ModSquad) has no job word in its path and
+      // no content to score, so without the host rule it never
+      // becomes a render candidate at all (ModSquad, 2026-11-12).
+      if (isCareersLikeUrl(u, careersUrl) || atsHostBonus(u) > 0) {
         // Score on path AND host, like the fetched branch: a
         // jobs./careers. subdomain homepage scores 0 on path alone,
         // so without the host bonus it would always lose to the
@@ -1493,6 +1511,7 @@ export async function searchCompanyJobs(
           rejectedNoMatch: screened.rejectedNoMatch,
           rejectedLocation: screened.rejectedLocation,
           reviewLocation: screened.reviewLocation,
+          rejected: screened.rejected,
         },
         renderUsed,
         renderAttempted,
@@ -1509,9 +1528,11 @@ export async function searchCompanyJobs(
     // A page that carries the portal's search box or a job-board
     // widget is a candidate even when its path says nothing about
     // jobs: portal homepages ARE the portal (TTEC's homepage is its
-    // job search; the old rule never rendered a bare homepage).
+    // job search; the old rule never rendered a bare homepage). An
+    // ATS host is portal-like by construction, too — a Workday shell
+    // carries no searchable content in its raw HTML.
     const contentScore = portalContentScore(html);
-    if (contentScore > 0 || isCareersLikeUrl(u, careersUrl)) {
+    if (contentScore > 0 || isCareersLikeUrl(u, careersUrl) || atsHostBonus(u) > 0) {
       zeroYieldTargets.push({
         url: u,
         score:
@@ -1590,6 +1611,7 @@ export async function searchCompanyJobs(
               rejectedNoMatch: screened.rejectedNoMatch,
               rejectedLocation: screened.rejectedLocation,
               reviewLocation: screened.reviewLocation,
+              rejected: screened.rejected,
             },
             renderUsed,
             renderAttempted,
@@ -1619,7 +1641,7 @@ export async function searchCompanyJobs(
     sourcePage: null,
     triedUrls,
     fetchOk: anyFetchOk,
-    screened: { rejectedNoMatch: 0, rejectedLocation: 0, reviewLocation: 0 },
+    screened: { rejectedNoMatch: 0, rejectedLocation: 0, reviewLocation: 0, rejected: [] },
     renderUsed,
     renderAttempted,
     renderMs,
@@ -1678,6 +1700,10 @@ export interface ScreenedPostings {
   rejectedNoMatch: number;
   rejectedLocation: number;
   reviewLocation: number;
+  /** Why postings were dropped (title + location + reason, capped at
+   *  10): without it a "4 postings, 0 leads" result cannot say whether
+   *  the roles were wrong or the matcher was — NexRep, 2026-11-12. */
+  rejected: { title: string; location: string; reason: 'no-match' | 'location' }[];
 }
 
 /** Literal title words that name CS work. LITERAL only — the gate
@@ -1782,6 +1808,10 @@ export function screenPostings(
   let rejectedNoMatch = 0;
   let rejectedLocation = 0;
   let reviewLocation = 0;
+  const rejected: { title: string; location: string; reason: 'no-match' | 'location' }[] = [];
+  const noteRejected = (p: Posting, reason: 'no-match' | 'location'): void => {
+    if (rejected.length < 10) rejected.push({ title: p.title, location: p.location || '', reason });
+  };
   const cap = (t: string): string => t.charAt(0).toUpperCase() + t.slice(1);
   // A customer-service resume claims both 'customer' and 'service';
   // a frontend resume claims neither, so this gate only ever applies
@@ -1792,6 +1822,7 @@ export function screenPostings(
     const matches = matchResumeTerms(postingWords, resumeTerms);
     if (matches.length === 0 || !matches.some((m) => !m.ambiguousOnly)) {
       rejectedNoMatch += 1;
+      noteRejected(p, 'no-match');
       continue;
     }
     if (isCsResume) {
@@ -1813,12 +1844,14 @@ export function screenPostings(
       });
       if (!namesCsWork || !namesRole) {
         rejectedNoMatch += 1;
+        noteRejected(p, 'no-match');
         continue;
       }
     }
     const loc = locationVerdict(p.location, `${p.title} ${p.description}`, isUSCompany);
     if (loc.verdict === 'reject') {
       rejectedLocation += 1;
+      noteRejected(p, 'location');
       continue;
     }
     const needsReview = loc.verdict === 'review';
@@ -1878,7 +1911,7 @@ export function screenPostings(
       sourceType: p.source ?? 'html',
     });
   }
-  return { leads, rejectedNoMatch, rejectedLocation, reviewLocation };
+  return { leads, rejectedNoMatch, rejectedLocation, reviewLocation, rejected };
 }
 
 /* ------------------------------------------------------------------ */
