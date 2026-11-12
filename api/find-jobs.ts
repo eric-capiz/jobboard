@@ -707,6 +707,9 @@ export interface CompanySearchResult {
      *  the render ended (a visible element carrying banner text),
      *  as opposed to bannerPresent, which is text in the HTML. */
     bannerVisible: boolean;
+    /** The label of the search toggle the search step clicked on
+     *  this target (null when no toggle fired). */
+    searchToggleClicked: string | null;
   }[];
   /** The render targets in the order the loop tried them (best score
    *  first), with their scores — so a live canary can say whether a
@@ -1625,6 +1628,7 @@ export async function searchCompanyJobs(
     bannerButtons: string[];
     cookieClickedLabel: string | null;
     bannerVisible: boolean;
+    searchToggleClicked: string | null;
   }[] = [];
   let renderTargets: { url: string; score: number }[] = [];
   // A single posting on a non-list page, remembered while the walk
@@ -1827,6 +1831,7 @@ export async function searchCompanyJobs(
         bannerButtons: rendered?.bannerButtons ?? [],
         cookieClickedLabel: rendered?.cookieClickedLabel ?? null,
         bannerVisible: rendered?.bannerVisible ?? false,
+        searchToggleClicked: rendered?.searchToggleClicked ?? null,
       });
       if (!rendered) {
         // The renderer died before returning anything — the next

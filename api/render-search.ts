@@ -625,6 +625,7 @@ type AttemptResult = 'no-form' | 'failed' | 'settled' | 'board';
 async function clickSearchToggle(
   page: SearchablePage,
   remainMs: () => number,
+  onToggle?: (label: string) => void,
 ): Promise<'toggled' | 'board' | null> {
   if (remainMs() < 6000) return null;
   let info: SearchFormInfo;
@@ -654,6 +655,10 @@ async function clickSearchToggle(
   const startUrl = page.url();
   const startLen = await textLength(page);
   if (!(await clickButton(page, pick.index))) return null;
+  // Report the click BEFORE waiting: the caller needs to know the
+  // toggle fired even if the page it reveals has no form (Sitel:
+  // the toggle may reveal a country picker, not a search box).
+  onToggle?.(label(pick));
   await waitForChange(page, remainMs, startUrl, startLen, 4000);
   if (isBoardUrl(page.url())) return 'board';
   return 'toggled';
@@ -705,6 +710,7 @@ export async function tryPortalSearch(
   page: SearchablePage,
   searchTerm: string,
   deadlineMs: number,
+  onToggle?: (label: string) => void,
 ): Promise<PortalSearchOutcome> {
   const remainMs = (): number => deadlineMs - Date.now();
   // A search needs at least ~6s: scan + submit + results wait. Less
@@ -717,7 +723,7 @@ export async function tryPortalSearch(
     // No qualifying box — but the box may live behind a toggle
     // ("Search jobs" expands the form). One click, one re-scan, one
     // retry; a failed toggle still reports no-form.
-    const toggled = await clickSearchToggle(page, remainMs);
+    const toggled = await clickSearchToggle(page, remainMs, onToggle);
     if (toggled === 'board') return 'board-redirect';
     if (!toggled) return 'no-form';
     const retry = await attemptSearch(page, '', remainMs);

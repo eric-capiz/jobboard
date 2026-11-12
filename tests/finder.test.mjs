@@ -2173,6 +2173,27 @@ async function testPortalSearch() {
     countryToggleOutcome === 'searched' && countryTogglePage.buttonClicks === 1,
     { outcome: countryToggleOutcome, clicks: countryTogglePage.buttonClicks },
   );
+  // The toggle click is reported to the caller: the render's
+  // attempt record must say the toggle fired (and which button),
+  // not just that the search found no form. A toggle that reveals
+  // nothing still reports its label.
+  let reportedToggle = null;
+  const reportPage = new FakePage({
+    scanResult: {
+      inputs: [],
+      buttons: [mkButton({ index: 0, text: 'Find a job in your country', type: 'button', formIndex: -1 })],
+      forms: [],
+    },
+    counts: [{ jobLinks: 0, resultsText: false }],
+  });
+  await searchMod.tryPortalSearch(reportPage, 'customer service', Date.now() + 30000, (label) => {
+    reportedToggle = label;
+  });
+  check(
+    'portal-search: the toggle click label is reported to the caller',
+    reportedToggle === 'Find a job in your country' && reportPage.buttonClicks === 1,
+    { reportedToggle, clicks: reportPage.buttonClicks },
+  );
   // Empty search yields listings: Enter alone submits, no term typed.
   const emptyWins = new FakePage({
     scanResult: portalScan,
@@ -3591,6 +3612,54 @@ async function testRound8() {
   );
 }
 
+async function testRound9() {
+  // Batch 9 (2026-11-12 round-8 canary vs c5012bf1): Foundever's
+  // render shows clicks 1 with clickedLabel null (a later no-match
+  // call overwrote the label — fixed: only a click updates it),
+  // and Sitel's no-form cannot say whether the "Find a job in your
+  // country" toggle fired. The toggle label rides the attempt
+  // record; the dismissBanner reload is skipped when under 12s
+  // remain, so the search keeps its 6s (Foundever skipped-time).
+  const jobsMod = freshRequire(`${OUT}/find-jobs.cjs`);
+  const resumeText =
+    'Customer service representative with phone support experience, technical support, troubleshooting, billing questions, and help desk work for members';
+  globalThis.fetch = async () => ({ ok: true, text: async () => '<html><body>No careers here.</body></html>' });
+  // A toggle that fired but revealed no form: the label still rides
+  // the attempt record.
+  const stubToggle = async (url) => ({
+    html: '', searchOutcome: 'no-form', searchMs: 900, renderedUrl: url,
+    cookieClicks: 0, bannerPresent: true, bannerButtons: ['BUTTON:Find a job in your country'],
+    cookieClickedLabel: null, bannerVisible: true, searchToggleClicked: 'Find a job in your country',
+  });
+  const res = await jobsMod.searchCompanyJobs(
+    { name: 'Toggle Co', website: 'https://toggle.example', careersUrl: 'https://toggle.example/careers', isUSCompany: true },
+    resumeText,
+    { renderPage: stubToggle },
+  );
+  check(
+    'toggle-diag: the toggle click label rides the attempt record',
+    res.renderAttempts.length >= 1 &&
+      res.renderAttempts[0]?.searchToggleClicked === 'Find a job in your country' &&
+      res.renderAttempts[0]?.bannerVisible === true,
+    res.renderAttempts,
+  );
+  // A render with no toggle reports null.
+  const stubNone = async (url) => ({
+    html: '', searchOutcome: 'no-form', searchMs: 900, renderedUrl: url,
+    cookieClicks: 0, bannerPresent: false, bannerButtons: [],
+  });
+  const resNone = await jobsMod.searchCompanyJobs(
+    { name: 'Toggle Co', website: 'https://toggle.example', careersUrl: 'https://toggle.example/careers', isUSCompany: true },
+    resumeText,
+    { renderPage: stubNone },
+  );
+  check(
+    'toggle-diag: no toggle reports a null label',
+    resNone.renderAttempts.length >= 1 && resNone.renderAttempts[0]?.searchToggleClicked === null,
+    resNone.renderAttempts,
+  );
+}
+
 async function testMatchingFixes() {
   // The 0/3004 fix round: synonym groups replace the hard title gate,
   // location becomes three-way (ok / review / reject), and JSON-LD on
@@ -4048,6 +4117,7 @@ await testRound5();
 await testRound6();
 await testRound7();
 await testRound8();
+await testRound9();
 await testPaginationAndSearchScan();
 await testTestCompany();
 await testJazzhr();

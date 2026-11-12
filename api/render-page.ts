@@ -137,6 +137,11 @@ export interface RenderPageResult {
    *  cannot say the banner is up. When present is true but visible
    *  is false, the click worked and the text is residual. */
   bannerVisible?: boolean;
+  /** The label of the search toggle the search step clicked, if
+   *  any (null when the step never needed a toggle, or no toggle
+   *  matched). Distinguishes "no toggle fired" from "the toggle
+   *  revealed a picker, not a search box" (Sitel's country picker). */
+  searchToggleClicked?: string | null;
 }
 
 export type RenderPageFn = (
@@ -323,9 +328,15 @@ export async function renderPageHtml(url: string, searchTerm: string = '', timeo
           // real accept button or another accept-like element.
           return { clicked: true, labels, clickedLabel: textOf(accept).replace(/\s+/g, ' ').slice(0, 60) };
         }).then((result) => {
-          if (result.clicked) cookieClicks += 1;
+          // Only a click updates the label: later no-match calls
+          // must not erase what an earlier call clicked (Foundever:
+          // clicks 1, clickedLabel null — the last call found
+          // nothing and overwrote it).
+          if (result.clicked) {
+            cookieClicks += 1;
+            lastClickedLabel = result.clickedLabel;
+          }
           lastAcceptLabels = result.labels;
-          lastClickedLabel = result.clickedLabel;
           return result;
         });
       } catch {
@@ -349,6 +360,15 @@ export async function renderPageHtml(url: string, searchTerm: string = '', timeo
         await waitForDomStable(pg, remain, 2000, 500);
       }
       if (!clicked) return false;
+      // The reload makes consent take effect — but only when the
+      // search can still afford it. A click hides the banner for
+      // THIS page load, so when the budget is already half-spent the
+      // reload (page load + 3s settle + re-check passes) is what
+      // starves the search: Foundever's render burned 16s in
+      // settles and the search never ran (skipped-time, 2026-11-12).
+      // Below 12s left, skip the reload and let the search run on
+      // the clicked page.
+      if (remain() <= 12000) return true;
       try {
         await pg.reload({ waitUntil: 'domcontentloaded', timeout: Math.max(1000, remain()) });
       } catch {
@@ -408,7 +428,13 @@ export async function renderPageHtml(url: string, searchTerm: string = '', timeo
     // reload is needed — the search runs on the now-visible form.
     if (remain() > 1000) await tryCookieAccept(page);
     const searchStart = Date.now();
-    const searchOutcome = await tryPortalSearch(page, searchTerm, deadline);
+    // The label of the search toggle the step clicked, if any (a
+    // country-picker entry, not a search box, still counts: Sitel's
+    // no-form may mean the toggle revealed a picker, not nothing).
+    let searchToggleClicked: string | null = null;
+    const searchOutcome = await tryPortalSearch(page, searchTerm, deadline, (label) => {
+      searchToggleClicked = label;
+    });
     const searchMs = Date.now() - searchStart;
     // No-form diagnosis: what the scan actually saw on the page, so
     // a live no-form can be told apart (no inputs vs. unqualifying
@@ -423,7 +449,7 @@ export async function renderPageHtml(url: string, searchTerm: string = '', timeo
       }
     }
     if (searchOutcome === 'board-redirect') {
-      return { html: '', searchOutcome, searchMs, renderedUrl: page.url(), cookieClicks };
+      return { html: '', searchOutcome, searchMs, renderedUrl: page.url(), cookieClicks, searchToggleClicked };
     }
     const html = await page.content();
     // Visibility, not just text: the banner's copy can stay in the
@@ -464,6 +490,7 @@ export async function renderPageHtml(url: string, searchTerm: string = '', timeo
       bannerButtons: lastAcceptLabels,
       cookieClickedLabel: lastClickedLabel,
       bannerVisible,
+      searchToggleClicked,
     };
   } catch {
     // A failed render still reports WHY instead of a bare null, so the
