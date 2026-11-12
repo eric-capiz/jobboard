@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>MockJobs — Careers Portal</title></head>
+<body>
+<div id="cookie-banner">
+  <p>We use cookies to offer you the best possible website experience. Your cookie preferences will be stored in your browser's local storage.</p>
+  <button id="accept-cookies" onclick="document.getElementById('cookie-banner').style.display='none'">Accept All Cookies</button>
+</div>
+<header>
+  <nav>
+    <a href="/index.html">Home</a>
+    <a href="/about.html">About Us</a>
+  </nav>
+  <h1>MockJobs Careers</h1>
+  <p>Find your next role with us.</p>
+  <button id="country-toggle">Find a job in your country</button>
+</header>
+<div id="country-modal" role="dialog" style="display:none">
+  <h2>Choose your country</h2>
+  <ul id="country-list"><!-- options are added by script when the picker opens, like the real portal --></ul>
+</div>
+<script>
+  document.getElementById('country-toggle').addEventListener('click', function () {
+    var list = document.getElementById('country-list');
+    if (list.children.length === 0) {
+      var countries = [
+        ['United States (USA)', '/results-us.html'],
+        ['Canada', '/results-ca.html'],
+        ['Mexico', '/results-mx.html']
+      ];
+      countries.forEach(function (c) {
+        var li = document.createElement('li');
+        var a = document.createElement('a');
+        a.textContent = c[0];
+        a.href = c[1];
+        li.appendChild(a);
+        list.appendChild(li);
+      });
+    }
+    document.getElementById('country-modal').style.display = 'block';
+  });
+</script>
+</body>
+</html>

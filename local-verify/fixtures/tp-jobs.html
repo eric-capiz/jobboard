@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>MockTP — Job Opportunities</title></head>
+<body>
+<header>
+  <nav><a href="/tp.html">Home</a></nav>
+  <h1>Job Opportunities</h1>
+  <button id="country-btn" type="button" aria-haspopup="true" aria-expanded="false">Select your country</button>
+  <div id="country-menu" class="dropdown-menu" style="display:none">
+    <button type="button" data-country="US">United States</button>
+    <button type="button" data-country="JM">Jamaica</button>
+    <button type="button" data-country="IN">India</button>
+  </div>
+</header>
+<main>
+  <div id="tp-results"><p>Choose your country to see open roles.</p></div>
+</main>
+<script>
+  // The results template lives in the page's own script, like a real
+  // portal's client-side render: the plain-HTML walk sees the job
+  // markers and detail links in the source but no parsed postings.
+  var RESULTS = {
+    US: '<p>Results 1 – 4 of 4</p>'
+      + '<div class="job-card"><a href="/job/Customer-Service-Representative-Remote/3001/">Customer Service Representative</a><span class="location">Remote, Any Location, US</span></div>'
+      + '<div class="job-card"><a href="/job/Bilingual-Customer-Service-Representative-Remote/3002/">Bilingual Customer Service Representative</a><span class="location">Remote, Any Location, US</span></div>'
+      + '<div class="job-card"><a href="/job/Technical-Support-Representative-Remote/3003/">Technical Support Representative</a><span class="location">Remote, Any Location, US</span></div>'
+      + '<div class="job-card"><a href="/job/Customer-Service-Representative-Kingston/3004/">Customer Service Representative</a><span class="location">Kingston, Jamaica</span></div>',
+    JM: '<p>Results 1 – 1 of 1</p>'
+      + '<div class="job-card"><a href="/job/Customer-Service-Representative-Kingston/3004/">Customer Service Representative</a><span class="location">Kingston, Jamaica</span></div>',
+    IN: '<p>Results 0 – 0 of 0</p>'
+  };
+  document.getElementById('country-btn').addEventListener('click', function () {
+    var menu = document.getElementById('country-menu');
+    var open = menu.style.display === 'block';
+    menu.style.display = open ? 'none' : 'block';
+    this.setAttribute('aria-expanded', open ? 'false' : 'true');
+  });
+  document.querySelectorAll('#country-menu button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.getElementById('tp-results').innerHTML = RESULTS[b.getAttribute('data-country')] || '<p>Results 0 – 0 of 0</p>';
+      document.getElementById('country-menu').style.display = 'none';
+    });
+  });
+</script>
+</body>
+</html>

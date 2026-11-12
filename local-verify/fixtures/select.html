@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>MockJobs — Region</title></head>
+<body>
+<h1>Careers by Region</h1>
+<label for="region">Region</label>
+<select id="region" aria-label="Region">
+  <option value="" selected>Select a region</option>
+  <option value="US">United States</option>
+  <option value="CA">Canada</option>
+  <option value="EU">Europe</option>
+</select>
+<div id="results"></div>
+<script>
+  document.getElementById('region').addEventListener('change', function (e) {
+    var box = document.getElementById('results');
+    box.innerHTML = '';
+    if (e.target.value !== 'US') {
+      box.innerHTML = '<p>Results 0 – 0 of 0</p>';
+      return;
+    }
+    box.innerHTML = '<p>Results 1 – 10 of 12</p>'
+      + '<div class="job-card"><a href="/job/Remote-Remote-Customer-Service-Representative-Any/1450276400/">Remote Customer Service Representative</a><span class="location">Remote, Any Location, US</span></div>'
+      + '<div class="job-card"><a href="/job/Remote-Bilingual-Customer-Service-Associate-1-Any/1448643800/">Bilingual Customer Service Associate 1</a><span class="location">Remote, Any Location, US</span></div>';
+  });
+</script>
+</body>
+</html>

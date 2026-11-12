@@ -778,8 +778,33 @@ function titleOk(title: string): boolean {
 }
 
 function locationIn(text: string): string {
-  const m = text.match(/Location:\s*([^<\n]{2,60})/i);
-  if (m) return stripTags(m[1]).trim();
+  // The LAST "Location:" line / location span in the text wins: a
+  // Strategy B window (900 chars before an apply link) can span two
+  // cards, and the location closest to the link is the card's own —
+  // the first match would be the PREVIOUS card's (2026-11-12 local
+  // round: a Remote card read "Virginia, US" off the Retention card
+  // above it). Per-card chunks carry a single location, so first and
+  // last agree there.
+  let lastLoc = '';
+  for (const m of text.matchAll(/Location:\s*([^<\n]{2,60})/gi)) {
+    const v = stripTags(m[1]).trim();
+    if (v) lastLoc = v;
+  }
+  if (lastLoc) return lastLoc;
+  // A location element: <span class="location">Kingston, Jamaica</span>
+  // or <span class="job-location">…</span> (TalentBrew). Strategy A
+  // chunks and Strategy C cards carry the location this way; without
+  // it the role reads as blank-location and a non-US on-site role
+  // passes the sweep's location rule as a review lead
+  // (Teleperformance's Jamaica role, 2026-11-12 local round).
+  let lastSpan = '';
+  for (const m of text.matchAll(
+    /<span[^>]*class="[^"]*(?:job-)?location[^"]*"[^>]*>([^<]{2,80})<\/span>/gi,
+  )) {
+    const v = stripTags(m[1]).trim();
+    if (v) lastSpan = v;
+  }
+  if (lastSpan) return lastSpan;
   if (/\bRemote\b/i.test(text)) return 'Remote';
   return '';
 }
@@ -819,6 +844,12 @@ export function isJunkTitle(title: string): boolean {
   // count guards abbreviations: 'Customer Service Rep.' is three
   // words and a real title; a six-word sentence is not.
   if (/\.\s*$/.test(t) && t.split(/\s+/).length >= 6) return true;
+  // A pagination / nav label is never a role: TTEC's pager link
+  // ("Next") became a posting titled "Next" via Strategy A's
+  // link-text fallback (the trailing chunk has no heading,
+  // 2026-11-12 local round). A real role title is never exactly
+  // one of these words.
+  if (/^(next|previous|prev|back|more|load more|show more|view all)$/i.test(t)) return true;
   // A real job title never starts with one of these verbs.
   if (/^(join|become|apply)\b/i.test(t)) return true;
   // Category labels: 'Jobs near you', 'Jobs for veterans ...',
@@ -869,9 +900,24 @@ export function isJobDetailUrl(rawUrl: string): boolean {
       return false;
     }
   }
-  // A job marker anywhere in the path: /jobs/frontend-developer,
-  // /careers/frontend, /career-details, /position/123.
-  if (/job|career|position|opening|posting|vacancy|apply|detail|role/i.test(u.pathname)) return true;
+  // A search / list / pagination URL is never one job: TTEC's pager
+  // is /search-jobs&p=2 (the Next link) — the "job marker anywhere"
+  // rule below would call it a detail (the path contains "job"), and
+  // Strategy A's link-text fallback then titles it "Next", so the
+  // sweep sees a 9th posting on a page with 8 cards (2026-11-12
+  // local round). A real detail's last segment is a role slug or a
+  // numeric id, never a search word; a p=/page= marker is pagination.
+  if (/^(search|results|browse|find|list)/i.test(last) || /[?&]p(ag)?=\d/i.test(rawUrl)) {
+    return false;
+  }
+  // A job marker as a full segment or a segment start:
+  // /jobs/frontend-developer, /careers/frontend, /career-details,
+  // /position/123. NOT a marker buried mid-segment: /about-careers/
+  // is a marketing page, not a job — the old substring rule called
+  // it a detail, and the render-target exclusion then dropped a page
+  // the loop must still be able to try (the target-order test pins
+  // it, 2026-11-12 local round).
+  if (segs.some((s) => /^(job|jobs|career|careers|position|opening|posting|vacancy|apply|detail|role)/i.test(s))) return true;
   // A numeric id in the last segment: /program/remote-call-center-
   // representative-work-from-home-47/, /jobs/12345.
   if (/\d/.test(last)) return true;
@@ -1695,15 +1741,24 @@ export async function searchCompanyJobs(
       // no content to score, so without the host rule it never
       // becomes a render candidate at all (ModSquad, 2026-11-12).
       if (isCareersLikeUrl(u, careersUrl) || atsHostBonus(u) > 0) {
-        // Score on path AND host, like the fetched branch: a
-        // jobs./careers. subdomain homepage scores 0 on path alone,
-        // so without the host bonus it would always lose to the
-        // /careers and /jobs guesses (2 each) — and the render would
-        // go to a guess that fails the same way instead of the portal.
-        zeroYieldTargets.push({
-          url: u,
-          score: renderTargetScore(u, careersUrl) + companyHostBonus(u, company.name),
-        });
+        // A job-detail URL is one role, not a list — rendering it
+        // shows that role alone, never the portal, so it must not
+        // spend render budget: NexRep's board page links 3 detail
+        // URLs and they outranked the /careers guess, burning both
+        // renders on detail pages (2026-11-12 local round). The
+        // plain-HTML fetch already captured the role as a teaser
+        // fallback; only the render rank is lost, not the role.
+        if (!isJobDetailUrl(u)) {
+          // Score on path AND host, like the fetched branch: a
+          // jobs./careers. subdomain homepage scores 0 on path alone,
+          // so without the host bonus it would always lose to the
+          // /careers and /jobs guesses (2 each) — and the render would
+          // go to a guess that fails the same way instead of the portal.
+          zeroYieldTargets.push({
+            url: u,
+            score: renderTargetScore(u, careersUrl) + companyHostBonus(u, company.name),
+          });
+        }
       }
       continue;
     }
@@ -1779,7 +1834,12 @@ export async function searchCompanyJobs(
     // ATS host is portal-like by construction, too — a Workday shell
     // carries no searchable content in its raw HTML.
     const contentScore = portalContentScore(html);
-    if (contentScore > 0 || isCareersLikeUrl(u, careersUrl) || atsHostBonus(u) > 0) {
+    // A job-detail URL is one role, not a list (same rule as the
+    // fetch-failed branch above): rendering it shows that role
+    // alone, never the portal, so it must not spend render budget.
+    // The plain-HTML fetch already captured the role as a teaser
+    // fallback; only the render rank is lost, not the role.
+    if ((contentScore > 0 || isCareersLikeUrl(u, careersUrl) || atsHostBonus(u) > 0) && !isJobDetailUrl(u)) {
       zeroYieldTargets.push({
         url: u,
         score:

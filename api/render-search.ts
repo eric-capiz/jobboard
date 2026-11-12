@@ -53,9 +53,16 @@
  * $0: no new dependency — puppeteer-core only (already in the render
  * reader). The in-page functions below run inside the browser via
  * page.evaluate, so they must stay self-contained: no imports, no
- * closures over module state. The selection logic runs in Node on the
- * serialized descriptors, so the offline test suite can drive it with
- * canned data and a fake page — no real browser needed there.
+ * closures over module state, NO calls to module-level helpers —
+ * page.evaluate serializes the function ALONE and any free reference
+ * throws ReferenceError in the page (round 13 broke listingsNow
+ * exactly this way when countJobListings called hasResultsCountText;
+ * the FakePage suite dispatches by function name and CANNOT catch
+ * serialization breakage — only the local Chromium driver
+ * local-verify/driver.ts proves an in-page function runs in a real
+ * browser). The selection logic runs in Node on the serialized
+ * descriptors, so the offline test suite can drive it with canned
+ * data and a fake page — no real browser needed there.
  */
 
 import { isBoardUrl } from './finder-lib.js';
@@ -222,11 +229,17 @@ export function scanSearchForm(): SearchFormInfo {
 
 /** Whether the page's body text states a POSITIVE results count —
  *  the "listings present" half of hasVisibleListings. Pure (takes
- *  the text), so the offline suite can drive it directly. Three
- *  shapes, all requiring the count to be above zero (portals show
- *  "Search results (0 jobs available)" on the empty shell, and that
- *  line plus a nav link would otherwise read as "listings present"
- *  and skip the search entirely — proven on Concentrix 2026-11-11):
+ *  the text), so the offline suite can drive it directly. KEEP IN
+ *  SYNC with countJobListings: the in-page function cannot call
+ *  this helper (page.evaluate serializes the function alone — a
+ *  call to it throws ReferenceError in the page), so the patterns
+ *  are duplicated there. The local Chromium driver
+ *  (local-verify/driver.ts, fixture A) is the guard that the two
+ *  agree in a real browser. Three shapes, all requiring the count
+ *  to be above zero (portals show "Search results (0 jobs
+ *  available)" on the empty shell, and that line plus a nav link
+ *  would otherwise read as "listings present" and skip the search
+ *  entirely — proven on Concentrix 2026-11-11):
  *  "1-25 of 4,659 jobs" (adjacent count word), "Results 1 – 10 of
  *  34" (Phenom's range format — no count word adjacent to any
  *  number, so the adjacent-count pattern misses it entirely, and
@@ -278,7 +291,46 @@ export function countJobListings(): JobListingCount {
   // as "9 roles across all departments" (Liveops, 2026-11-12), and
   // without it the search step hides a visible list behind a term
   // search that returns nothing.
-  const resultsText = hasResultsCountText(bodyText);
+  // The patterns below are INLINED here on purpose — they duplicate
+  // hasResultsCountText, because this function runs inside the
+  // browser via page.evaluate, which serializes the function ALONE:
+  // any call to a module-level helper throws ReferenceError in the
+  // page, listingsNow reads false, and the search step submits over
+  // a results page it should have harvested (caught by the local
+  // Chromium reproduction 2026-11-12: both fixtures harvested their
+  // leads via the HTML path while listingsNow stayed false). KEEP
+  // THE TWO IN SYNC — the offline suite tests hasResultsCountText,
+  // the local Chromium driver tests this function in a real browser.
+  let resultsText = false;
+  for (const m of bodyText.matchAll(/([\d,]+)\s+(jobs?|results?|openings?|positions?|roles?)\b/gi)) {
+    if (parseInt(m[1].replace(/,/g, ''), 10) > 0) {
+      resultsText = true;
+      break;
+    }
+  }
+  if (!resultsText) {
+    // Phenom's range format, "Results 1 – 10 of 34": no number sits
+    // adjacent to a count word, so the pattern above misses it — and
+    // the search then submits on a results page and destroys the
+    // country context the gate pick just established (Foundever
+    // round-12 canary). The trailing total (34) is the count.
+    for (const m of bodyText.matchAll(/results?\s+[\d,]+\s*[–—-]\s*[\d,]+\s+of\s+([\d,]+)/gi)) {
+      if (parseInt(m[1].replace(/,/g, ''), 10) > 0) {
+        resultsText = true;
+        break;
+      }
+    }
+  }
+  if (!resultsText) {
+    for (const m of bodyText.matchAll(
+      /[\d,]+\s*[–—-]\s*[\d,]+\s+of\s+([\d,]+)\s+(jobs?|results?|openings?|positions?|roles?)\b/gi,
+    )) {
+      if (parseInt(m[1].replace(/,/g, ''), 10) > 0) {
+        resultsText = true;
+        break;
+      }
+    }
+  }
   return { jobLinks, resultsText };
 }
 
@@ -1020,7 +1072,17 @@ export function selectGateAction(
     const target = gateTargetOf(normalized, searchTerm);
     if (!target) continue;
     if (target === 'role' && !inPicker) continue;
-    if (!inPicker && !gateOpened) continue;
+    // A bare locale link ("United States", "English") is pickable
+    // without a gate having opened: the label is an exact locale
+    // match — a job title is never exactly "United States" — and the
+    // same-host + not-a-board checks below still apply. Omni's
+    // country list is bare footer links, no dropdown container, and
+    // the old rule left them unpickable forever (2026-11-12 local
+    // round). 'remote' stays gated — a bare "Remote" link is as
+    // likely a job card or a location chip as a filter — and 'role'
+    // already requires a picker.
+    const bareLocale = !inPicker && (target === 'us' || target === 'english');
+    if (!inPicker && !gateOpened && !bareLocale) continue;
     if (!inPicker && c.href) {
       // A bare link: only when it stays on the portal's own host —
       // a footer locale link is the portal's country flow, a board
@@ -1193,6 +1255,60 @@ async function attemptSearch(
   return 'settled';
 }
 
+type GatesAfterSearchResult = 'searched' | 'no-form' | 'board-redirect' | null;
+
+/** Drive gates AFTER the search submits settled with no listings (or
+ *  the term retry found no box): a gate may still be standing behind
+ *  the box that was submitted — Omni's header search submits to the
+ *  site's ?s= page while the country gate sits untouched on it, and
+ *  the term retry only re-submits the same site search (2026-11-12
+ *  local round: both Omni fixtures ended no-form with the gate never
+ *  driven). Up to three gate actions (an opener, then the pick, then
+ *  the next gate), with a listings check after each. A navigating
+ *  pick is terminal: the pick chose its destination, and a submit
+ *  there would reset the context it just established (the same rule
+ *  as the no-form branch). Null when there is no gate to drive — the
+ *  caller then returns the search outcome it already had. A gate
+ *  action that navigates lands on a FRESH page: the opener/toggle
+ *  exclusion is about the page the gate opened on, not this new one,
+ *  so gateOpened resets when the URL changes (Sitel: the gate opener
+ *  IS the link to the portal, and the portal's own "Find a job in
+ *  your country" button must open). Never throws. */
+async function driveGatesAfterSearch(
+  page: SearchablePage,
+  remainMs: () => number,
+  searchTerm: string,
+  onCountry?: (label: string) => void,
+  onGate?: (label: string) => void,
+): Promise<GatesAfterSearchResult> {
+  let gateOpened = false;
+  for (let round = 0; round < 3; round++) {
+    const roundUrl = page.url();
+    const gated = await resolveGateOnce(page, remainMs, searchTerm, gateOpened, onCountry, onGate);
+    if (gated === 'board') return 'board-redirect';
+    if (gated === 'navigated') {
+      gateOpened = true;
+      await waitForDomStable(page, remainMs, 3000, 500);
+      if (await listingsNow(page)) return 'searched';
+      if (await jobLinksNow(page)) return 'searched';
+      return 'no-form';
+    }
+    if (gated) {
+      if (page.url() !== roundUrl) gateOpened = false;
+      else gateOpened = true;
+      await waitForDomStable(page, remainMs, 3000, 500);
+      if (await listingsNow(page)) return 'searched';
+      if (await jobLinksNow(page)) return 'searched';
+      continue;
+    }
+    return null;
+  }
+  await waitForDomStable(page, remainMs, 3000, 500);
+  if (await listingsNow(page)) return 'searched';
+  if (await jobLinksNow(page)) return 'searched';
+  return null;
+}
+
 /** The search step: on a rendered careers page that shows no listings,
  *  submit the portal's own search (empty first, then the resume role
  *  term) and wait for results. Never throws — every failure mode is an
@@ -1240,6 +1356,7 @@ export async function tryPortalSearch(
     let gateOpened = toggled === 'toggled';
     let ranSearch = false;
     for (let round = 0; round < 4; round++) {
+      const roundUrl = page.url();
       const gated = await resolveGateOnce(page, remainMs, searchTerm, gateOpened, onCountry, onGate);
       if (gated === 'board') return 'board-redirect';
       if (gated === 'navigated') {
@@ -1256,7 +1373,15 @@ export async function tryPortalSearch(
         // then check for listings before anything else — cards may
         // be visible under a count format the detector does not
         // know, and a submit over them would only replace the page.
-        gateOpened = true;
+        // A gate action that navigated landed on a FRESH page: the
+        // opener/toggle exclusion is about the page the gate opened
+        // on, not this new one — its own "Find a job" button is a
+        // legitimate opener, not a re-click of the one that just
+        // fired (Sitel: the gate opener IS the link to the portal,
+        // and the portal's own "Find a job in your country" button
+        // must open, 2026-11-12 local round).
+        if (page.url() !== roundUrl) gateOpened = false;
+        else gateOpened = true;
         await waitForDomStable(page, remainMs, 3000, 500);
         if (await listingsNow(page)) return 'searched';
         if (await jobLinksNow(page)) return 'searched';
@@ -1297,11 +1422,27 @@ export async function tryPortalSearch(
   if (first === 'failed') return 'submit-failed';
   if (await listingsNow(page)) return 'searched';
   // Empty search showed nothing (some portals require a keyword).
-  // One retry with the resume's role term, time permitting.
-  if (!searchTerm || remainMs() < 6000) return 'no-results';
-  const second = await attemptSearch(page, searchTerm, remainMs);
-  if (second === 'board') return 'board-redirect';
-  if (second === 'no-form') return 'no-form';
-  if (second === 'failed') return 'submit-failed';
-  return (await listingsNow(page)) ? 'searched' : 'no-results';
+  // One retry with the resume's role term, time permitting — then,
+  // before concluding, drive any gate still standing behind the box
+  // that was submitted (Omni: the box was the site's header search,
+  // not the portal's; the country gate is untouched, and the term
+  // retry only re-submits the same site search, 2026-11-12 local
+  // round). The gate runs last, so a working term retry is never
+  // pre-empted by a gate pick, and no submit ever follows a pick.
+  let tail: PortalSearchOutcome;
+  if (!searchTerm || remainMs() < 6000) {
+    tail = 'no-results';
+  } else {
+    const second = await attemptSearch(page, searchTerm, remainMs);
+    if (second === 'board') return 'board-redirect';
+    if (second === 'no-form') tail = 'no-form';
+    else if (second === 'failed') return 'submit-failed';
+    else tail = (await listingsNow(page)) ? 'searched' : 'no-results';
+  }
+  if (tail === 'searched') return 'searched';
+  const gated = await driveGatesAfterSearch(page, remainMs, searchTerm, onCountry, onGate);
+  if (gated === 'board-redirect') return 'board-redirect';
+  if (gated === 'searched') return 'searched';
+  if (gated === 'no-form') return 'no-form';
+  return tail;
 }

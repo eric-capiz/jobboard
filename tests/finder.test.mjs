@@ -2388,6 +2388,93 @@ async function testPortalSearch() {
     )?.label === 'United States',
     null,
   );
+  // Bare locale links are pickable with no gate opened (Omni's
+  // country list is bare footer links, no dropdown container, and
+  // the old rule left them unpickable forever); bare 'Remote' and
+  // bare role links are not, and a bare US link to another host is
+  // not either (2026-11-12 local round). A job title is never
+  // exactly "United States", which is what makes the bare locale
+  // safe to pick.
+  check(
+    'gate-resolver: bare "United States" link is pickable with no gate opened',
+    searchMod.selectGateAction(
+      {
+        controls: [
+          mkGateButton({ index: 0, label: 'United States', href: 'https://portal.example/us-results' }),
+        ],
+      },
+      'customer service',
+      false,
+      'https://portal.example/careers',
+    )?.label === 'United States',
+    null,
+  );
+  check(
+    'gate-resolver: bare "English" link is pickable with no gate opened',
+    searchMod.selectGateAction(
+      {
+        controls: [
+          mkGateButton({ index: 0, label: 'English', href: 'https://portal.example/us-results' }),
+        ],
+      },
+      'customer service',
+      false,
+      'https://portal.example/careers',
+    )?.label === 'English',
+    null,
+  );
+  check(
+    'gate-resolver: bare "Remote" link is NOT pickable with no gate opened',
+    searchMod.selectGateAction(
+      {
+        controls: [
+          mkGateButton({ index: 0, label: 'Remote', href: 'https://portal.example/us-results' }),
+        ],
+      },
+      'customer service',
+      false,
+      'https://portal.example/careers',
+    ) === null,
+    null,
+  );
+  check(
+    'gate-resolver: bare role link ("Customer Service") is NOT pickable',
+    searchMod.selectGateAction(
+      {
+        controls: [
+          mkGateButton({ index: 0, label: 'Customer Service', href: 'https://portal.example/us-results' }),
+        ],
+      },
+      'customer service',
+      false,
+      'https://portal.example/careers',
+    ) === null,
+    null,
+  );
+  check(
+    'gate-resolver: bare US link to another host is NOT pickable',
+    searchMod.selectGateAction(
+      {
+        controls: [
+          mkGateButton({ index: 0, label: 'United States', href: 'https://other.example/us-results' }),
+        ],
+      },
+      'customer service',
+      false,
+      'https://portal.example/careers',
+    ) === null,
+    null,
+  );
+  check(
+    'gate-resolver: bare US button (no href) is pickable with no gate opened',
+    searchMod.selectGateAction(
+      { controls: [mkGateButton({ index: 0, label: 'United States' })] },
+      'customer service',
+      false,
+      'https://portal.example/careers',
+    )?.label === 'United States',
+    null,
+  );
   // Region dropdown as a native <select>, visible on load with no
   // toggle at all: the US option is picked through the select, the
   // box appears, the search finds listings.
@@ -2644,6 +2731,198 @@ async function testPortalSearch() {
       JSON.stringify(noResults.typedTerms) === JSON.stringify(['customer service']) &&
       noResults.pressedKeys.filter((k) => k === 'Enter').length === 2,
     { typed: noResults.typedTerms, keys: noResults.pressedKeys },
+  );
+  // The search box is the site's header search, not the portal's:
+  // the empty submit strands the page on ?s= with no listings, and
+  // the term retry is refused as site search — but the country gate
+  // still stands behind the box. The gate is driven AFTER the
+  // submits, never before a working term retry, and no submit ever
+  // follows a pick (Omni: both live renders ended no-form with the
+  // gate never driven, 2026-11-12 local round). Counts queue:
+  // entry, after-empty-submit, then after the opener two checks
+  // (listings + bare links), then after the navigating pick.
+  const omniScan = {
+    inputs: [mkInput({ index: 0, name: 's', type: 'search', placeholder: 'Search', formIndex: 0 })],
+    buttons: [],
+    forms: [{ action: '/', method: 'get' }],
+  };
+  const omniMenuScan = {
+    controls: [
+      mkGateButton({ index: 0, label: 'United States', containerRole: 'menu' }),
+      mkGateButton({ index: 1, label: 'Puerto Rico', containerRole: 'menu' }),
+      mkGateButton({ index: 2, label: 'Guatemala', containerRole: 'menu' }),
+    ],
+  };
+  let reportedOmniCountry = null;
+  const omniPage = new FakePage({
+    url: 'https://portal.example/',
+    scanResult: omniScan,
+    counts: [
+      { jobLinks: 0, resultsText: false },
+      { jobLinks: 0, resultsText: false },
+      { jobLinks: 0, resultsText: false },
+      { jobLinks: 0, resultsText: false },
+      { jobLinks: 5, resultsText: true },
+    ],
+    onEnter: (term, page) => page.setUrl('https://portal.example/?s='),
+    gateScan: {
+      controls: [mkGateButton({ index: 0, label: 'Select your country' })],
+    },
+    onGateClick: (label, page) => {
+      if (label === 'Select your country') page.gateScan = omniMenuScan;
+      else {
+        page.setUrl('https://portal.example/us-results');
+        page.gateScan = { controls: [] };
+      }
+    },
+  });
+  const omniOutcome = await searchMod.tryPortalSearch(
+    omniPage,
+    'customer service',
+    Date.now() + 30000,
+    () => {},
+    (label) => {
+      reportedOmniCountry = label;
+    },
+    () => {},
+  );
+  check(
+    'portal-search: post-submit gate — opener then US pick after the site search strands the page',
+    omniOutcome === 'searched' &&
+      omniPage.gateClicks === 2 &&
+      JSON.stringify(omniPage.gateLabels) === JSON.stringify(['Select your country', 'United States']) &&
+      reportedOmniCountry === 'United States' &&
+      omniPage.pressedKeys.filter((k) => k === 'Enter').length === 1 &&
+      omniPage.typedTerms.length === 0,
+    { outcome: omniOutcome, gateClicks: omniPage.gateClicks, gateLabels: omniPage.gateLabels, reportedOmniCountry, keys: omniPage.pressedKeys, typed: omniPage.typedTerms },
+  );
+  // Same stranded site search, but the country gate is bare footer
+  // links — no dropdown container, no gate opened yet. A bare
+  // "United States" link is pickable (a job title is never exactly
+  // "United States"), so the gate still drives after the submits.
+  let reportedBareCountry = null;
+  const bareLinkPage = new FakePage({
+    url: 'https://portal.example/',
+    scanResult: omniScan,
+    counts: [
+      { jobLinks: 0, resultsText: false },
+      { jobLinks: 0, resultsText: false },
+      { jobLinks: 5, resultsText: true },
+    ],
+    onEnter: (term, page) => page.setUrl('https://portal.example/?s='),
+    gateScan: {
+      controls: [
+        mkGateButton({ index: 0, label: 'United States', href: 'https://portal.example/us-results' }),
+        mkGateButton({ index: 1, label: 'Puerto Rico', href: 'https://portal.example/pr-results' }),
+      ],
+    },
+    onGateClick: (label, page) => {
+      page.setUrl('https://portal.example/us-results');
+      page.gateScan = { controls: [] };
+    },
+  });
+  const bareOutcome = await searchMod.tryPortalSearch(
+    bareLinkPage,
+    'customer service',
+    Date.now() + 30000,
+    () => {},
+    (label) => {
+      reportedBareCountry = label;
+    },
+    () => {},
+  );
+  check(
+    'portal-search: post-submit gate — bare "United States" footer link drives after the site search strands the page',
+    bareOutcome === 'searched' &&
+      bareLinkPage.gateClicks === 1 &&
+      JSON.stringify(bareLinkPage.gateLabels) === JSON.stringify(['United States']) &&
+      reportedBareCountry === 'United States' &&
+      bareLinkPage.pressedKeys.filter((k) => k === 'Enter').length === 1,
+    { outcome: bareOutcome, gateClicks: bareLinkPage.gateClicks, gateLabels: bareLinkPage.gateLabels, reportedBareCountry, keys: bareLinkPage.pressedKeys },
+  );
+  // Both submits stranded, gate scan empty: the search outcome
+  // stands — no-form when the term retry found no box, and the gate
+  // helper returns null without touching anything.
+  const strandedPage = new FakePage({
+    url: 'https://portal.example/',
+    scanResult: omniScan,
+    counts: [
+      { jobLinks: 0, resultsText: false },
+      { jobLinks: 0, resultsText: false },
+    ],
+    onEnter: (term, page) => page.setUrl('https://portal.example/?s='),
+    gateScan: { controls: [] },
+  });
+  check(
+    'portal-search: post-submit with no gate falls through to no-form',
+    (await runSearch(strandedPage)) === 'no-form' &&
+      strandedPage.gateClicks === 0 &&
+      strandedPage.pressedKeys.filter((k) => k === 'Enter').length === 1,
+    { gateClicks: strandedPage.gateClicks, keys: strandedPage.pressedKeys },
+  );
+  // The gate opener IS the link to the portal: it navigates, and the
+  // portal's own "Find a job in your country" button is a legitimate
+  // opener on the fresh page — not a re-click of the one that just
+  // fired. The exclusion is about the page the gate opened on, so
+  // gateOpened resets when the URL changes (Sitel: the first local
+  // round burned a second render on exactly this, 2026-11-12).
+  const sitelPortalScan = {
+    controls: [mkGateButton({ index: 0, label: 'Find a job in your country' })],
+  };
+  const sitelPickerScan = {
+    controls: [
+      mkGateButton({ index: 0, label: 'United States (USA)', containerRole: 'dialog' }),
+      mkGateButton({ index: 1, label: 'Canada', containerRole: 'dialog' }),
+      mkGateButton({ index: 2, label: 'Mexico', containerRole: 'dialog' }),
+    ],
+  };
+  let reportedSitelCountry = null;
+  const sitelPage = new FakePage({
+    url: 'https://portal.example/',
+    scanResult: { inputs: [], buttons: [], forms: [] },
+    counts: [
+      { jobLinks: 0, resultsText: false },
+      { jobLinks: 0, resultsText: false },
+      { jobLinks: 0, resultsText: false },
+      { jobLinks: 0, resultsText: false },
+      { jobLinks: 0, resultsText: false },
+      { jobLinks: 5, resultsText: true },
+    ],
+    gateScan: {
+      controls: [
+        mkGateButton({ index: 0, label: 'Find a job in your country', href: 'https://portal.example/jobs-portal' }),
+      ],
+    },
+    onGateClick: (label, page) => {
+      if (page.url() === 'https://portal.example/') {
+        page.setUrl('https://portal.example/jobs-portal');
+        page.gateScan = sitelPortalScan;
+      } else if (page.gateClicks === 2) {
+        page.gateScan = sitelPickerScan;
+      } else {
+        page.setUrl('https://portal.example/us-results');
+        page.gateScan = { controls: [] };
+      }
+    },
+  });
+  const sitelOutcome = await searchMod.tryPortalSearch(
+    sitelPage,
+    'customer service',
+    Date.now() + 30000,
+    () => {},
+    (label) => {
+      reportedSitelCountry = label;
+    },
+    () => {},
+  );
+  check(
+    'portal-search: gate opener that navigates resets the exclusion — the portal’s own "Find a job in your country" opens',
+    sitelOutcome === 'searched' &&
+      sitelPage.gateClicks === 3 &&
+      JSON.stringify(sitelPage.gateLabels) ===
+        JSON.stringify(['Find a job in your country', 'Find a job in your country', 'United States (USA)']) &&
+      reportedSitelCountry === 'United States (USA)',
+    { outcome: sitelOutcome, gateClicks: sitelPage.gateClicks, gateLabels: sitelPage.gateLabels, reportedSitelCountry },
   );
   // Page already lists jobs: no search at all.
   const alreadyListed = new FakePage({
@@ -3217,6 +3496,31 @@ async function testRealPostingGate() {
       isJunkTitle('Customer Support Specialist') === false &&
       isRealPosting('Customer service jobs', 'https://rawco.example/jobs/frontend-developer') === false &&
       isRealPosting('Frontend Developer', 'https://www.ttecjobs.com/en/customer-service') === false,
+    null,
+  );
+  // List and pagination URLs are not details: a search page whose
+  // last segment starts with search/results/find, and any URL
+  // carrying a pagination marker (&p=2 / ?page=2). The marker is a
+  // segment START — '/about-careers/' is a marketing page, not a
+  // job, while '/careers/jamaica/' stays a detail via its 'careers'
+  // segment (TalentBrew's "Next" pager link used to parse as a
+  // 9th posting titled "Next", 2026-11-12 local round).
+  check(
+    'gate: list/pagination URLs are not details',
+    isJobDetailUrl('https://www.ttecjobs.com/en/search-jobs') === false &&
+      isJobDetailUrl('https://www.ttecjobs.com/search-jobs&p=2') === false &&
+      isJobDetailUrl('https://www.ttecjobs.com/jobs&p=2') === false &&
+      isJobDetailUrl('https://www.ttecjobs.com/en/search-jobs?page=2') === false &&
+      isJobDetailUrl('https://example.com/about-careers/') === false &&
+      isJobDetailUrl('https://example.com/careers/jamaica/') === true,
+    null,
+  );
+  check(
+    'gate: navigation labels are junk titles',
+    isJunkTitle('Next') === true &&
+      isJunkTitle('Previous') === true &&
+      isJunkTitle('Load more') === true &&
+      isJunkTitle('Back End Developer') === false,
     null,
   );
   // End to end: a TTEC-like homepage full of junk links parses to
@@ -3863,6 +4167,24 @@ async function testRound7() {
     'gate-category: Help & Support nav item no longer parses as a posting',
     kellyParsed.length === 1 && kellyParsed[0]?.title === 'Forklift-Standup',
     kellyParsed,
+  );
+  // A card whose location lives in a <span class="location"> (or
+  // .job-location) carries that location — Strategy A/C cards and
+  // TalentBrew cards alike. The span used to be ignored, so an
+  // on-site role read as blank-location and passed the remote-only
+  // sweep as a review lead (Foundever's "Retention … Virginia, US",
+  // 2026-11-12 local round).
+  const spanLocHtml = `<html><body>
+<div class="job-card"><h3>Retention Customer Service Associate</h3><span class="location">Virginia, US</span><a href="/jobs/retention-customer-service-associate">Apply</a></div>
+<div class="job-card"><h3>Remote Customer Service Representative</h3><span class="job-location">Remote, Any Location, US</span><a href="/jobs/remote-customer-service-representative">Apply</a></div>
+</body></html>`;
+  const spanLocParsed = jobsMod.parseCareersPage(spanLocHtml, 'https://portal.example/careers');
+  check(
+    'gate-category: location spans are read into the posting',
+    spanLocParsed.length === 2 &&
+      spanLocParsed[0]?.location === 'Virginia, US' &&
+      spanLocParsed[1]?.location === 'Remote, Any Location, US',
+    spanLocParsed,
   );
 
   // --- Render-target ordering: a walked-with-postings page ranks

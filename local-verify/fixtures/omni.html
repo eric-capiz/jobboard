@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>MockOmni — Home</title></head>
+<body>
+<header>
+  <nav>
+    <a href="/omni.html">Omni</a>
+    <a href="/omni.html">Clients</a>
+    <a href="/omni.html">Gig Workers</a>
+  </nav>
+  <form action="/omni.html" method="get" role="search">
+    <input type="search" name="s" placeholder="Search" aria-label="Search">
+    <button type="submit">Search</button>
+  </form>
+  <button id="country-btn" type="button" aria-haspopup="true" aria-expanded="false">Select your country</button>
+  <div id="country-menu" class="dropdown-menu" style="display:none">
+    <button type="button" data-href="/omni-us.html">United States</button>
+    <button type="button" data-href="/omni-other.html">Puerto Rico</button>
+    <button type="button" data-href="/omni-other.html">Guatemala</button>
+    <button type="button" data-href="/omni-other.html">Philippines</button>
+    <button type="button" data-href="/omni-other.html">Mexico</button>
+  </div>
+</header>
+<main>
+  <h1>Work from anywhere</h1>
+  <p>Join thousands of gig workers delivering customer experiences from home.</p>
+</main>
+<script>
+  document.getElementById('country-btn').addEventListener('click', function () {
+    var menu = document.getElementById('country-menu');
+    var open = menu.style.display === 'block';
+    menu.style.display = open ? 'none' : 'block';
+    this.setAttribute('aria-expanded', open ? 'false' : 'true');
+  });
+  document.querySelectorAll('#country-menu button').forEach(function (b) {
+    b.addEventListener('click', function () { window.location.href = b.getAttribute('data-href'); });
+  });
+</script>
+</body>
+</html>
