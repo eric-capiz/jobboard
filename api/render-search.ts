@@ -25,6 +25,17 @@
  *      bounded by the render deadline.
  *   5. The caller returns the final page HTML to the existing
  *      extractors — extraction + scoring are untouched.
+ *   6. When no search box is found, the gate resolver drives
+ *      through whatever gates the listings (a country picker, a
+ *      region/department/language dropdown, a modal, tabs) —
+ *      generic heuristics over visible text, roles, and ARIA
+ *      labels, never a site-specific label or URL. It opens the
+ *      gate, picks the option matching the sweep target (United
+ *      States, remote / work-from-home, English, or the resume's
+ *      role term for a department filter), waits for the page to
+ *      settle, and re-scans. A gate that reveals listings ends
+ *      the search at once; one that reveals the box lets the
+ *      retry submit it.
  *
  * SOURCE DISCIPLINE: the search happens ONLY on the company's own
  * careers page — the same URL the render already opened. The form's
@@ -627,7 +638,13 @@ async function clickSearchToggle(
   remainMs: () => number,
   onToggle?: (label: string) => void,
 ): Promise<'toggled' | 'board' | null> {
-  if (remainMs() < 6000) return null;
+  // A toggle click is one click plus a short change wait (~3s),
+  // not the 6s a full search attempt needs. The old 6000ms gate
+  // starved the toggle itself on a late-starting search step
+  // (round-11 canary, Foundever attempt 1: toggle never fired).
+  // Every wait below is bounded by remainMs(), so a short budget
+  // degrades gracefully instead of overrunning the render.
+  if (remainMs() < 3000) return null;
   let info: SearchFormInfo;
   try {
     info = (await page.evaluate(scanSearchForm)) as SearchFormInfo;
@@ -664,81 +681,427 @@ async function clickSearchToggle(
   return 'toggled';
 }
 
-/** The country-picker rescue: the search box lives behind a
- *  country choice. Foundever's portal gates its search behind
- *  "Find a job in your country"; the toggle opens a picker, and
- *  the picker reveals one low-scoring input (a country filter)
- *  but no job search box (15 inputs, 1 visible, bestScore 2,
- *  2026-11-12 canary). One click on the United States entry — a
- *  button or a link — then the caller re-scans. The label is
- *  matched exactly (a bare "United States" entry), so a footer
- *  locale link that happens to say "United States" is the same
- *  portal's own country flow, not a board. Bounded by the same
- *  budget as a search attempt. */
-/** In-page finder for the country entry (named so the offline
- *  test can drive it with canned data). Self-contained: no
- *  imports, no closures over module state. */
-export function findCountryEntry(): { index: number; label: string } | null {
-  const els = Array.from(document.querySelectorAll('button, a')) as HTMLElement[];
-  for (let i = 0; i < els.length; i++) {
-    const el = els[i];
+/* ------------------------------------------------------------------ */
+/* Gate resolver — generic, no site-specific labels                    */
+/* ------------------------------------------------------------------ */
+
+/** Some portals gate their listings behind a control that must be
+ *  driven through before any job appears: a country picker modal
+ *  ("Find a job in your country" -> "United States (USA)" ->
+ *  /go/Search-Jobs-US/ — Foundever, proven by hand 2026-11-12, 34
+ *  US jobs behind the picker while the app saw an empty homepage),
+ *  a native <select> for region/department/language, a listbox, a
+ *  tab set, a modal. The old country-only rescue failed this exact
+ *  page twice over: its finder required the label to be EXACTLY
+ *  "United States" (the real option reads "United States (USA)"),
+ *  and its 6000ms budget gate refused the pick because the search
+ *  step starts late in the render (load + cookie passes + settles
+ *  burn most of the 20s), so the toggle fired and the pick never
+ *  did (round-11 canary: searchToggleClicked set, searchCountryClicked
+ *  null, both attempts).
+ *
+ *  The resolver is generic: it scans every visible button, link,
+ *  tab, menu item, and native select, and matches by heuristics
+ *  over visible text, roles, and ARIA labels — never a site's
+ *  labels, URLs, or selectors. One action per call (a pick, or an
+ *  opener click that reveals the options), so the caller re-scans
+ *  after each step and the loop below can stack gates (country,
+ *  then department). Targets, in priority order: United States
+ *  (locale gates block everything), English (language gates block
+ *  reading), remote / work-from-home (the sweep's remote-only
+ *  lane), and the resume's role term (a department filter).
+ *
+ *  Safety: an option is only clickable when it sits in a picker
+ *  container (listbox/menu/dialog/tablist, or a picker/modal/
+ *  dropdown class on an ancestor) or a gate was already opened in
+ *  this search step — a bare page link is pickable only on an
+ *  exact target match AND a same-host href, so a board link is
+ *  never followed. A job title that happens to contain the role
+ *  words ("Remote Customer Service Representative 1") is never a
+ *  department option: it carries a digit or a role noun. A gate
+ *  action is one click plus a short change wait (~2.5s), not the
+ *  6s a full search attempt needs, so a late-starting search step
+ *  can still drive through a gate. Every action is verified after:
+ *  the caller re-scans for listings or a search box, and a wrong
+ *  pick costs one loop iteration, not the company. */
+
+export interface GateOptionDescriptor {
+  /** Index into the select's options. */
+  index: number;
+  text: string;
+  value: string;
+  selected: boolean;
+}
+
+export interface GateControlDescriptor {
+  /** 'button' addresses document.querySelectorAll('button, a,
+   *  [role="tab"], [role="option"], [role="menuitem"], [role="button"]');
+   *  'select' addresses document.querySelectorAll('select'). */
+  kind: 'button' | 'select';
+  index: number;
+  /** Visible text (buttons) or label (selects: <label> /
+   *  aria-label / name / id / title). */
+  label: string;
+  ariaLabel: string;
+  /** href for links ('' for buttons and selects). */
+  href: string;
+  /** Nearest ancestor role among listbox/menu/dialog/tablist/
+   *  combobox, or ''. */
+  containerRole: string;
+  /** True when an ancestor carries a picker/modal/menu/dropdown
+   *  class or id — a picker container without an ARIA role. */
+  containerClass: boolean;
+  /** ARIA role of the element itself (tag name when none). */
+  role: string;
+  visible: boolean;
+  /** Options of a select (empty for buttons). */
+  options: GateOptionDescriptor[];
+}
+
+export interface GateScanResult {
+  controls: GateControlDescriptor[];
+}
+
+/** Serialize the page's gate controls. Runs in the browser; the
+ *  selection logic (below) runs in Node on this data, so a test can
+ *  drive it with canned descriptors and no browser. */
+export function scanGateControls(): GateScanResult {
+  const isVisible = (el: Element): boolean => {
     const r = el.getBoundingClientRect();
-    if (r.width <= 0 || r.height <= 0) continue;
-    const t = (el.innerText || '').trim();
-    if (/^(united states( of america)?|usa|u\.s\.a?\.?)$/i.test(t)) {
-      return { index: i, label: t };
+    if (r.width <= 0 || r.height <= 0) return false;
+    try {
+      return getComputedStyle(el).visibility !== 'hidden';
+    } catch {
+      return true;
+    }
+  };
+  const containerOf = (el: Element): { role: string; cls: boolean } => {
+    let role = '';
+    let cls = false;
+    let node: Element | null = el.parentElement;
+    while (node) {
+      if (!role) {
+        const r = (node.getAttribute?.('role') || '').toLowerCase();
+        if (['listbox', 'menu', 'dialog', 'tablist', 'combobox'].includes(r)) role = r;
+      }
+      if (!cls) {
+        const c = `${node.getAttribute?.('class') || ''} ${node.getAttribute?.('id') || ''}`;
+        if (/picker|modal|menu|dropdown|listbox|dialog|popover|popup|drawer|overlay/i.test(c)) cls = true;
+      }
+      if (role && cls) break;
+      node = node.parentElement;
+    }
+    return { role, cls };
+  };
+  const selectLabel = (el: HTMLSelectElement): string => {
+    try {
+      const labels = (el as unknown as { labels?: NodeListOf<HTMLLabelElement> }).labels;
+      if (labels && labels.length) {
+        return Array.from(labels)
+          .map((l) => l.innerText || '')
+          .join(' ');
+      }
+    } catch {
+      // No labels — fall through to the attributes.
+    }
+    return (
+      el.getAttribute('aria-label') ||
+      el.getAttribute('name') ||
+      el.getAttribute('id') ||
+      el.getAttribute('title') ||
+      ''
+    );
+  };
+  const controls: GateControlDescriptor[] = [];
+  const btns = Array.from(
+    document.querySelectorAll('button, a, [role="tab"], [role="option"], [role="menuitem"], [role="button"]'),
+  ) as HTMLElement[];
+  btns.forEach((el, index) => {
+    const cont = containerOf(el);
+    controls.push({
+      kind: 'button',
+      index,
+      label: (el.innerText || '').trim(),
+      ariaLabel: el.getAttribute('aria-label') || '',
+      href: el.getAttribute('href') || '',
+      containerRole: cont.role,
+      containerClass: cont.cls,
+      role: (el.getAttribute('role') || el.tagName.toLowerCase()).toLowerCase(),
+      visible: isVisible(el),
+      options: [],
+    });
+  });
+  const selects = Array.from(document.querySelectorAll('select')) as HTMLSelectElement[];
+  selects.forEach((el, index) => {
+    const cont = containerOf(el);
+    controls.push({
+      kind: 'select',
+      index,
+      label: selectLabel(el),
+      ariaLabel: el.getAttribute('aria-label') || '',
+      href: '',
+      containerRole: cont.role,
+      containerClass: cont.cls,
+      role: 'select',
+      visible: isVisible(el),
+      options: Array.from(el.options).map((o, oi) => ({
+        index: oi,
+        text: (o.text || '').trim(),
+        value: o.value || '',
+        selected: o.selected,
+      })),
+    });
+  });
+  return { controls };
+}
+
+/** In-page handle getter for a gate button/link (named so the
+ *  offline test can tell its clicks apart from toggle clicks). */
+function gateButtonElement(idx: number): Element | null {
+  return (
+    document.querySelectorAll('button, a, [role="tab"], [role="option"], [role="menuitem"], [role="button"]')[idx] ??
+    null
+  );
+}
+
+/** In-page pick for a native <select> option (named so the offline
+ *  test can drive it with canned data). A native dropdown's options
+ *  are not real-clickable the way a button is, so the value is set
+ *  through the native setter and input/change events are dispatched
+ *  — the same mechanism puppeteer's page.select uses, so a
+ *  React-controlled select registers the change. Self-contained: no
+ *  imports, no closures over module state. */
+export function pickSelectOption(selectIndex: number, optionIndex: number): boolean {
+  const sel = document.querySelectorAll('select')[selectIndex] as HTMLSelectElement | undefined;
+  const opt = sel?.options[optionIndex];
+  if (!sel || !opt) return false;
+  try {
+    const setter = Object.getOwnPropertyDescriptor(
+      (window as unknown as { HTMLSelectElement: typeof HTMLSelectElement }).HTMLSelectElement.prototype,
+      'value',
+    )?.set;
+    if (setter) setter.call(sel, opt.value);
+    else sel.value = opt.value;
+  } catch {
+    sel.value = opt.value;
+  }
+  sel.dispatchEvent(new Event('input', { bubbles: true }));
+  sel.dispatchEvent(new Event('change', { bubbles: true }));
+  return sel.value === opt.value;
+}
+
+/** Normalize a gate label for matching: collapse whitespace, drop
+ *  a trailing parenthetical ("United States (USA)" -> "United
+ *  States"), and drop any trailing " - ..." / ", ..." suffix
+ *  ("United States - English", "Remote, USA"). The round-11 miss
+ *  was an exact match against the raw label; the option's real
+ *  text carries exactly these suffixes. */
+export function normalizeGateLabel(text: string): string {
+  return text
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\s*\(.*?\)\s*$/, '')
+    .replace(/\s*[-–—|,].*$/, '')
+    .trim();
+}
+
+export type GateTarget = 'us' | 'remote' | 'english' | 'role';
+
+export interface GateAction {
+  kind: 'button' | 'select';
+  index: number;
+  /** For a select pick: the option's index. */
+  optionIndex?: number;
+  /** Raw label of what was picked / opened (reported, not matched). */
+  label: string;
+  target: GateTarget | 'open';
+}
+
+/** Role nouns a department name never carries — a job title that
+ *  happens to contain the resume's role words ("Remote Customer
+ *  Service Representative 1") is not a department option. */
+const ROLE_NOUNS = /representative|manager|associate|specialist|agent|engineer|analyst|coordinator|lead|director|supervisor|technician|consultant|officer/i;
+
+/** Match a normalized label against the sweep targets. The role
+ *  target is a phrase match on the search term's words in any
+ *  order — the live term is the resume's two most frequent words
+ *  (e.g. 'service customer'), while the option reads 'Customer
+ *  Service'. Short labels only, no digits, no role noun: a job
+ *  title is never a department option. */
+function gateTargetOf(normalized: string, searchTerm: string): GateTarget | null {
+  if (/^(united states( of america)?|usa|u\.s\.a?\.?|us)$/i.test(normalized)) return 'us';
+  if (/^english$/i.test(normalized)) return 'english';
+  if (/^(remote|work[- ]from[- ]home|wfh)$/i.test(normalized)) return 'remote';
+  if (searchTerm) {
+    const words = searchTerm
+      .toLowerCase()
+      .split(/\s+/)
+      .filter((w) => w.length >= 3);
+    const wordCount = normalized.split(/\s+/).filter(Boolean).length;
+    if (words.length > 0 && wordCount <= 4 && !/\d/.test(normalized) && !ROLE_NOUNS.test(normalized)) {
+      const lower = normalized.toLowerCase();
+      const esc = (w: string): string => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      if (words.every((w) => new RegExp(`\\b${esc(w)}\\b`).test(lower))) return 'role';
     }
   }
   return null;
 }
 
-/** In-page handle getter for the country entry (named so the
- *  offline test can tell its clicks apart from toggle clicks). */
-function countryEntryElement(idx: number): Element | null {
-  return document.querySelectorAll('button, a')[idx] ?? null;
-}
+const GATE_TARGET_PRIORITY: Record<GateTarget, number> = { us: 0, english: 1, remote: 2, role: 3 };
 
-async function clickCountryEntry(
-  page: SearchablePage,
-  remainMs: () => number,
-  onCountry?: (label: string) => void,
-): Promise<'picked' | 'board' | null> {
-  if (remainMs() < 6000) return null;
-  let entry: { index: number; label: string } | null;
-  try {
-    entry = (await page.evaluate(findCountryEntry)) as { index: number; label: string } | null;
-  } catch {
-    return null;
+/** Pick the one gate action to take from a scan, or null. Picks
+ *  beat openers, and the target priority is US, then English, then
+ *  remote, then the role term. `gateOpened` is true once a toggle
+ *  or a gate opener has fired in this search step: a bare page
+ *  link is only pickable in that context (the picker it opened is
+ *  what the option belongs to), and only on an exact target match
+ *  with a same-host href. A role-term pick needs a picker
+ *  container even then — a bare link matching the role words is a
+ *  job, not a department. Pure — runs in Node on the scan data. */
+export function selectGateAction(
+  scan: GateScanResult,
+  searchTerm: string,
+  gateOpened: boolean,
+  pageUrl: string,
+): GateAction | null {
+  let bestPick: GateAction | null = null;
+  let bestPriority = Number.POSITIVE_INFINITY;
+  const consider = (action: GateAction): void => {
+    const p = GATE_TARGET_PRIORITY[action.target as GateTarget];
+    if (p < bestPriority) {
+      bestPick = action;
+      bestPriority = p;
+    }
+  };
+  for (const c of scan.controls) {
+    if (!c.visible) continue;
+    if (c.kind === 'select') {
+      if (c.options.length < 2) continue;
+      for (const opt of c.options) {
+        if (opt.selected || !opt.text.trim()) continue;
+        const target = gateTargetOf(normalizeGateLabel(opt.text), searchTerm);
+        if (target) {
+          consider({ kind: 'select', index: c.index, optionIndex: opt.index, label: opt.text.trim(), target });
+        }
+      }
+      continue;
+    }
+    const raw = (c.label || c.ariaLabel || '').trim();
+    if (!raw) continue;
+    const normalized = normalizeGateLabel(raw);
+    if (!normalized) continue;
+    const inPicker =
+      c.containerRole !== '' || c.containerClass || c.role === 'tab' || c.role === 'option' || c.role === 'menuitem';
+    const target = gateTargetOf(normalized, searchTerm);
+    if (!target) continue;
+    if (target === 'role' && !inPicker) continue;
+    if (!inPicker && !gateOpened) continue;
+    if (!inPicker && c.href) {
+      // A bare link: only when it stays on the portal's own host —
+      // a footer locale link is the portal's country flow, a board
+      // link is not. Buttons (href '') carry no such risk.
+      try {
+        const abs = new URL(c.href, pageUrl);
+        if (abs.hostname !== new URL(pageUrl).hostname) continue;
+        if (isBoardUrl(abs.href)) continue;
+      } catch {
+        continue;
+      }
+    }
+    consider({ kind: 'button', index: c.index, label: raw, target });
   }
-  if (!entry) return null;
-  const startUrl = page.url();
-  const startLen = await textLength(page);
-  let handle: SearchableHandle | null = null;
-  try {
-    handle = await page.evaluateHandle(countryEntryElement, entry.index);
-  } catch {
-    return null;
-  }
-  const el = handle?.asElement() ?? null;
-  if (!el) return null;
-  try {
-    // Real mouse click, like the toggle and the submit: a
-    // synthetic .click() may not register on a React-controlled
-    // picker.
-    await el.click();
-  } catch {
-    return null;
-  } finally {
-    try {
-      await handle?.dispose();
-    } catch {
-      // Disposal is housekeeping, never load-bearing.
+  if (bestPick) return bestPick;
+  // No pickable option — look for a gate opener: a control whose
+  // label names the gate itself ("Choose your country", "Language",
+  // "Department"). The search toggle's own phrasing is excluded
+  // once it has fired (re-clicking it would close the picker it
+  // opened); before it has fired it is a legitimate opener for a
+  // search step that starved before the toggle.
+  for (const c of scan.controls) {
+    if (c.kind !== 'button' || !c.visible) continue;
+    const text = `${c.label} ${c.ariaLabel}`.trim();
+    if (!text) continue;
+    if (/search jobs|find jobs|find a job/i.test(text) && gateOpened) continue;
+    if (
+      /\b(country|region|location|language|department|category|team|area|division|choose your|select your|pick your)\b/i.test(
+        text,
+      )
+    ) {
+      return { kind: 'button', index: c.index, label: (c.label || c.ariaLabel).trim(), target: 'open' };
     }
   }
-  onCountry?.(entry.label);
-  await waitForChange(page, remainMs, startUrl, startLen, 4000);
+  return null;
+}
+
+type GateResult = 'picked' | 'opened' | 'board' | null;
+
+/** Drive through ONE gate: scan, pick the action, perform it, wait
+ *  for the page to change and settle. Returns what happened so the
+ *  caller can re-scan (a pick may have revealed listings or the
+ *  search box; an opener may have revealed the options). Null when
+ *  there is no gate to drive or no budget left. Never throws. */
+async function resolveGateOnce(
+  page: SearchablePage,
+  remainMs: () => number,
+  searchTerm: string,
+  gateOpened: boolean,
+  onCountry?: (label: string) => void,
+  onGate?: (label: string) => void,
+): Promise<GateResult> {
+  // A gate action is a single click plus a short change wait — it
+  // needs ~2.5s, not the 6s a full search attempt needs. The old
+  // country pick's 6000ms gate starved on exactly this: the search
+  // step starts late in the render (load + cookie passes + settles
+  // burn most of the 20s), so by the time the toggle had fired the
+  // pick was refused for lack of budget.
+  if (remainMs() < 2500) return null;
+  let scan: GateScanResult;
+  try {
+    scan = (await page.evaluate(scanGateControls)) as GateScanResult;
+  } catch {
+    return null;
+  }
+  const action = selectGateAction(scan, searchTerm, gateOpened, page.url());
+  if (!action) return null;
+  const startUrl = page.url();
+  const startLen = await textLength(page);
+  let done = false;
+  if (action.kind === 'select') {
+    try {
+      done = (await page.evaluate(pickSelectOption, action.index, action.optionIndex ?? 0)) as boolean;
+    } catch {
+      done = false;
+    }
+  } else {
+    let handle: SearchableHandle | null = null;
+    try {
+      handle = await page.evaluateHandle(gateButtonElement, action.index);
+    } catch {
+      handle = null;
+    }
+    const el = handle?.asElement() ?? null;
+    if (el) {
+      try {
+        await el.click();
+        done = true;
+      } catch {
+        done = false;
+      } finally {
+        try {
+          await handle?.dispose();
+        } catch {
+          // Disposal is housekeeping, never load-bearing.
+        }
+      }
+    }
+  }
+  if (!done) return null;
+  if (action.target === 'us') onCountry?.(action.label);
+  onGate?.(action.label);
+  await waitForChange(page, remainMs, startUrl, startLen, 2500);
+  await waitForDomStable(page, remainMs, 2000, 500);
   if (isBoardUrl(page.url())) return 'board';
-  return 'picked';
+  return action.target === 'open' ? 'opened' : 'picked';
 }
 
 /** One search attempt on the CURRENT page: re-scan (a previous submit
@@ -789,6 +1152,7 @@ export async function tryPortalSearch(
   deadlineMs: number,
   onToggle?: (label: string) => void,
   onCountry?: (label: string) => void,
+  onGate?: (label: string) => void,
 ): Promise<PortalSearchOutcome> {
   const remainMs = (): number => deadlineMs - Date.now();
   // A search needs at least ~6s: scan + submit + results wait. Less
@@ -799,33 +1163,49 @@ export async function tryPortalSearch(
   if (first === 'board') return 'board-redirect';
   if (first === 'no-form') {
     // No qualifying box — but the box may live behind a toggle
-    // ("Search jobs" expands the form). One click, one re-scan, one
-    // retry; a failed toggle still reports no-form.
+    // ("Search jobs" expands the form) and/or behind a gate: a
+    // country picker, a region/department/language dropdown, a
+    // modal, tabs. Drive through them in order, re-scanning after
+    // each step: one toggle, then up to three gate actions (an
+    // opener click, then the option pick, then the next gate — a
+    // page can stack a country picker in front of a department
+    // filter). A gate action that reveals listings ends the search
+    // at once; one that reveals the box lets the retry below submit
+    // it; a page with no gate at all still reports no-form, and a
+    // failed toggle still reports no-form. The old country-only
+    // rescue is subsumed here: the gate resolver matches "United
+    // States (USA)" where the exact-label finder saw nothing, and
+    // its action gate is 2.5s, not 6s, so a search step that started
+    // late in the render can still drive through a gate.
     const toggled = await clickSearchToggle(page, remainMs, onToggle);
     if (toggled === 'board') return 'board-redirect';
-    if (!toggled) return 'no-form';
-    const retry = await attemptSearch(page, '', remainMs);
-    if (retry === 'board') return 'board-redirect';
-    if (retry === 'failed') return 'submit-failed';
-    if (retry === 'no-form') {
-      // The toggle revealed a country picker, not a search box
-      // (Foundever/Sitel). One click on the United States entry,
-      // then one more search attempt; if it reveals nothing, still
-      // no-form. If the pick reveals the box but the empty search
-      // shows nothing, fall through to the resume-term retry below.
-      const picked = await clickCountryEntry(page, remainMs, onCountry);
-      if (picked === 'board') return 'board-redirect';
-      if (!picked) return 'no-form';
-      const afterPick = await attemptSearch(page, '', remainMs);
-      if (afterPick === 'board') return 'board-redirect';
-      if (afterPick === 'failed') return 'submit-failed';
-      if (afterPick === 'no-form') return 'no-form';
-      if (await listingsNow(page)) return 'searched';
-    } else if (await listingsNow(page)) {
-      return 'searched';
+    let gateOpened = toggled === 'toggled';
+    let ranSearch = false;
+    for (let round = 0; round < 4; round++) {
+      const attempt = await attemptSearch(page, '', remainMs);
+      if (attempt === 'board') return 'board-redirect';
+      if (attempt === 'failed') return 'submit-failed';
+      if (attempt !== 'no-form') {
+        ranSearch = true;
+        break;
+      }
+      const gated = await resolveGateOnce(page, remainMs, searchTerm, gateOpened, onCountry, onGate);
+      if (gated === 'board') return 'board-redirect';
+      if (!gated) return 'no-form';
+      gateOpened = true;
+      if (gated === 'picked' && (await listingsNow(page))) return 'searched';
     }
-    // The toggle revealed the box and the empty search ran, but
-    // showed nothing — fall through to the resume-term retry below.
+    if (!ranSearch) {
+      // The last gate action may have revealed the box — one final
+      // scan before concluding no-form.
+      const attempt = await attemptSearch(page, '', remainMs);
+      if (attempt === 'board') return 'board-redirect';
+      if (attempt === 'failed') return 'submit-failed';
+      if (attempt === 'no-form') return 'no-form';
+    }
+    if (await listingsNow(page)) return 'searched';
+    // The empty search ran but showed nothing — fall through to
+    // the resume-term retry below.
     if (!searchTerm || remainMs() < 6000) return 'no-results';
     const second = await attemptSearch(page, searchTerm, remainMs);
     if (second === 'board') return 'board-redirect';

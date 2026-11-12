@@ -2009,9 +2009,13 @@ async function testPortalSearch() {
       this.countQueue = [...(opts.counts || [])];
       this.onEnter = opts.onEnter || null;
       this.onButtonClick = opts.onButtonClick || null;
-      this.countryEntry = opts.countryEntry ?? null;
-      this.onCountryClick = opts.onCountryClick || null;
-      this.countryClicks = 0;
+      this.gateScan = opts.gateScan || { controls: [] };
+      this.onGateClick = opts.onGateClick || null;
+      this.gateClicks = 0;
+      this.gateLabels = [];
+      this.onSelectPick = opts.onSelectPick || null;
+      this.selectPicks = 0;
+      this.selectLabels = [];
       this.failEnter = !!opts.failEnter;
       this.calls = [];
       this.typedTerms = [];
@@ -2047,21 +2051,35 @@ async function testPortalSearch() {
           ? this.countQueue.shift()
           : { jobLinks: 0, resultsText: false };
       }
-      if (name === 'findCountryEntry') return this.countryEntry;
+      if (name === 'scanGateControls') return this.gateScan;
+      if (name === 'pickSelectOption') {
+        const [selectIndex, optionIndex] = args;
+        const sel = (this.gateScan.controls || []).find(
+          (c) => c.kind === 'select' && c.index === selectIndex,
+        );
+        const label = sel?.options?.[optionIndex]?.text ?? '';
+        this.selectPicks += 1;
+        this.selectLabels.push(label);
+        if (this.onSelectPick) this.onSelectPick(label, this);
+        return true;
+      }
       return 1000;
     }
     async evaluateHandle(fn, ...args) {
-      const isCountry = String(fn).includes('country');
+      const isGate = String(fn).includes('gateButtonElement');
       const isButton = String(fn).includes('button');
-      this.calls.push({ fn: 'evaluateHandle:' + (isCountry ? 'country' : isButton ? 'button' : 'input'), args });
+      this.calls.push({ fn: 'evaluateHandle:' + (isGate ? 'gate' : isButton ? 'button' : 'input'), args });
       const self = this;
       return {
         asElement: () => ({
           click: async () => {
-            if (isCountry) {
+            if (isGate) {
+              const btns = (self.gateScan.controls || []).filter((c) => c.kind === 'button');
+              const label = btns[args[0]]?.label ?? btns[args[0]]?.ariaLabel ?? '';
               self.buttonClicks += 1;
-              self.countryClicks += 1;
-              if (self.onCountryClick) self.onCountryClick(self.currentTerm, self);
+              self.gateClicks += 1;
+              self.gateLabels.push(label);
+              if (self.onGateClick) self.onGateClick(label, self);
             } else if (isButton) {
               self.buttonClicks += 1;
               if (self.onButtonClick) self.onButtonClick(self.currentTerm, self);
@@ -2203,30 +2221,79 @@ async function testPortalSearch() {
     reportedToggle === 'Find a job in your country' && reportPage.buttonClicks === 1,
     { reportedToggle, clicks: reportPage.buttonClicks },
   );
-  // The toggle reveals a country picker, not a search box: the
-  // retry still finds no form, the "United States" entry is
-  // clicked, the box appears, and the search finds listings.
+  // Gate-control makers for the generic resolver tests.
+  const mkGateButton = (over) => ({
+    kind: 'button',
+    index: 0,
+    label: '',
+    ariaLabel: '',
+    href: '',
+    containerRole: '',
+    containerClass: false,
+    role: 'button',
+    visible: true,
+    options: [],
+    ...over,
+  });
+  const mkGateOption = (over) => ({ index: 0, text: '', value: '', selected: false, ...over });
+  const mkGateSelect = (over) => ({
+    kind: 'select',
+    index: 0,
+    label: '',
+    ariaLabel: '',
+    href: '',
+    containerRole: '',
+    containerClass: false,
+    role: 'select',
+    visible: true,
+    options: [],
+    ...over,
+  });
+  // The toggle reveals a country picker modal, not a search box: the
+  // retry still finds no form, the "United States (USA)" entry is
+  // picked, the box appears, and the search finds listings. The
+  // label carries the "(USA)" suffix the old exact-match finder
+  // missed (round-11 canary: toggle fired, country never picked).
   // Foundever/Sitel live shape (15 inputs, 1 visible, bestScore 2
-  // after the toggle).
+  // after the toggle). A job-title link in the same picker must
+  // never be picked as a gate option.
   const pickerScan = {
     inputs: [],
     buttons: [mkButton({ index: 0, text: 'United States', type: 'button', formIndex: -1 })],
     forms: [],
   };
+  const countryPickerScan = {
+    controls: [
+      mkGateButton({ index: 0, label: 'United States (USA)', containerRole: 'dialog' }),
+      mkGateButton({ index: 1, label: 'Canada', containerRole: 'dialog' }),
+      mkGateButton({ index: 2, label: 'Mexico', containerRole: 'dialog' }),
+      mkGateButton({
+        index: 3,
+        label: 'Remote Customer Service Representative 1',
+        href: '/go/Search-Jobs-US/9244800/',
+        containerRole: 'dialog',
+      }),
+    ],
+  };
   let reportedCountry = null;
+  let reportedGate = null;
   const countryPage = new FakePage({
     scanResult: {
       inputs: [],
       buttons: [mkButton({ index: 0, text: 'Find a job in your country', type: 'button', formIndex: -1 })],
       forms: [],
     },
-    counts: [{ jobLinks: 0, resultsText: false }, { jobLinks: 5, resultsText: true }],
+    counts: [
+      { jobLinks: 0, resultsText: false },
+      { jobLinks: 0, resultsText: false },
+      { jobLinks: 5, resultsText: true },
+    ],
     onEnter: (term, page) => page.setUrl('https://portal.example/careers/results'),
     onButtonClick: (term, page) => {
       page.scanResult = pickerScan;
     },
-    countryEntry: { index: 0, label: 'United States' },
-    onCountryClick: (term, page) => {
+    gateScan: countryPickerScan,
+    onGateClick: (label, page) => {
       page.scanResult = portalScan;
     },
   });
@@ -2238,16 +2305,21 @@ async function testPortalSearch() {
     (label) => {
       reportedCountry = label;
     },
+    (label) => {
+      reportedGate = label;
+    },
   );
   check(
-    'portal-search: country pick after the toggle reveals the box and the search finds listings',
+    'portal-search: country picker modal pick ("United States (USA)") reveals the box and the search finds listings',
     countryOutcome === 'searched' &&
       countryPage.buttonClicks === 2 &&
-      countryPage.countryClicks === 1 &&
-      reportedCountry === 'United States',
-    { outcome: countryOutcome, clicks: countryPage.buttonClicks, countryClicks: countryPage.countryClicks, reportedCountry },
+      countryPage.gateClicks === 1 &&
+      JSON.stringify(countryPage.gateLabels) === JSON.stringify(['United States (USA)']) &&
+      reportedCountry === 'United States (USA)' &&
+      reportedGate === 'United States (USA)',
+    { outcome: countryOutcome, clicks: countryPage.buttonClicks, gateClicks: countryPage.gateClicks, gateLabels: countryPage.gateLabels, reportedCountry, reportedGate },
   );
-  // No US entry in the picker: still no-form, no crash.
+  // No US entry in the picker: still no-form, no crash, nothing clicked.
   const noCountryPage = new FakePage({
     scanResult: {
       inputs: [],
@@ -2258,13 +2330,193 @@ async function testPortalSearch() {
     onButtonClick: (term, page) => {
       page.scanResult = pickerScan;
     },
-    countryEntry: null,
+    gateScan: {
+      controls: [
+        mkGateButton({ index: 0, label: 'Canada', containerRole: 'dialog' }),
+        mkGateButton({ index: 1, label: 'Mexico', containerRole: 'dialog' }),
+      ],
+    },
   });
   check(
     'portal-search: picker with no US entry still reports no-form',
     (await searchMod.tryPortalSearch(noCountryPage, 'customer service', Date.now() + 30000)) === 'no-form' &&
-      noCountryPage.countryClicks === 0,
-    { countryClicks: noCountryPage.countryClicks },
+      noCountryPage.gateClicks === 0,
+    { gateClicks: noCountryPage.gateClicks },
+  );
+  // The round-11 root cause, pinned directly: the picker's label
+  // carries a suffix, and normalization must strip it.
+  check(
+    'gate-resolver: "United States (USA)" normalizes to "United States"',
+    searchMod.normalizeGateLabel('United States (USA)') === 'United States' &&
+      searchMod.normalizeGateLabel('Work from Home (US)') === 'Work from Home' &&
+      searchMod.normalizeGateLabel('United States - English') === 'United States',
+    searchMod.normalizeGateLabel('United States (USA)'),
+  );
+  // US outranks remote when both options are visible at once.
+  check(
+    'gate-resolver: US pick outranks remote when both options are visible',
+    searchMod.selectGateAction(
+      {
+        controls: [
+          mkGateButton({ index: 0, label: 'Remote', containerRole: 'menu' }),
+          mkGateButton({ index: 1, label: 'United States', containerRole: 'menu' }),
+        ],
+      },
+      'customer service',
+      true,
+      'https://portal.example/careers',
+    )?.label === 'United States',
+    null,
+  );
+  // Region dropdown as a native <select>, visible on load with no
+  // toggle at all: the US option is picked through the select, the
+  // box appears, the search finds listings.
+  const regionPage = new FakePage({
+    scanResult: { inputs: [], buttons: [], forms: [] },
+    counts: [
+      { jobLinks: 0, resultsText: false },
+      { jobLinks: 0, resultsText: false },
+      { jobLinks: 5, resultsText: true },
+    ],
+    onEnter: (term, page) => page.setUrl('https://portal.example/careers/results'),
+    gateScan: {
+      controls: [
+        mkGateSelect({
+          index: 0,
+          label: 'Region',
+          options: [
+            mkGateOption({ index: 0, text: 'Select a region', value: '', selected: true }),
+            mkGateOption({ index: 1, text: 'United States', value: 'US' }),
+            mkGateOption({ index: 2, text: 'Canada', value: 'CA' }),
+            mkGateOption({ index: 3, text: 'Europe', value: 'EU' }),
+          ],
+        }),
+      ],
+    },
+    onSelectPick: (label, page) => {
+      page.scanResult = portalScan;
+    },
+  });
+  const regionOutcome = await searchMod.tryPortalSearch(regionPage, 'customer service', Date.now() + 30000);
+  check(
+    'portal-search: region <select> pick ("United States") reveals the box and the search finds listings',
+    regionOutcome === 'searched' &&
+      regionPage.selectPicks === 1 &&
+      JSON.stringify(regionPage.selectLabels) === JSON.stringify(['United States']) &&
+      regionPage.gateClicks === 0,
+    { outcome: regionOutcome, selectPicks: regionPage.selectPicks, selectLabels: regionPage.selectLabels },
+  );
+  // Department dropdown as a native <select>: the resume's role
+  // term picks the matching department ("Customer Service"), the
+  // box appears, the search finds listings. The placeholder option
+  // (selected) is never picked.
+  let reportedDeptGate = null;
+  const deptPage = new FakePage({
+    scanResult: { inputs: [], buttons: [], forms: [] },
+    counts: [
+      { jobLinks: 0, resultsText: false },
+      { jobLinks: 0, resultsText: false },
+      { jobLinks: 5, resultsText: true },
+    ],
+    onEnter: (term, page) => page.setUrl('https://portal.example/careers/results'),
+    gateScan: {
+      controls: [
+        mkGateSelect({
+          index: 0,
+          label: 'Department',
+          options: [
+            mkGateOption({ index: 0, text: 'All departments', value: '', selected: true }),
+            mkGateOption({ index: 1, text: 'Customer Service', value: 'cs' }),
+            mkGateOption({ index: 2, text: 'Engineering', value: 'eng' }),
+            mkGateOption({ index: 3, text: 'Sales', value: 'sales' }),
+          ],
+        }),
+      ],
+    },
+    onSelectPick: (label, page) => {
+      page.scanResult = portalScan;
+    },
+  });
+  const deptOutcome = await searchMod.tryPortalSearch(
+    deptPage,
+    'customer service',
+    Date.now() + 30000,
+    () => {},
+    () => {},
+    (label) => {
+      reportedDeptGate = label;
+    },
+  );
+  check(
+    'portal-search: department <select> pick ("Customer Service") reveals the box and the search finds listings',
+    deptOutcome === 'searched' &&
+      deptPage.selectPicks === 1 &&
+      JSON.stringify(deptPage.selectLabels) === JSON.stringify(['Customer Service']) &&
+      reportedDeptGate === 'Customer Service',
+    { outcome: deptOutcome, selectPicks: deptPage.selectPicks, selectLabels: deptPage.selectLabels, reportedDeptGate },
+  );
+  // Language selector in two steps: a "Language" opener button
+  // reveals the language options, then "English" is picked, the
+  // box appears, and the search finds listings.
+  const langOptionsScan = {
+    controls: [
+      mkGateButton({ index: 0, label: 'English', containerRole: 'menu' }),
+      mkGateButton({ index: 1, label: 'Deutsch', containerRole: 'menu' }),
+      mkGateButton({ index: 2, label: 'Español', containerRole: 'menu' }),
+    ],
+  };
+  const langPage = new FakePage({
+    scanResult: { inputs: [], buttons: [], forms: [] },
+    counts: [
+      { jobLinks: 0, resultsText: false },
+      { jobLinks: 0, resultsText: false },
+      { jobLinks: 5, resultsText: true },
+    ],
+    onEnter: (term, page) => page.setUrl('https://portal.example/careers/results'),
+    gateScan: {
+      controls: [mkGateButton({ index: 0, label: 'Language' })],
+    },
+    onGateClick: (label, page) => {
+      if (page.gateClicks === 1) page.gateScan = langOptionsScan;
+      else page.scanResult = portalScan;
+    },
+  });
+  const langOutcome = await searchMod.tryPortalSearch(langPage, 'customer service', Date.now() + 30000);
+  check(
+    'portal-search: language selector opener then "English" pick reveals the box and the search finds listings',
+    langOutcome === 'searched' &&
+      langPage.gateClicks === 2 &&
+      JSON.stringify(langPage.gateLabels) === JSON.stringify(['Language', 'English']),
+    { outcome: langOutcome, gateClicks: langPage.gateClicks, gateLabels: langPage.gateLabels },
+  );
+  // A bare "United States" link that points at a job board is never
+  // picked, even after a gate opened: same-host rule + board guard.
+  const boardLinkPage = new FakePage({
+    scanResult: {
+      inputs: [],
+      buttons: [mkButton({ index: 0, text: 'Find a job in your country', type: 'button', formIndex: -1 })],
+      forms: [],
+    },
+    counts: [{ jobLinks: 0, resultsText: false }],
+    onButtonClick: (term, page) => {
+      page.scanResult = pickerScan;
+    },
+    gateScan: {
+      controls: [
+        mkGateButton({
+          index: 0,
+          label: 'United States',
+          href: 'https://boards.greenhouse.io/embed/job_board/js?for=x',
+        }),
+      ],
+    },
+  });
+  check(
+    'portal-search: bare US link to a board is never picked',
+    (await searchMod.tryPortalSearch(boardLinkPage, 'customer service', Date.now() + 30000)) === 'no-form' &&
+      boardLinkPage.gateClicks === 0 &&
+      boardLinkPage.buttonClicks === 1,
+    { gateClicks: boardLinkPage.gateClicks, buttonClicks: boardLinkPage.buttonClicks },
   );
   // Empty search yields listings: Enter alone submits, no term typed.
   const emptyWins = new FakePage({

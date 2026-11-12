@@ -172,6 +172,12 @@ export interface RenderPageResult {
    *  any (null when the step never needed a country pick, or no US
    *  entry matched). */
   searchCountryClicked?: string | null;
+  /** The label of the last gate action the search step drove
+   *  (opener or pick, e.g. "United States (USA)" or "Customer
+   *  Service") — null when no gate action fired. The generic
+   *  resolver's action log; searchCountryClicked above is kept
+   *  for the US-pick continuity. */
+  searchGateClicked?: string | null;
 }
 
 export type RenderPageFn = (
@@ -491,10 +497,13 @@ export async function renderPageHtml(url: string, searchTerm: string = '', timeo
     // no-form may mean the toggle revealed a picker, not nothing).
     let searchToggleClicked: string | null = null;
     let searchCountryClicked: string | null = null;
+    let searchGateClicked: string | null = null;
     const searchOutcome = await tryPortalSearch(page, searchTerm, deadline, (label) => {
       searchToggleClicked = label;
     }, (label) => {
       searchCountryClicked = label;
+    }, (label) => {
+      searchGateClicked = label;
     });
     const searchMs = Date.now() - searchStart;
     // No-form diagnosis: what the scan actually saw on the page, so
@@ -510,7 +519,7 @@ export async function renderPageHtml(url: string, searchTerm: string = '', timeo
       }
     }
     if (searchOutcome === 'board-redirect') {
-      return { html: '', searchOutcome, searchMs, renderedUrl: page.url(), cookieClicks, searchToggleClicked, searchCountryClicked };
+      return { html: '', searchOutcome, searchMs, renderedUrl: page.url(), cookieClicks, searchToggleClicked, searchCountryClicked, searchGateClicked };
     }
     const html = await page.content();
     // Visibility, not just text: the banner's copy can stay in the
@@ -537,6 +546,7 @@ export async function renderPageHtml(url: string, searchTerm: string = '', timeo
       bannerVisible,
       searchToggleClicked,
       searchCountryClicked,
+      searchGateClicked,
     };
   } catch {
     // A failed render still reports WHY instead of a bare null, so the
