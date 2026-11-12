@@ -2352,6 +2352,22 @@ async function testPortalSearch() {
       searchMod.normalizeGateLabel('United States - English') === 'United States',
     searchMod.normalizeGateLabel('United States (USA)'),
   );
+  // Results-count formats: Phenom's "Results 1 – 10 of 34" must
+  // count as listings (round-12 canary: the range format was missed,
+  // so the search submitted on the US results page and destroyed
+  // the country context). A zero total never counts.
+  check(
+    'gate-resolver: results-count text recognizes range formats and rejects zeros',
+    searchMod.hasResultsCountText('Results 1 – 10 of 34') === true &&
+      searchMod.hasResultsCountText('Results 1 - 10 of 34') === true &&
+      searchMod.hasResultsCountText('Showing 1-10 of 34 jobs') === true &&
+      searchMod.hasResultsCountText('1-25 of 4,659 jobs') === true &&
+      searchMod.hasResultsCountText('9 roles across all departments') === true &&
+      searchMod.hasResultsCountText('Search results (0 jobs available)') === false &&
+      searchMod.hasResultsCountText('Results 0 – 0 of 0') === false &&
+      searchMod.hasResultsCountText('No jobs found') === false,
+    null,
+  );
   // US outranks remote when both options are visible at once.
   check(
     'gate-resolver: US pick outranks remote when both options are visible',

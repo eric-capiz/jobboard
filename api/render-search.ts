@@ -220,6 +220,37 @@ export function scanSearchForm(): SearchFormInfo {
   };
 }
 
+/** Whether the page's body text states a POSITIVE results count —
+ *  the "listings present" half of hasVisibleListings. Pure (takes
+ *  the text), so the offline suite can drive it directly. Three
+ *  shapes, all requiring the count to be above zero (portals show
+ *  "Search results (0 jobs available)" on the empty shell, and that
+ *  line plus a nav link would otherwise read as "listings present"
+ *  and skip the search entirely — proven on Concentrix 2026-11-11):
+ *  "1-25 of 4,659 jobs" (adjacent count word), "Results 1 – 10 of
+ *  34" (Phenom's range format — no count word adjacent to any
+ *  number, so the adjacent-count pattern misses it entirely, and
+ *  the search step then submits on a results page and destroys the
+ *  country context the gate pick just established: Foundever round-12
+ *  canary, US + Work-from-Home picked, then an empty submit landed
+ *  on the global /search/ page and returned Budapest roles), and
+ *  "1 – 10 of 34 jobs" (range + count word). The range formats take
+ *  the TRAILING total (34), not the page size (10). */
+export function hasResultsCountText(bodyText: string): boolean {
+  for (const m of bodyText.matchAll(/([\d,]+)\s+(jobs?|results?|openings?|positions?|roles?)\b/gi)) {
+    if (parseInt(m[1].replace(/,/g, ''), 10) > 0) return true;
+  }
+  for (const m of bodyText.matchAll(/results?\s+[\d,]+\s*[–—-]\s*[\d,]+\s+of\s+([\d,]+)/gi)) {
+    if (parseInt(m[1].replace(/,/g, ''), 10) > 0) return true;
+  }
+  for (const m of bodyText.matchAll(
+    /[\d,]+\s*[–—-]\s*[\d,]+\s+of\s+([\d,]+)\s+(jobs?|results?|openings?|positions?|roles?)\b/gi,
+  )) {
+    if (parseInt(m[1].replace(/,/g, ''), 10) > 0) return true;
+  }
+  return false;
+}
+
 /** Cheap listing heuristic for the rendered page: visible job-looking
  *  links, plus a "N jobs" results count in the body text. */
 export function countJobListings(): JobListingCount {
@@ -247,13 +278,7 @@ export function countJobListings(): JobListingCount {
   // as "9 roles across all departments" (Liveops, 2026-11-12), and
   // without it the search step hides a visible list behind a term
   // search that returns nothing.
-  let resultsText = false;
-  for (const m of bodyText.matchAll(/([\d,]+)\s+(jobs?|results?|openings?|positions?|roles?)\b/gi)) {
-    if (parseInt(m[1].replace(/,/g, ''), 10) > 0) {
-      resultsText = true;
-      break;
-    }
-  }
+  const resultsText = hasResultsCountText(bodyText);
   return { jobLinks, resultsText };
 }
 
