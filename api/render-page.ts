@@ -81,6 +81,32 @@ function bannerTextPresent(html: string): boolean {
   return /we use cookies|cookie preferences|accept all cookies|consent preferences/i.test(text);
 }
 
+/** Whether a cookie banner is VISIBLY covering the page (an element
+ *  carrying banner phrases with a non-zero visible box). Runs in
+ *  the browser via page.evaluate, so it must stay self-contained:
+ *  no imports, no closures over module state. The text check above
+ *  cannot say this — the banner's copy can stay in the DOM after
+ *  the banner hides. Used twice: dismissBanner decides whether a
+ *  reload is needed at all, and the final result records whether
+ *  the banner is really up at the end. */
+export function bannerVisibleInPage(): boolean {
+  const phrases = /we use cookies|cookie preferences|accept (all )?cookies|this site uses cookies|we value your privacy/i;
+  const els = Array.from(document.querySelectorAll('body *'));
+  for (const el of els) {
+    const t = (el as HTMLElement).innerText || '';
+    if (t.length === 0 || t.length > 500 || !phrases.test(t)) continue;
+    const r = el.getBoundingClientRect();
+    if (r.width <= 0 || r.height <= 0) continue;
+    try {
+      if (getComputedStyle(el).visibility === 'hidden') continue;
+    } catch {
+      // No computed style — the box is enough.
+    }
+    return true;
+  }
+  return false;
+}
+
 export interface RenderPageResult {
   /** The rendered DOM HTML — the post-search results page when the
    *  portal search ran. Empty when the render ended on a board domain
@@ -360,14 +386,22 @@ export async function renderPageHtml(url: string, searchTerm: string = '', timeo
         await waitForDomStable(pg, remain, 2000, 500);
       }
       if (!clicked) return false;
-      // The reload makes consent take effect — but only when the
-      // search can still afford it. A click hides the banner for
-      // THIS page load, so when the budget is already half-spent the
-      // reload (page load + 3s settle + re-check passes) is what
-      // starves the search: Foundever's render burned 16s in
-      // settles and the search never ran (skipped-time, 2026-11-12).
-      // Below 12s left, skip the reload and let the search run on
-      // the clicked page.
+      // Reload ONLY when the banner is still visibly up after the
+      // click passes. A click hides the banner for THIS page load;
+      // reloading re-shows it when consent does not persist across
+      // the load — Foundever: the click lands on "Accept All
+      // Cookies" and the banner is back up at the end of the render
+      // (2026-11-12 canary). When the banner is already down, skip
+      // the reload entirely: the search runs on the clicked page
+      // with the banner down, and the budget the reload would have
+      // burned stays available for the search.
+      let bannerStillUp = false;
+      try {
+        bannerStillUp = (await pg.evaluate(bannerVisibleInPage)) as boolean;
+      } catch {
+        bannerStillUp = true;
+      }
+      if (!bannerStillUp) return true;
       if (remain() <= 12000) return true;
       try {
         await pg.reload({ waitUntil: 'domcontentloaded', timeout: Math.max(1000, remain()) });
@@ -459,23 +493,7 @@ export async function renderPageHtml(url: string, searchTerm: string = '', timeo
     // really up; text alone does not.
     let bannerVisible = false;
     try {
-      bannerVisible = (await page.evaluate(() => {
-        const phrases = /we use cookies|cookie preferences|accept (all )?cookies|this site uses cookies|we value your privacy/i;
-        const els = Array.from(document.querySelectorAll('body *'));
-        for (const el of els) {
-          const t = (el as HTMLElement).innerText || '';
-          if (t.length === 0 || t.length > 500 || !phrases.test(t)) continue;
-          const r = el.getBoundingClientRect();
-          if (r.width <= 0 || r.height <= 0) continue;
-          try {
-            if (getComputedStyle(el).visibility === 'hidden') continue;
-          } catch {
-            // No computed style — the box is enough.
-          }
-          return true;
-        }
-        return false;
-      })) as boolean;
+      bannerVisible = (await page.evaluate(bannerVisibleInPage)) as boolean;
     } catch {
       bannerVisible = false;
     }
