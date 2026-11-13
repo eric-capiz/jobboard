@@ -6306,6 +6306,72 @@ async function testRound22Fix1() {
       listParsed[1]?.location === '',
     listParsed,
   );
+  // Follow-up (2026-11-13 live): the REAL Whitestown detail page has
+  // NO "Location:" line or location span in its visible HTML — the
+  // place lives ONLY in the page's JSON-LD JobPosting block
+  // (addressCountry "us"), which the first version missed because
+  // pageLocation read locationIn(clean) only. The JSON-LD parse
+  // carried "Whitestown, Indiana, us" while the APPLY NOW parse went
+  // out blank at 60. A detail page whose only location is JSON-LD
+  // now carries that location onto blank parses too.
+  const jsonLdDetailHtml = `<html><head>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"JobPosting","title":"Customer Service - Self Storage Manager","url":"${detailUrl}","jobLocation":{"@type":"Place","address":{"@type":"PostalAddress","addressLocality":"Whitestown","addressRegion":"Indiana","addressCountry":"us"}}}</script>
+</head><body>
+<div class="job-info"><h2>Customer Service - Self Storage Manager</h2></div>
+<div class="apply-button"><a href="https://jobs.smartrecruiters.com/PublicStorage/744000161367179-customer-service-self-storage-manager?oga=true&amp;utm_source=HireClixCS">APPLY NOW</a></div>
+</body></html>`;
+  const jsonLdParsed = jobsMod.parseCareersPage(jsonLdDetailHtml, detailUrl);
+  // The parse off this mirror carries the page's h2 title (Strategy A
+  // takes the heading and the SmartRecruiters apply link in one
+  // chunk); the point is the LOCATION, not which strategy named it.
+  const jsonLdSlug = jsonLdParsed.find((p) => p.url.includes('smartrecruiters.com'));
+  check(
+    'round22 fix1b: Strategy F parse off a JSON-LD-only detail page carries the JSON-LD location',
+    !!jsonLdSlug && jsonLdSlug.location === 'Whitestown, Indiana, us',
+    jsonLdParsed,
+  );
+  check(
+    'round22 fix1b: no blank-location parse survives off a JSON-LD-only detail page',
+    jsonLdParsed.length > 0 && jsonLdParsed.every((p) => p.location !== ''),
+    jsonLdParsed,
+  );
+  // TELECOMMUTE JSON-LD reads Remote; two JobPosting blocks read
+  // nothing (a detail page has one job — several blocks prove no
+  // single place, so never guess); malformed JSON-LD reads nothing.
+  const remoteJsonLdHtml = `<html><head>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"JobPosting","title":"Customer Service Representative","url":"https://remote.example/jobs/1","jobLocationType":"TELECOMMUTE"}</script>
+</head><body>
+<div class="apply-button"><a href="https://jobs.smartrecruiters.com/RemoteCo/1-customer-service-representative">APPLY NOW</a></div>
+</body></html>`;
+  const remoteParsed = jobsMod.parseCareersPage(remoteJsonLdHtml, 'https://remote.example/jobs/1');
+  check(
+    'round22 fix1b: TELECOMMUTE JSON-LD on a detail page reads Remote',
+    remoteParsed.length > 0 && remoteParsed.every((p) => p.location === 'Remote'),
+    remoteParsed,
+  );
+  const twoJsonLdHtml = `<html><head>
+<script type="application/ld+json">{"@type":"JobPosting","title":"Job One","url":"https://two.example/jobs/1","jobLocation":{"address":{"addressLocality":"Whitestown","addressRegion":"Indiana","addressCountry":"us"}}}</script>
+<script type="application/ld+json">{"@type":"JobPosting","title":"Job Two","url":"https://two.example/jobs/2","jobLocation":{"address":{"addressLocality":"Austin","addressRegion":"Texas","addressCountry":"us"}}}</script>
+</head><body>
+<div class="apply-button"><a href="https://jobs.smartrecruiters.com/TwoCo/1-customer-service-representative">APPLY NOW</a></div>
+</body></html>`;
+  const twoParsed = jobsMod.parseCareersPage(twoJsonLdHtml, 'https://two.example/jobs/1');
+  check(
+    'round22 fix1b: two JobPosting blocks on a detail page read no page location',
+    twoParsed.length > 0 && twoParsed.every((p) => p.location === ''),
+    twoParsed,
+  );
+  const badJsonLdHtml = `<html><head>
+<script type="application/ld+json">{not json</script>
+</head><body>
+<div class="apply-button"><a href="https://jobs.smartrecruiters.com/BadCo/1-customer-service-representative">APPLY NOW</a></div>
+</body></html>`;
+  const badParsed = jobsMod.parseCareersPage(badJsonLdHtml, 'https://bad.example/jobs/1');
+  check(
+    'round22 fix1b: malformed JSON-LD on a detail page reads no page location',
+    badParsed.length > 0 && badParsed.every((p) => p.location === ''),
+    badParsed,
+  );
 }
 
 async function testRound22() {

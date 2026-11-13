@@ -1300,10 +1300,15 @@ export function parseCareersPage(html: string, pageUrl: string): Posting[] {
   // (Strategy F's slug-derived title has no card to read one from,
   // so the SmartRecruiters APPLY NOW parse on a Public Storage
   // detail page went out blank and scored 60 while the page itself
-  // says Whitestown, Indiana — 2026-11-12 verify-401). List pages
-  // hold many roles, so no single page location exists there and
-  // this stays '' — list behavior is untouched.
-  const pageLocation = isJobDetailUrl(pageUrl) ? locationIn(clean) : '';
+  // says Whitestown, Indiana — 2026-11-12 verify-401). The place
+  // may live ONLY in the page's JSON-LD JobPosting block — the
+  // visible HTML has no "Location:" line or location span — so the
+  // fallback reads the block too (2026-11-13 live: the JSON-LD
+  // parse carried "Whitestown, Indiana, us" while locationIn()
+  // read blank off the same page). List pages hold many roles, so
+  // no single page location exists there and this stays '' — list
+  // behavior is untouched.
+  const pageLocation = isJobDetailUrl(pageUrl) ? (locationIn(clean) || jsonLdFirstJobLocation(html)) : '';
   const postings: Posting[] = [];
   const seen = new Set<string>();
   const seenUrls = new Set<string>(); // URLs already pushed, so Strategy F can skip them.
@@ -1507,6 +1512,107 @@ export function parseCareersPage(html: string, pageUrl: string): Posting[] {
   return postings.slice(0, 50);
 }
 
+/** The location a schema.org JobPosting's jobLocation states:
+ *  addressLocality + addressRegion + addressCountry joined (a
+ *  string jobLocation, or a Place name, reads as-is; an array takes
+ *  its first usable entry). */
+function locationFromJobLocation(jl: any): string {
+  if (!jl) return '';
+  if (typeof jl === 'string') return jl.trim();
+  if (Array.isArray(jl)) {
+    for (const item of jl) {
+      const s = locationFromJobLocation(item);
+      if (s) return s;
+    }
+    return '';
+  }
+  if (typeof jl === 'object') {
+    const addr = jl.address;
+    if (addr && typeof addr === 'object') {
+      const parts = [addr.addressLocality, addr.addressRegion, addr.addressCountry]
+        .filter((x) => typeof x === 'string' && x.trim())
+        .map((x: string) => x.trim());
+      if (parts.length > 0) return parts.join(', ');
+    }
+    if (typeof jl.name === 'string') return jl.name.trim();
+  }
+  return '';
+}
+
+/** The requirement text a JobPosting states (applicant location
+ *  requirements): a string reads as-is, an array takes its first
+ *  usable entry, an object takes its name. */
+function requirementText(req: any): string {
+  if (!req) return '';
+  if (typeof req === 'string') return req.trim();
+  if (Array.isArray(req)) {
+    for (const item of req) {
+      const s = requirementText(item);
+      if (s) return s;
+    }
+    return '';
+  }
+  if (typeof req === 'object' && typeof req.name === 'string') return req.name.trim();
+  return '';
+}
+
+/** The location ONE schema.org JobPosting states: TELECOMMUTE reads
+ *  Remote (plus the applicant-location requirement when stated);
+ *  otherwise the jobLocation, falling back to the requirement text.
+ *  Shared by the JSON-LD posting parse and by the detail-page
+ *  location rescue below, so both read the same place. */
+function jobPostingLocation(j: any): string {
+  const locType = j.jobLocationType;
+  const locTypes = Array.isArray(locType) ? locType : [locType];
+  const telecommute = locTypes.some(
+    (t) => typeof t === 'string' && t.toUpperCase().includes('TELECOMMUTE'),
+  );
+  const reqText = requirementText(j.applicantLocationRequirements);
+  if (telecommute) return reqText ? `Remote, ${reqText}` : 'Remote';
+  return locationFromJobLocation(j.jobLocation) || reqText;
+}
+
+/** The location a page's schema.org JobPosting block states, when
+ *  the page carries EXACTLY ONE JobPosting: a detail page is one
+ *  job, so its block IS the page's place. Several blocks prove no
+ *  single place (a list page with JSON-LD), and malformed JSON-LD
+ *  proves nothing — both read '' rather than a guess. Used only as
+ *  the detail-page location fallback: some portals (SmartRecruiters
+ *  detail pages) carry the place ONLY in JSON-LD — no "Location:"
+ *  line, no location span — so locationIn() reads blank while the
+ *  JSON-LD parse carries the place (Public Storage Whitestown,
+ *  2026-11-13 live: "Whitestown, Indiana, us" from the block, blank
+ *  from the visible HTML, and the SmartRecruiters APPLY NOW parse
+ *  went out blank at 60). */
+function jsonLdFirstJobLocation(html: string): string {
+  const nodes: any[] = [];
+  const collect = (node: any) => {
+    if (!node || typeof node !== 'object') return;
+    if (Array.isArray(node)) {
+      for (const n of node) collect(n);
+      return;
+    }
+    const type = node['@type'];
+    const types = Array.isArray(type) ? type : [type];
+    if (types.includes('JobPosting')) {
+      nodes.push(node);
+      return;
+    }
+    if (node['@graph']) collect(node['@graph']);
+  };
+  const scriptRe = /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  let sm: RegExpExecArray | null;
+  while ((sm = scriptRe.exec(html)) !== null) {
+    try {
+      collect(JSON.parse(sm[1]));
+    } catch {
+      // Malformed JSON-LD — ignore the block, keep looking.
+    }
+  }
+  if (nodes.length !== 1) return '';
+  return jobPostingLocation(nodes[0]);
+}
+
 /** Parse schema.org JobPosting blocks embedded in the SAME careers
  *  page HTML. Same-page structured data only: nothing new is fetched,
  *  and fields are never merged across blocks — each JobPosting object
@@ -1517,41 +1623,6 @@ export function parseCareersPage(html: string, pageUrl: string): Posting[] {
  *  HTML doesn't already show (the caller drops title dupes). */
 export function parseJsonLdPostings(html: string, pageUrl: string): Posting[] {
   const postings: Posting[] = [];
-  const locationFromJobLocation = (jl: any): string => {
-    if (!jl) return '';
-    if (typeof jl === 'string') return jl.trim();
-    if (Array.isArray(jl)) {
-      for (const item of jl) {
-        const s = locationFromJobLocation(item);
-        if (s) return s;
-      }
-      return '';
-    }
-    if (typeof jl === 'object') {
-      const addr = jl.address;
-      if (addr && typeof addr === 'object') {
-        const parts = [addr.addressLocality, addr.addressRegion, addr.addressCountry]
-          .filter((x) => typeof x === 'string' && x.trim())
-          .map((x: string) => x.trim());
-        if (parts.length > 0) return parts.join(', ');
-      }
-      if (typeof jl.name === 'string') return jl.name.trim();
-    }
-    return '';
-  };
-  const requirementText = (req: any): string => {
-    if (!req) return '';
-    if (typeof req === 'string') return req.trim();
-    if (Array.isArray(req)) {
-      for (const item of req) {
-        const s = requirementText(item);
-        if (s) return s;
-      }
-      return '';
-    }
-    if (typeof req === 'object' && typeof req.name === 'string') return req.name.trim();
-    return '';
-  };
   const pushPosting = (j: any) => {
     const title = typeof j.title === 'string' ? cleanTitle(j.title) : '';
     if (!titleOk(title)) return;
@@ -1570,18 +1641,7 @@ export function parseJsonLdPostings(html: string, pageUrl: string): Posting[] {
       if (!Number.isNaN(vt.getTime()) && vt.getTime() < Date.now()) return;
     }
     const description = typeof j.description === 'string' ? stripTags(j.description) : '';
-    let location = '';
-    const locType = j.jobLocationType;
-    const locTypes = Array.isArray(locType) ? locType : [locType];
-    const telecommute = locTypes.some(
-      (t) => typeof t === 'string' && t.toUpperCase().includes('TELECOMMUTE'),
-    );
-    const reqText = requirementText(j.applicantLocationRequirements);
-    if (telecommute) {
-      location = reqText ? `Remote, ${reqText}` : 'Remote';
-    } else {
-      location = locationFromJobLocation(j.jobLocation) || reqText;
-    }
+    const location = jobPostingLocation(j);
     let postedDate = '';
     if (typeof j.datePosted === 'string') {
       const d = new Date(j.datePosted);
