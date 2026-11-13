@@ -991,8 +991,10 @@ async function testHouseRx() {
   check('houserx: source is the careers page', res.body?.sourcePage === 'https://houserx.example/careers', res.body);
   check('houserx: union postings seen 4', res.body?.postingsSeen === 4, res.body);
   check('houserx: sr ui engineer found at 81', res.body?.leads?.length === 1 && res.body?.leads[0]?.title === 'Sr. UI Engineer, Front End' && res.body?.leads[0]?.matchScore === 81, res.body?.leads);
-  // Scores cap at 100: a rich description matching 16 resume terms
-  // would otherwise score 130.
+  // Scores cap description-only matches at 5: a rich description
+  // matching 16 resume terms would otherwise score 130 — now the
+  // title matches 2 and only 5 of the 14 description-only matches
+  // count, for 50 + 50*7/10 = 85.
   const richJson = JSON.stringify({
     jobs: [
       { title: 'Frontend Developer', location: { name: 'Remote' }, absolute_url: 'https://www.rich.example/careers?gh_jid=1', content: '<p>React TypeScript JavaScript frontend developer with Storybook design systems web built node api testing agile ci cd experience.</p>', created_at: '2026-10-20T00:00:00Z' },
@@ -1016,7 +1018,7 @@ async function testHouseRx() {
     }, { 'x-sync-key': 'testkey' }),
     resCap,
   );
-  check('score caps at 100', resCap.body?.leads?.length === 1 && resCap.body?.leads[0]?.matchScore === 100, resCap.body?.leads);
+  check('score: description-only matches cap at 5 (rich description scores 85, not 100)', resCap.body?.leads?.length === 1 && resCap.body?.leads[0]?.matchScore === 85, resCap.body?.leads);
 }
 
 async function testFitReasons() {
@@ -5825,6 +5827,109 @@ async function testRound19() {
   check('round19: flag without a resume label adds nothing', noLabelRun.autoAdded === 0 && boardJobs(appStateCol).length === 1, noLabelRun);
 }
 
+async function testRound20() {
+  // Batch 20 (2026-11-12): the CS gate hole + score saturation.
+  // Thorn's 'Senior Support Engineer – Tooling & Automation' scored
+  // 100 for the CS resume live: 'support' is both a CS-function word
+  // and a role word, so the title passed the gate on 'support' +
+  // 'engineer', and its ~2KB description matched 10+ resume terms.
+  const jobsMod = freshRequire(`${OUT}/find-jobs.cjs`);
+  const csResume =
+    'Customer service representative with phone support experience, technical support, troubleshooting, billing questions, and help desk work for members';
+  const richDesc =
+    'Provide technical support and troubleshooting for customers. Answer billing questions by phone and help members with service issues.';
+  // --- Gate: technical titles need a served party ------------------
+  const gate = jobsMod.screenPostings(
+    'Thorn',
+    [
+      { title: 'Senior Support Engineer - Tooling & Automation', location: 'Remote', url: 'https://example.com/jobs/1', description: richDesc, postedDate: '' },
+      { title: 'Customer Support Engineer', location: 'Remote', url: 'https://example.com/jobs/2', description: '', postedDate: '' },
+      { title: 'Director, Development/Volunteer Services', location: 'Remote', url: 'https://example.com/jobs/3', description: richDesc, postedDate: '' },
+      { title: 'Director of Customer Service', location: 'Remote', url: 'https://example.com/jobs/4', description: '', postedDate: '' },
+      { title: 'Customer Service Representative', location: 'Remote', url: 'https://example.com/jobs/5', description: 'Call members.', postedDate: '' },
+      { title: 'Patient Service Representative', location: 'Remote', url: 'https://example.com/jobs/6', description: 'Call members and help.', postedDate: '' },
+    ],
+    csResume,
+    true,
+  );
+  const byTitle = (t) => gate.leads.find((l) => l.title === t);
+  check(
+    'round20: Thorn Senior Support Engineer is rejected for the CS resume (gate, not score)',
+    !byTitle('Senior Support Engineer - Tooling & Automation') &&
+      gate.rejected.some((r) => r.title === 'Senior Support Engineer - Tooling & Automation' && r.reason === 'no-match'),
+    gate.leads.map((l) => [l.title, l.matchScore]),
+  );
+  check(
+    'round20: Customer Support Engineer still passes (engineer + served party) at 60',
+    byTitle('Customer Support Engineer')?.matchScore === 60,
+    byTitle('Customer Support Engineer')?.matchScore,
+  );
+  check(
+    'round20: Director, Development/Volunteer Services drops out (director + no served party)',
+    !byTitle('Director, Development/Volunteer Services'),
+    gate.leads.map((l) => [l.title, l.matchScore]),
+  );
+  check(
+    'round20: Director of Customer Service still passes (director + customer) at 60',
+    byTitle('Director of Customer Service')?.matchScore === 60,
+    byTitle('Director of Customer Service')?.matchScore,
+  );
+  check(
+    'round20: Customer Service Representative keeps its title-heavy score (70)',
+    byTitle('Customer Service Representative')?.matchScore === 70,
+    byTitle('Customer Service Representative')?.matchScore,
+  );
+  check(
+    'round20: Patient Service Representative keeps its title-heavy score (70)',
+    byTitle('Patient Service Representative')?.matchScore === 70,
+    byTitle('Patient Service Representative')?.matchScore,
+  );
+  // --- Score: description-only matches cap at 5 -------------------
+  // A frontend resume must still match the Thorn engineering role
+  // (the gate is CS-only), but its long description can no longer
+  // saturate the score at 100: 1 title match + 5 capped description
+  // matches over 8 terms = 50 + 50*6/8 = 88.
+  const feResume =
+    'React TypeScript JavaScript frontend developer with Storybook and design systems experience';
+  const feRichDesc =
+    'React TypeScript JavaScript frontend developer with Storybook design systems experience building web apps.';
+  const fe = jobsMod.screenPostings(
+    'Thorn',
+    [
+      { title: 'Senior Support Engineer - Tooling & Automation', location: 'Remote', url: 'https://example.com/jobs/1', description: feRichDesc, postedDate: '' },
+      { title: 'Director of Machine Learning & AI', location: 'Remote', url: 'https://example.com/jobs/2', description: feRichDesc, postedDate: '' },
+    ],
+    feResume,
+    true,
+  );
+  const feByTitle = (t) => fe.leads.find((l) => l.title === t);
+  check(
+    'round20: frontend x Thorn Senior Support Engineer still a lead, below 100 (88)',
+    feByTitle('Senior Support Engineer - Tooling & Automation')?.matchScore === 88,
+    feByTitle('Senior Support Engineer - Tooling & Automation')?.matchScore,
+  );
+  check(
+    'round20: frontend x Thorn Director of Machine Learning & AI drops below 100 (81)',
+    feByTitle('Director of Machine Learning & AI')?.matchScore === 81,
+    feByTitle('Director of Machine Learning & AI')?.matchScore,
+  );
+  // The 100 cap still binds when a short resume really matches
+  // everything: 2 title + 2 description matches over 4 terms.
+  const cap = jobsMod.screenPostings(
+    'Cap Co',
+    [
+      { title: 'Frontend Developer', location: 'Remote', url: 'https://example.com/jobs/1', description: 'React TypeScript work.', postedDate: '' },
+    ],
+    'React TypeScript frontend developer',
+    true,
+  );
+  check(
+    'round20: a full match on a short resume still caps at 100',
+    cap.leads.length === 1 && cap.leads[0]?.matchScore === 100,
+    cap.leads.map((l) => [l.title, l.matchScore]),
+  );
+}
+
 await testFindCompanies();
 await testFindCompaniesTransientError();
 await testFindCompaniesDupeStretch();
@@ -5865,6 +5970,7 @@ await testRound17();
 await testRound18();
 await testRound18b();
 await testRound19();
+await testRound20();
 await testPaginationAndSearchScan();
 await testTestCompany();
 await testJazzhr();

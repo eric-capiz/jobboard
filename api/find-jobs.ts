@@ -2430,6 +2430,29 @@ const CS_ROLE_QUALIFIERS = new Set([
   'billing',
 ]);
 
+/** Role words that name a TECHNICAL role, not a service role:
+ *  engineer / developer / designer / director / lead. A CS resume
+ *  matching Thorn's 'Senior Support Engineer – Tooling & Automation'
+ *  at 100 (live 2026-11-12) exposed the hole: 'support' is both a
+ *  CS-function word and a role word, so the title passed the gate on
+ *  'support' + 'engineer' with no served party anywhere. When a
+ *  title names one of these technical roles, 'support' on its own
+ *  cannot satisfy the role half — the title must also name who is
+ *  served. 'Customer Support Engineer' still passes; 'Senior
+ *  Support Engineer' and 'Director, Development/Volunteer Services'
+ *  (Day Kimball, 60) do not. A title with no technical word is
+ *  unaffected: 'Customer Service Support' still passes on 'support'
+ *  alone. Trade-off, accepted: a bare 'Technical Support Engineer'
+ *  (no served party in the title) now fails the gate too. */
+const CS_TECH_ROLE_WORDS = new Set(['engineer', 'developer', 'designer', 'director', 'lead']);
+
+/** Who is served: the qualifier a technical role word needs.
+ *  Deliberately NOT the full CS_ROLE_QUALIFIERS set — 'support' /
+ *  'help' / 'call' / 'billing' would let the very word that caused
+ *  the hole qualify the title ('Senior Support Engineer' carries
+ *  'support'). Only a served party counts. */
+const CS_SERVED_PARTY_WORDS = new Set(['customer', 'client', 'member', 'patient', 'guest', 'user']);
+
 const ROLE_WORDS = new Set([
   'representative',
   'agent',
@@ -2479,9 +2502,15 @@ const ROLE_WORDS = new Set([
 
 /** Score postings against the resume. A posting is scored when at
  *  least one resume term matches (exact or synonym) in its title or
- *  description — the floor, not a gate. The score formula is unchanged:
- *  50 + 50 × overlap, where overlap is the ratio of matched resume
- *  terms to min(terms, 10), capped at 100. A single match lands in the
+ *  description — the floor, not a gate. The score is 50 + 50 ×
+ *  overlap, where overlap is credited matches over min(terms, 10),
+ *  capped at 100 — but credited matches are title matches in full
+ *  plus at most 5 description-only matches: a ~2KB Greenhouse
+ *  description used to let generic resume words match 10+ terms and
+ *  saturate the score at 100 no matter what the title said (Thorn:
+ *  all 4 roles scored 100 for every frontend resume, including
+ *  Director of Machine Learning & AI). The title is what the role
+ *  IS; the description only supports it. A single match lands in the
  *  mid-50s (near miss); auto-add at 60+ still needs real overlap, so
  *  the score — not the floor — is the precision gate. Location is
  *  classified before scoring: hard rejects drop out, uncertain
@@ -2526,17 +2555,25 @@ export function screenPostings(
       // the title. The old check used synonym-credited terms, so a
       // 'Specialist' title credited 'agent' and passed as CS work.
       const namesCsWork = [...titleWords].some((w) => CS_FUNCTION_WORDS.has(w));
-      // A 'specialist'/'technician' title is only a CS role when the
-      // title also names who is served ('Customer Service Specialist'
-      // keeps passing; 'Field Service Technician' and 'Lab Safety
-      // Specialist' do not). Every other role word counts on its own.
-      const namesRole = [...titleWords].some((w) => {
-        if (!ROLE_WORDS.has(w)) return false;
-        if (w === 'specialist' || w === 'technician') {
-          return [...titleWords].some((q) => CS_ROLE_QUALIFIERS.has(q));
-        }
-        return true;
-      });
+      // A title naming a technical role (engineer / developer /
+      // designer / director / lead) is a CS role only when it also
+      // names who is served — 'support' alone cannot carry it, or
+      // 'Senior Support Engineer – Tooling & Automation' passes on
+      // 'support' + 'engineer' with no served party (Thorn, 100).
+      // A title with no technical word keeps the old rule: a
+      // 'specialist'/'technician' title still needs a served-party
+      // (or support-kind) qualifier, every other role word counts
+      // on its own.
+      const namesTechRole = [...titleWords].some((w) => CS_TECH_ROLE_WORDS.has(w));
+      const namesRole = namesTechRole
+        ? [...titleWords].some((w) => CS_SERVED_PARTY_WORDS.has(w))
+        : [...titleWords].some((w) => {
+            if (!ROLE_WORDS.has(w)) return false;
+            if (w === 'specialist' || w === 'technician') {
+              return [...titleWords].some((q) => CS_ROLE_QUALIFIERS.has(q));
+            }
+            return true;
+          });
       if (!namesCsWork || !namesRole) {
         rejectedNoMatch += 1;
         noteRejected(p, 'no-match');
@@ -2551,9 +2588,19 @@ export function screenPostings(
     }
     const needsReview = loc.verdict === 'review';
     if (needsReview) reviewLocation += 1;
-    const overlap = resumeTerms.length === 0 ? 0 : matches.length / Math.min(resumeTerms.length, 10);
-    // Capped at 100: a rich description can match more than 10 resume
-    // terms, and a score above 100 reads as broken.
+    // Title matches count in full; description-only matches count at
+    // most 5 — a long description must not saturate the score (see
+    // the screenPostings header). Description-only means a resume
+    // term no title word already matched.
+    const titleMatches = matchResumeTerms(new Set(tokenize(p.title)), resumeTerms);
+    const titleMatchedTerms = new Set(titleMatches.map((m) => m.term));
+    const descOnlyCount = matchResumeTerms(new Set(tokenize(p.description)), resumeTerms).filter(
+      (m) => !titleMatchedTerms.has(m.term),
+    ).length;
+    const creditedMatches = titleMatches.length + Math.min(descOnlyCount, 5);
+    const overlap = resumeTerms.length === 0 ? 0 : creditedMatches / Math.min(resumeTerms.length, 10);
+    // Capped at 100: a rich title + description can still match every
+    // resume term, and a score above 100 reads as broken.
     const matchScore = Math.min(100, Math.round(50 + 50 * overlap));
     // Gaps: the posting description's most frequent terms the resume
     // doesn't mention — what the posting wants that the resume lacks.
