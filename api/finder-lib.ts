@@ -125,12 +125,58 @@ export function domainOf(website: string): string {
   }
 }
 
+/** Aggregator / job-board domains: never a posting source, never a
+ *  posting URL. LinkedIn, Indeed, Glassdoor and friends host millions
+ *  of jobs that are not the company's own — the walk used to follow a
+ *  company's LinkedIn link and extract 17 postings with LinkedIn
+ *  apply URLs (Shore United Bank, 2026-11-12 verify-401: 25 LinkedIn
+ *  leads on the board). Deliberately NOT here: governmentjobs.com —
+ *  a municipal hiring portal, not an aggregator (9 kept PASS jobs
+ *  apply through it), and usajobs.gov / other .gov portals, which
+ *  the apply-host check in find-jobs.ts allows for the same reason. */
+export const AGGREGATOR_HOSTS = new Set([
+  'linkedin.com',
+  'indeed.com',
+  'glassdoor.com',
+  'ziprecruiter.com',
+  'monster.com',
+  'simplyhired.com',
+  'careerbuilder.com',
+  'dice.com',
+  'jobleads.com',
+  'seoclerk.com',
+  'macslist.org',
+  'snagajob.com',
+  'careerjet.com',
+  'jooble.org',
+  'flexjobs.com',
+]);
+
+/** True when the URL lives on a job-board / aggregator host
+ *  (subdomains count: www.linkedin.com, jobs.lever.co is NOT one —
+ *  Lever is an ATS, handled by isBoardUrl below). */
+export function isAggregatorUrl(url: string): boolean {
+  let host = '';
+  try {
+    host = new URL(url).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  for (const d of AGGREGATOR_HOSTS) {
+    if (host === d || host.endsWith(`.${d}`)) return true;
+  }
+  return false;
+}
+
 /** Board domains are never a source: a URL on one is skipped outright,
  *  whether the user pasted it or a page links to it. Shared by the
  *  HTML reader and the render fallback (which also refuses to parse a
  *  page that redirected onto a board). */
 export function isBoardUrl(url: string): boolean {
-  return /greenhouse\.io|lever\.co|ashbyhq\.com|jazz\.co|applytojob\.com/i.test(url);
+  return (
+    /greenhouse\.io|lever\.co|ashbyhq\.com|jazz\.co|applytojob\.com/i.test(url) ||
+    isAggregatorUrl(url)
+  );
 }
 
 /** Composite dedupe key: normalized name + website domain. */
@@ -208,6 +254,42 @@ export async function getCompaniesCollection(): Promise<Collection<CompanyDoc>> 
     indexesReady = true;
   }
   return col;
+}
+
+/** Read-only roster lookup for the test-company path: is this
+ *  company a U.S. company by roster construction? The roster is
+ *  U.S.-only by construction (Wikidata P17=Q30 or U.S. HQ, SEC
+ *  EDGAR, U.S. seed) EXCEPT manually added companies (source
+ *  'Manual'), which are never assumed U.S. The sweep passes
+ *  isUSCompany from the roster row it already holds; test-company
+ *  never had the row, so it defaulted to false and every
+ *  blank-location / bare-'Remote' posting came back flagged 'no
+ *  location listed — verify' (312 of 400 in the 2026-11-12
+ *  verify-401 run). Match by nameKey first, then by website or
+ *  careersUrl domain (apex included, so a jobs.* careers subdomain
+ *  still finds its company). Returns false when the company is not
+ *  on the roster, or is a Manual row — never throws for a missing
+ *  row; the caller treats a DB failure as false, not as an error. */
+export async function resolveIsUSCompany(
+  companiesCol: Collection<CompanyDoc>,
+  input: { name: string; website: string; careersUrl: string },
+): Promise<boolean> {
+  const ors: Record<string, string>[] = [];
+  const nk = nameKey(input.name ?? '');
+  if (nk) ors.push({ nameKey: nk });
+  for (const site of [input.website, input.careersUrl]) {
+    if (!site) continue;
+    const d = domainOf(site);
+    if (!d) continue;
+    ors.push({ domain: d });
+    // A jobs.* / careers.* subdomain's apex is the roster domain.
+    const parts = d.split('.');
+    if (parts.length >= 3) ors.push({ domain: parts.slice(1).join('.') });
+  }
+  if (ors.length === 0) return false;
+  const doc = await companiesCol.findOne({ $or: ors } as never);
+  if (!doc) return false;
+  return (doc.source ?? '') !== 'Manual';
 }
 
 /** The JobBoard app-state doc (the board itself lives here as

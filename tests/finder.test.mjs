@@ -5930,6 +5930,318 @@ async function testRound20() {
   );
 }
 
+async function testRound21() {
+  // Batch 21 (2026-11-12): the six systemic bugs the verify-401 run
+  // found (board 405 -> 265, 140 removed). Each fix is pinned below
+  // against the exact evidenced case.
+  const jobsMod = freshRequire(`${OUT}/find-jobs.cjs`);
+  const libMod = freshRequire(`${OUT}/finder-lib.cjs`);
+  const csResume =
+    'Customer service representative with phone support experience, technical support, troubleshooting, billing questions, and help desk work for members';
+
+  // --- Fix 1: test-company isUSCompany ---------------------------
+  const companiesCol = new FakeCollection();
+  await companiesCol.insertMany([
+    { name: 'NSSF', website: 'https://nssf.org', domain: 'nssf.org', nameKey: 'nssf', careersUrl: '', category: 'General', source: 'Wikidata', addedAt: '2026-10-29T00:00:00Z' },
+    { name: 'Manual Co', website: 'https://manualco.example', domain: 'manualco.example', nameKey: 'manual co', careersUrl: '', category: 'General', source: 'Manual', addedAt: '2026-10-29T00:00:00Z' },
+    { name: 'Concentrix', website: 'https://www.concentrix.com', domain: 'concentrix.com', nameKey: 'concentrix', careersUrl: 'https://jobs.concentrix.com/job-search/', category: 'General', source: 'Wikidata', addedAt: '2026-10-29T00:00:00Z' },
+  ]);
+  check(
+    'round21 fix1: roster company resolves US',
+    (await libMod.resolveIsUSCompany(companiesCol, { name: 'NSSF', website: 'https://nssf.org', careersUrl: '' })) === true,
+  );
+  check(
+    'round21 fix1: Manual company does not resolve US',
+    (await libMod.resolveIsUSCompany(companiesCol, { name: 'Manual Co', website: 'https://manualco.example', careersUrl: '' })) === false,
+  );
+  check(
+    'round21 fix1: unknown company does not resolve US',
+    (await libMod.resolveIsUSCompany(companiesCol, { name: 'Nobody Inc', website: 'https://nobody.example', careersUrl: '' })) === false,
+  );
+  check(
+    'round21 fix1: jobs-subdomain careersUrl finds its company by apex domain',
+    (await libMod.resolveIsUSCompany(companiesCol, { name: 'Concentrix Jobs', website: '', careersUrl: 'https://jobs.concentrix.com/job-search/' })) === true,
+  );
+
+  // --- Fix 2: aggregator domains are never a posting source -------
+  check(
+    'round21 fix2: LinkedIn / Indeed / MacsList are aggregators and board URLs',
+    libMod.isAggregatorUrl('https://www.linkedin.com/jobs/view/123') === true &&
+      libMod.isAggregatorUrl('https://www.indeed.com/jobs?q=x') === true &&
+      libMod.isAggregatorUrl('https://jobs.macslist.org/job/abc') === true &&
+      libMod.isBoardUrl('https://www.linkedin.com/jobs/view/123') === true,
+  );
+  check(
+    'round21 fix2: governmentjobs.com is NOT an aggregator (municipal portal)',
+    libMod.isAggregatorUrl('https://www.governmentjobs.com/careers/sanjoseca/jobs/5367151/x') === false,
+  );
+  check(
+    'round21 fix2: LinkedIn URL is not a job detail, Greenhouse still is',
+    jobsMod.isJobDetailUrl('https://www.linkedin.com/jobs/view/customer-service-representative-123456') === false &&
+      jobsMod.isJobDetailUrl('https://www.linkedin.com/jobs/view/123?id=456') === false &&
+      jobsMod.isJobDetailUrl('https://job-boards.greenhouse.io/datagrail/jobs/7982580003') === true,
+  );
+  // End to end: a careers page linking a LinkedIn apply URL parses
+  // to zero postings for that card, while the same-site role on the
+  // same page is kept (Shore United Bank shape).
+  const boardHtml = `<html><body>
+<div class="job-listing"><h3>Customer Service Representative</h3><p>Location: Remote</p><a href="https://www.linkedin.com/jobs/view/123456">Apply on LinkedIn</a></div>
+<div class="job-listing"><h3>Customer Support Specialist</h3><p>Location: Remote</p><a href="/jobs/support-specialist">Apply</a></div>
+</body></html>`;
+  const parsedBoard = jobsMod.parseCareersPage(boardHtml, 'https://shoreunited.example');
+  check(
+    'round21 fix2: LinkedIn-apply link dropped at parse, same-site role kept',
+    parsedBoard.length === 1 && parsedBoard[0].title === 'Customer Support Specialist',
+    parsedBoard,
+  );
+
+  // --- Fix 3: title-embedded locations ---------------------------
+  check(
+    'round21 fix3: Location-marker titles read the place',
+    jobsMod.locationFromTitle('Customer Service Self Storage Manager Location Whitestown In United States Jobs Category Customer Service') === 'Whitestown In' &&
+      jobsMod.locationFromTitle('Customer Service Self Storage Manager Location Beaumont Tx United States Jobs Category Customer Service') === 'Beaumont Tx' &&
+      jobsMod.locationFromTitle('Customer Service Self Storage Manager Location West Los Angeles Ca United States Jobs Category Customer Service') === 'West Los Angeles Ca',
+  );
+  check(
+    'round21 fix3: trailing-place titles read the place',
+    jobsMod.locationFromTitle('Patient Access Representative Job – Dallas, TX') === 'Dallas, TX' &&
+      jobsMod.locationFromTitle('Intervie Day on 12/9 - Access Representative Opportunities (Patient Scheduling) - Boynton Beach, FL') === 'Boynton Beach, FL',
+  );
+  check(
+    'round21 fix3: no place, no extraction',
+    jobsMod.locationFromTitle('Location Manager') === '' &&
+      jobsMod.locationFromTitle('Relocation Specialist') === '' &&
+      jobsMod.locationFromTitle('Customer Service Representative') === '' &&
+      jobsMod.locationFromTitle('Customer Service Representative, Remote') === '',
+  );
+  // End to end: a Public Storage-style posting (blank location,
+  // Location-marker title) is rejected on location for the CS
+  // resume, while a blank-location role with no place in its title
+  // still passes for a U.S. company (NSSF CSR).
+  const ps = jobsMod.screenPostings(
+    'Public Storage',
+    [
+      { title: 'Customer Service Self Storage Manager Location Whitestown In United States Jobs Category Customer Service', location: '', url: 'https://publicstoragejobs.com/jobs/1', description: '', postedDate: '' },
+      { title: 'Customer Service Representative', location: '', url: 'https://publicstoragejobs.com/jobs/2', description: '', postedDate: '' },
+    ],
+    csResume,
+    true,
+    ['publicstorage.com', 'publicstoragejobs.com'],
+  );
+  check(
+    'round21 fix3: Public Storage on-site title rejected on location, blank-location role still passes',
+    ps.leads.length === 1 &&
+      ps.leads[0].title === 'Customer Service Representative' &&
+      ps.rejectedLocation === 1,
+    ps,
+  );
+
+  // --- Fix 4: on-call is a schedule, not the verb 'call' ---------
+  const onCall = jobsMod.screenPostings(
+    'OnCall Co',
+    [
+      { title: 'Environmental Services Technician-PRN on-call 2nd shift', location: 'Remote', url: 'https://example.com/jobs/1', description: '', postedDate: '' },
+      { title: 'On-Call (part-time) Assessment Projects Specialist', location: 'Remote', url: 'https://example.com/jobs/2', description: '', postedDate: '' },
+      { title: 'On-Call Event Customer Service Representative', location: 'Remote', url: 'https://example.com/jobs/3', description: '', postedDate: '' },
+      { title: 'On-Call Registration/Answer Center Support', location: 'Remote', url: 'https://example.com/jobs/4', description: '', postedDate: '' },
+      { title: 'Customer Service Representative (On-Call)', location: 'Remote', url: 'https://example.com/jobs/5', description: '', postedDate: '' },
+      { title: 'Call Center Representative', location: 'Remote', url: 'https://example.com/jobs/6', description: '', postedDate: '' },
+    ],
+    csResume,
+    true,
+  );
+  const ocByTitle = (t) => onCall.leads.find((l) => l.title === t);
+  check(
+    'round21 fix4: on-call housekeeping technician rejected (no call credit)',
+    !ocByTitle('Environmental Services Technician-PRN on-call 2nd shift') &&
+      onCall.rejected.some((r) => r.title === 'Environmental Services Technician-PRN on-call 2nd shift' && r.reason === 'no-match'),
+    onCall.leads.map((l) => l.title),
+  );
+  check(
+    'round21 fix4: on-call assessment specialist rejected',
+    !ocByTitle('On-Call (part-time) Assessment Projects Specialist'),
+    onCall.leads.map((l) => l.title),
+  );
+  check(
+    'round21 fix4: genuine on-call CS roles survive',
+    !!ocByTitle('On-Call Event Customer Service Representative') &&
+      !!ocByTitle('On-Call Registration/Answer Center Support') &&
+      !!ocByTitle('Customer Service Representative (On-Call)') &&
+      !!ocByTitle('Call Center Representative'),
+    onCall.leads.map((l) => l.title),
+  );
+
+  // --- Fix 5: category / blog pages are not postings -------------
+  check(
+    'round21 fix5: Support Services is a junk title, Phone Support is not',
+    jobsMod.isJunkTitle('Support Services') === true &&
+      jobsMod.isJunkTitle('Support services') === true &&
+      jobsMod.isJunkTitle('Phone Support') === false &&
+      jobsMod.isJunkTitle('Customer Service Support') === false &&
+      jobsMod.isJunkTitle('Technical Customer Support') === false,
+  );
+  check(
+    'round21 fix5: blog hosts/paths are not details',
+    jobsMod.isJobDetailUrl('https://blog.providenceswedish.jobs/') === false &&
+      jobsMod.isJobDetailUrl('https://www.swedish.org/blog/benefits-that-support-you') === false,
+  );
+  check(
+    'round21 fix5: category title + URL together are not a real posting',
+    jobsMod.isRealPosting('Support Services', 'https://www.bmhsc.org/careers/career-areas/support-services') === false &&
+      jobsMod.isRealPosting('Support Services', 'https://www.overlakecareers.org/jobs/administrative-clerical/food-service-nutrition/facilities-trades/') === false &&
+      jobsMod.isRealPosting('Support Services', 'https://jobs.hoag.org/go/Support-Services-Jobs/886100/') === false &&
+      jobsMod.isRealPosting('Benefits that support you at every stage in your career', 'https://blog.providenceswedish.jobs/') === false,
+  );
+  // No multi-topic URL veto: a category path stacks segments, but
+  // so does a real detail — TalentBrew's /en/job/<city>/<role>/<id>/
+  // and Teleperformance's /careers/job-opportunities/<role>/ both
+  // carry a city/category segment before the role slug, and a veto
+  // on stacked segments killed them (11 pre-existing tests failed
+  // in the first round-21 run). The title rule above is the fix.
+  check(
+    'round21 fix5: city/category + role-slug detail URLs still pass',
+    jobsMod.isJobDetailUrl('https://www.ttecjobs.com/en/job/las-vegas/customer-service-representative/44028/103182764528') === true &&
+      jobsMod.isJobDetailUrl('https://tp.example/en-us/careers/job-opportunities/customer-service-representative/') === true,
+  );
+  // End to end: a Beaufort-like category page parses to zero
+  // postings — the title kills it, not the URL.
+  const catHtml = `<html><body>
+<div class="job-listing"><h3>Support Services</h3><a href="/careers/career-areas/support-services">View</a></div>
+</body></html>`;
+  check(
+    'round21 fix5: category page parses to zero postings',
+    jobsMod.parseCareersPage(catHtml, 'https://www.bmhsc.org').length === 0,
+    jobsMod.parseCareersPage(catHtml, 'https://www.bmhsc.org'),
+  );
+
+  // --- Fix 6: gate holes in the kept set -------------------------
+  // (a) Division/department suffixes name the org chart, not the
+  // role: San Jose Clean Energy's energy-program managers passed
+  // on 'Customer' from 'Customer Programs Division'.
+  const div = jobsMod.screenPostings(
+    'San Jose Clean Energy',
+    [
+      { title: 'Manager of Building Electrification Programs (Senior Power Resources Specialist) – Account Management, Marketing, and Customer Programs Division', location: '', url: 'https://www.governmentjobs.com/careers/sanjoseca/jobs/5367151/x', description: '', postedDate: '' },
+      { title: 'Energy Account Services Specialist I/II (Power Resources Specialist I/II) – Account Services, Marketing and Communications, and Customer Programs Division', location: '', url: 'https://www.governmentjobs.com/careers/sanjoseca/jobs/5537926/x', description: '', postedDate: '' },
+      { title: 'Senior Public Information Representative – Account Management, Marketing, and Customer Programs Division', location: '', url: 'https://www.governmentjobs.com/careers/sanjoseca/jobs/5478830/x', description: '', postedDate: '' },
+      { title: 'Customer Service Representative – Call Center Division', location: 'Remote', url: 'https://www.governmentjobs.com/careers/sanjoseca/jobs/1', description: '', postedDate: '' },
+      { title: 'Manager of Customer Programs – Operations Division', location: 'Remote', url: 'https://www.governmentjobs.com/careers/sanjoseca/jobs/2', description: '', postedDate: '' },
+    ],
+    csResume,
+    true,
+    ['sanjoseca.gov'],
+  );
+  const divByTitle = (t) => div.leads.find((l) => l.title === t);
+  check(
+    'round21 fix6: division-suffix energy roles rejected, real CS roles survive the strip',
+    !divByTitle('Manager of Building Electrification Programs (Senior Power Resources Specialist) – Account Management, Marketing, and Customer Programs Division') &&
+      !divByTitle('Energy Account Services Specialist I/II (Power Resources Specialist I/II) – Account Services, Marketing and Communications, and Customer Programs Division') &&
+      !divByTitle('Senior Public Information Representative – Account Management, Marketing, and Customer Programs Division') &&
+      !!divByTitle('Customer Service Representative – Call Center Division') &&
+      !!divByTitle('Manager of Customer Programs – Operations Division'),
+    div.leads.map((l) => l.title),
+  );
+  // (b) 'teacher' is no longer a role word: the teaching role
+  // passed on 'teacher' + 'service'.
+  const teacher = jobsMod.screenPostings(
+    'Nonprofit Association of Washington',
+    [
+      { title: 'Certified Teacher of the Visually Impaired and Orientation/Mobility Specialist - Washington Service', location: '', url: 'https://nonprofit.example/jobs/1', description: '', postedDate: '' },
+    ],
+    csResume,
+    true,
+  );
+  check(
+    'round21 fix6: Certified Teacher no longer passes the gate on teacher + service',
+    teacher.leads.length === 0,
+    teacher.leads,
+  );
+  // (c) Apply-host discipline: a posting on another org's site is
+  // that org's job, not the roster company's.
+  check(
+    'round21 fix6: apply-host allowlist',
+    jobsMod.isAllowedApplyHost('https://disasterphilanthropy.org/about/careers/manager-advisory-services/', ['peakgrantmaking.org']) === false &&
+      jobsMod.isAllowedApplyHost('https://akoyago.com/careers/technical-support-representative-tier-i-job-description/', ['peakgrantmaking.org']) === false &&
+      jobsMod.isAllowedApplyHost('https://icma.org/job-posts/149864', ['pml.org']) === false &&
+      jobsMod.isAllowedApplyHost('https://www.governmentjobs.com/careers/sanjoseca/jobs/5367151/x', ['sanjoseca.gov']) === true &&
+      jobsMod.isAllowedApplyHost('https://jobs.concentrix.com/job/customer-support-specialist', ['careers.concentrix.com']) === true &&
+      jobsMod.isAllowedApplyHost('https://jobs.wisc.edu/jobs/client-services-specialist', ['wcer.wisc.edu']) === true &&
+      jobsMod.isAllowedApplyHost('https://umchealthsystem.wd1.myworkdayjobs.com/en-US/External/job/x', ['umchealthsystem.org']) === true &&
+      jobsMod.isAllowedApplyHost('https://recruitingbypaycor.com/x', ['nexrep.com']) === true &&
+      jobsMod.isAllowedApplyHost('https://halvik.isolvedhire.com/iframe/1894977.html', ['halvik.com']) === true &&
+      jobsMod.isAllowedApplyHost('https://www.jobs.virginia.gov/jobs/x', ['vadars.org']) === true &&
+      jobsMod.isAllowedApplyHost('https://www.linkedin.com/jobs/view/123', ['shoreunitedbank.com']) === false &&
+      jobsMod.isAllowedApplyHost('https://testco.applytojob.com/apply/x', ['testco.com']) === true,
+  );
+  const attrib = jobsMod.screenPostings(
+    'PEAK Grantmaking',
+    [
+      { title: 'Manager, Advisory Services | Center for Disaster Philanthropy', location: 'Remote', url: 'https://disasterphilanthropy.org/about/careers/manager-advisory-services/', description: '', postedDate: '' },
+      { title: 'Tier I Support Representative | akoyaGO', location: 'Remote', url: 'https://akoyago.com/careers/technical-support-representative-tier-i-job-description/', description: '', postedDate: '' },
+    ],
+    csResume,
+    true,
+    ['peakgrantmaking.org'],
+  );
+  const pml = jobsMod.screenPostings(
+    'Pennsylvania Municipal League',
+    [
+      { title: 'Home to Hope Program Manager - Reentry & Behavioral Health Support (Grant-Funded)', location: '', url: 'https://icma.org/job-posts/149864', description: '', postedDate: '' },
+    ],
+    csResume,
+    true,
+    ['pml.org'],
+  );
+  check(
+    'round21 fix6: other-org jobs rejected by the apply host',
+    attrib.leads.length === 0 && pml.leads.length === 0,
+    { attrib: attrib.leads, pml: pml.leads },
+  );
+  // The PML title passes the gate on its own words — the host
+  // filter is the operative fix there, so pin that too.
+  const pmlNoHost = jobsMod.screenPostings(
+    'Pennsylvania Municipal League',
+    [
+      { title: 'Home to Hope Program Manager - Reentry & Behavioral Health Support (Grant-Funded)', location: '', url: 'https://icma.org/job-posts/149864', description: '', postedDate: '' },
+    ],
+    csResume,
+    true,
+  );
+  check(
+    'round21 fix6: without the host list the PML title still passes the gate (host filter is the fix)',
+    pmlNoHost.leads.length === 1,
+    pmlNoHost.leads,
+  );
+  // Widget / JSON-LD postings are exempt from the host check: their
+  // provenance is the company's own page (HouseRx's Greenhouse embed
+  // carries a houserx.com apply URL while the company is addressed
+  // by its .example stand-in). The same posting parsed off HTML is
+  // still rejected.
+  const widget = jobsMod.screenPostings(
+    'House Rx',
+    [
+      { title: 'Customer Service Representative', location: 'Remote', url: 'https://www.houserx.com/careers?gh_jid=4749398005', description: '', postedDate: '', source: 'greenhouse' },
+    ],
+    csResume,
+    true,
+    ['houserx.example'],
+  );
+  const widgetHtml = jobsMod.screenPostings(
+    'House Rx',
+    [
+      { title: 'Customer Service Representative', location: 'Remote', url: 'https://www.houserx.com/careers?gh_jid=4749398005', description: '', postedDate: '', source: 'html' },
+    ],
+    csResume,
+    true,
+    ['houserx.example'],
+  );
+  check(
+    'round21 fix6: widget posting exempt from the host check, HTML posting is not',
+    widget.leads.length === 1 && widgetHtml.leads.length === 0,
+    { widget: widget.leads.length, html: widgetHtml.leads.length },
+  );
+}
+
 await testFindCompanies();
 await testFindCompaniesTransientError();
 await testFindCompaniesDupeStretch();
@@ -5971,6 +6283,7 @@ await testRound18();
 await testRound18b();
 await testRound19();
 await testRound20();
+await testRound21();
 await testPaginationAndSearchScan();
 await testTestCompany();
 await testJazzhr();

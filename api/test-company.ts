@@ -1,4 +1,4 @@
-/* Single-company job test — no database involved.
+/* Single-company job test — read-only roster lookup, no writes.
  *
  * POST { company: { name, website, careersUrl }, resumeText } and the
  * endpoint runs exactly the same search the full Find Jobs sweep runs
@@ -11,6 +11,15 @@
  * with the result. That makes it a true test: if you know a company
  * is hiring for your resume's skill set, this tells you whether its
  * careers page is detected and the job found.
+ *
+ * The one read the endpoint does is a roster lookup: a company on
+ * the roster (source !== 'Manual') is a U.S. company by
+ * construction, so its blank-location / bare-'Remote' postings are
+ * evaluated the same way the sweep evaluates them — without it the
+ * test path defaulted isUSCompany to false and every such posting
+ * came back flagged 'no location listed — verify' (312 of 400 in
+ * the 2026-11-12 verify-401 run). A company the roster does not
+ * know, or a manually added one, keeps the old review behavior.
  *
  * Auth mirrors /api/state: x-sync-key must match SYNC_KEY.
  *
@@ -27,7 +36,13 @@
  * given careers URL, the same source discipline as the test.
  */
 
-import { authorized, type VercelRequest, type VercelResponse } from './finder-lib.js';
+import {
+  authorized,
+  getCompaniesCollection,
+  resolveIsUSCompany,
+  type VercelRequest,
+  type VercelResponse,
+} from './finder-lib.js';
 import {
   isJobDetailUrl,
   parseCareersPage,
@@ -232,13 +247,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       });
       return;
     }
-    const result = await searchCompanyJobs({ name, website, careersUrl }, resumeText, {
-      renderPage: renderPageHtml,
-      // Two renders per test: a no-form or failed first render retries
-      // the next-best target instead of spending the test on the
-      // wrong page.
-      renderBudget: { used: 0, max: 2 },
-    });
+    const result = await searchCompanyJobs(
+      {
+        name,
+        website,
+        careersUrl,
+        // Read-only roster lookup (see the header): a roster company
+        // is a U.S. company by construction. Best-effort — a DB
+        // failure leaves isUSCompany false rather than failing the
+        // test, exactly the old behavior.
+        isUSCompany: await (async () => {
+          try {
+            const companiesCol = await getCompaniesCollection();
+            return await resolveIsUSCompany(companiesCol, { name, website, careersUrl });
+          } catch {
+            return false;
+          }
+        })(),
+      },
+      resumeText,
+      {
+        renderPage: renderPageHtml,
+        // Two renders per test: a no-form or failed first render retries
+        // the next-best target instead of spending the test on the
+        // wrong page.
+        renderBudget: { used: 0, max: 2 },
+      },
+    );
     res.status(200).json({
       company: name,
       sourcePage: result.sourcePage,

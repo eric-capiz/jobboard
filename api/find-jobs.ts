@@ -24,8 +24,10 @@
 
 import {
   authorized,
+  domainOf,
   getAppStateCollection,
   getCompaniesCollection,
+  isAggregatorUrl,
   isBoardUrl,
   type CompanyDoc,
   type VercelRequest,
@@ -892,6 +894,44 @@ export function locationFromJobSlug(rawUrl: string): string {
   return `${first}, ${st}`;
 }
 
+/** The place a job TITLE states when the location line is blank:
+ *  Public Storage titles carry the facility in the title itself —
+ *  'Customer Service Self Storage Manager Location Whitestown In
+ *  United States Jobs Category Customer Service' — and the location
+ *  check never saw it (47 such roles reached the board, 2026-11-12
+ *  verify-401; 6 more the same shape). Two shapes: a literal
+ *  'Location <City> <ST>' marker (take the words up to 'united
+ *  states' / 'jobs' / 'category' / end, only when they name a US
+ *  state), and a trailing ', <City>, <ST>' or ' – <City>, <ST>'
+ *  ('Patient Access Representative Job – Dallas, TX'). Returns ''
+ *  when the title names no place — 'Location Manager' (no state)
+ *  and 'Relocation' never match. Never a guess: the chunk must
+ *  contain a real state abbreviation or name. */
+export function locationFromTitle(title: string): string {
+  const t = (title ?? '').trim();
+  if (!t) return '';
+  const stateAbbrs = new Set(STATE_NAMES.map(([, a]) => a));
+  const stateNames = new Set(STATE_NAMES.map(([n]) => n));
+  const hasState = (chunk: string): boolean => {
+    const words = chunk.toLowerCase().split(/[^a-z]+/).filter(Boolean);
+    return words.some((w) => stateAbbrs.has(w) || stateNames.has(w));
+  };
+  // Pattern A: a literal 'Location' marker, with or without a colon.
+  const mA = t.match(
+    /\blocation\s*:?\s+([A-Za-z][A-Za-z .',-]*?)(?:\s+united states\b|\s+jobs\b|\s+category\b|\s*$)/i,
+  );
+  if (mA) {
+    const chunk = mA[1].trim().replace(/[,.\s]+$/, '');
+    if (chunk && hasState(chunk)) return chunk;
+  }
+  // Pattern B: a trailing place after a dash or a comma.
+  const mB = t.match(/(?:[-–—]|,)\s*([A-Za-z][A-Za-z .'-]*?),\s*([A-Za-z]{2})\s*$/);
+  if (mB && stateAbbrs.has(mB[2].toLowerCase())) {
+    return `${mB[1].trim()}, ${mB[2].toUpperCase()}`;
+  }
+  return '';
+}
+
 /** De-slugify a job-detail URL into a role title: the role segment is
  *  the last slug-like segment that is not a bare id and not a generic
  *  path word. iCIMS: /jobs/80868/customer-service-expert/job ->
@@ -982,6 +1022,22 @@ export function isJunkTitle(title: string): boolean {
   // agents careers', 'Current Career Opportunities'.
   if (/^\s*jobs?\b/i.test(t)) return true;
   if (/\b(jobs|careers|openings|positions|roles|opportunities)\s*$/i.test(t)) return true;
+  // A bare category / department label is never a role: 'Support
+  // Services' (Beaufort Memorial, Carl T. Hayden VA, Hoag, Overlake
+  // — all four became board jobs at 60, 2026-11-12 verify-401).
+  // Three words at most, ending in plural 'services', naming no
+  // served party and no role word except 'support' itself. Scoped
+  // to 'services' only: 'Phone Support' is a real ModSquad role and
+  // must survive (it ends in 'support', not 'services'), and so do
+  // 'Customer Service Support' and 'Technical Customer Support'
+  // (they name who is served).
+  const words = t.split(/\s+/);
+  if (words.length <= 3 && /\bservices$/i.test(t)) {
+    const toks = new Set(tokenize(t));
+    const namesServedParty = [...toks].some((w) => CS_SERVED_PARTY_WORDS.has(w));
+    const namesRole = [...toks].some((w) => ROLE_WORDS.has(w) && w !== 'support');
+    if (!namesServedParty && !namesRole) return true;
+  }
   return false;
 }
 
@@ -997,6 +1053,13 @@ export function isJobDetailUrl(rawUrl: string): boolean {
   } catch {
     return false;
   }
+  // An aggregator is never a posting source: a LinkedIn / Indeed /
+  // Glassdoor link is a link TO a board, not one job on the business
+  // page — the walk used to follow a company's LinkedIn link and
+  // extract its postings as the company's own (Shore United Bank,
+  // 2026-11-12 verify-401: 25 LinkedIn leads). Checked before the
+  // query-param rule: a board URL with an id param is still a board.
+  if (isAggregatorUrl(rawUrl)) return false;
   // Explicit detail query params first — a list page never carries
   // one, and Concentrix's real detail links are /job/?id=R1779018
   // (whose last path segment, 'job', would otherwise veto below).
@@ -1004,6 +1067,22 @@ export function isJobDetailUrl(rawUrl: string): boolean {
   for (const k of ['id', 'jobid', 'job_id', 'gh_jid', 'req', 'reqid', 'job', 'position', 'posting']) {
     const v = q.get(k);
     if (v && v.trim()) return true;
+  }
+  // A blog host or blog path is never one job: Providence Swedish's
+  // blog post 'Benefits that support you at every stage in your
+  // career' became a board job at 60 (2026-11-12 verify-401) because
+  // blog.providenceswedish.jobs/ passed the marker rule. The path
+  // words match isJunkRenderPath's set.
+  const hostFirstLabel = u.hostname.split('.')[0].toLowerCase();
+  if (
+    hostFirstLabel === 'blog' ||
+    u.pathname
+      .toLowerCase()
+      .split('/')
+      .filter(Boolean)
+      .some((s) => /^(blog|category|categories|tag|tags|news|press|author|authors|events|event)$/.test(s))
+  ) {
+    return false;
   }
   const segs = u.pathname.toLowerCase().replace(/\/+$/, '').split('/').filter(Boolean);
   if (segs.length === 0) return false; // portal root: a list, not a job
@@ -1049,6 +1128,16 @@ export function isJobDetailUrl(rawUrl: string): boolean {
   if (/^(search|results|browse|find|list)/i.test(last) || /[?&]p(ag)?=\d/i.test(rawUrl)) {
     return false;
   }
+  // No multi-topic veto here: a category path stacks topic segments
+  // after the first marker (/careers/career-areas/support-services,
+  // Beaufort Memorial), but so does a real detail URL — TalentBrew's
+  // /en/job/las-vegas/customer-service-representative/44028/<id> and
+  // Teleperformance's /en-us/careers/job-opportunities/<role>/ both
+  // carry a city/category segment before the role slug, and a veto
+  // on stacked segments killed them (2026-11-12 round-21 local
+  // round: 11 pre-existing tests failed). A category page is killed
+  // by its TITLE instead (isJunkTitle's bare-category rule: the
+  // Beaufort/Overlake titles are literally 'Support Services').
   // A job marker as a full segment or a segment start:
   // /jobs/frontend-developer, /careers/frontend, /career-details,
   // /position/123. NOT a marker buried mid-segment: /about-careers/
@@ -1617,6 +1706,74 @@ export function atsHostBonus(u: string): number {
   }
 }
 
+/** Hosts a posting's apply URL may live on, beyond the searched
+ *  company's own hosts: the known ATS / widget hosts, the municipal
+ *  portal governmentjobs.com, and any .gov host (a government
+ *  employer's own hiring portal — workforindiana.in.gov,
+ *  jobs.virginia.gov). Anything else means the posting belongs to
+ *  another organization: PEAK Grantmaking's board lists other orgs'
+ *  jobs (disasterphilanthropy.org, akoyago.com) and the Pennsylvania
+ *  Municipal League's page links out to ICMA's board (icma.org) —
+ *  none of those are the roster company's job, whatever the title
+ *  says (2026-11-12 verify-401). 'paycor', 'e3applicants' and
+ *  'isolvedhire' are ATS hosts missing from ATS_HOST_SIGNS (their
+ *  portals are real sources: NexRep's Paylocity, LifeWorks NW's
+ *  e3applicants, Halvik's iSolved iframe); the board hosts
+ *  (greenhouse, lever, ashby, jazz, applytojob) are apply hosts,
+ *  not sources — a page-embedded Greenhouse widget's apply link is
+ *  legitimate. Aggregators are refused outright, even if one were
+ *  somehow among the company hosts. */
+const APPLY_HOST_SIGNS = [
+  ...ATS_HOST_SIGNS,
+  'paycor',
+  'e3applicants',
+  'isolvedhire',
+  'greenhouse',
+  'lever',
+  'ashbyhq',
+  'jazz',
+  'applytojob',
+];
+
+/** True when a posting's apply URL belongs to the searched company
+ *  or to one of its legitimate hiring systems. `companyHosts` are
+ *  the website + careersUrl hosts (bare domains, www stripped —
+ *  subdomains of them count, and so do SIBLING subdomains of a
+ *  subdomain company host: the company's careers page lives on
+ *  careers.concentrix.com while its portal is jobs.concentrix.com
+ *  — same apex, same company — and the Wisconsin Center for
+ *  Education Research (wcer.wisc.edu) posts on jobs.wisc.edu. The
+ *  apex strip only runs on 3+-label hosts: stripping 'uhd.edu' to
+ *  'edu' would allow any .edu host. Pass an empty list to skip the
+ *  check (the offline screenPostings tests do). Trade-off, accepted:
+ *  a sub-unit whose jobs live on a parent portal that shares no
+ *  apex with its own domain (UHD, uhd.edu, on careers.uh.edu) is
+ *  rejected — the evidenced case is an on-site Houston job Eric
+ *  cannot take anyway, and a parent portal is indistinguishable
+ *  from another org's board by host alone when the domains share
+ *  nothing. */
+export function isAllowedApplyHost(url: string, companyHosts: string[]): boolean {
+  if (!url || isAggregatorUrl(url)) return false;
+  let host = '';
+  try {
+    host = new URL(url).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  for (const h of companyHosts) {
+    const hh = h.toLowerCase();
+    if (host === hh || host.endsWith(`.${hh}`)) return true;
+    const parts = hh.split('.');
+    if (parts.length >= 3) {
+      const apex = parts.slice(1).join('.');
+      if (host === apex || host.endsWith(`.${apex}`)) return true;
+    }
+  }
+  if (host === 'governmentjobs.com' || host.endsWith('.governmentjobs.com')) return true;
+  if (host.endsWith('.gov')) return true;
+  return APPLY_HOST_SIGNS.some((s) => host.includes(s));
+}
+
 export function renderTargetScore(u: string, careersUrl: string): number {
   let score = 0;
   try {
@@ -1863,6 +2020,15 @@ export async function searchCompanyJobs(
 ): Promise<CompanySearchResult> {
   const careersUrl = company.careersUrl || '';
   const website = company.website || '';
+  // The hosts a posting's apply URL may live on: the company's own
+  // website + careers hosts. Threaded into every screenPostings
+  // call — a listing on another org's site is that org's job, not
+  // this company's (see isAllowedApplyHost).
+  const allowedHosts: string[] = [];
+  for (const site of [website, careersUrl]) {
+    const d = site ? domainOf(site) : '';
+    if (d && !allowedHosts.includes(d)) allowedHosts.push(d);
+  }
   const triedUrls: string[] = [];
   // Only pages on the business site are ever fetched: a careers link
   // the user gave (it names the company's own careers page), plus the
@@ -2030,7 +2196,7 @@ export async function searchCompanyJobs(
         // Solutions' jobs homepage below its own blog pages
         // (2026-11-12 canary) and the render went to the blog.
         readWithPostings.add(u);
-        const screened = screenPostings(company.name, pagePostings, resumeText, company.isUSCompany ?? false);
+        const screened = screenPostings(company.name, pagePostings, resumeText, company.isUSCompany ?? false, allowedHosts);
         // A page whose postings ALL die as no-match is not the list
         // — either the extractor misread the page (Teleperformance's
         // values page: two junk "postings", 2026-11-12 canary) or the
@@ -2215,7 +2381,7 @@ export async function searchCompanyJobs(
         );
         if (pagePostings.length > 0) {
           renderUsed = true;
-          const screened = screenPostings(company.name, pagePostings, resumeText, company.isUSCompany ?? false);
+          const screened = screenPostings(company.name, pagePostings, resumeText, company.isUSCompany ?? false, allowedHosts);
           // The walk's rule, mirrored here: a rendered page whose
           // postings ALL die as no-match is not the list either
           // (Teleperformance's values page scores 10 as a render
@@ -2288,7 +2454,7 @@ export async function searchCompanyJobs(
   // yielded postings.
   const fb = fallbackPostings ?? renderFallback;
   if (fb) {
-    const screened = screenPostings(company.name, fb.postings, resumeText, company.isUSCompany ?? false);
+    const screened = screenPostings(company.name, fb.postings, resumeText, company.isUSCompany ?? false, allowedHosts);
     return {
       leads: screened.leads,
       postingsSeen: fb.postings.length,
@@ -2490,7 +2656,12 @@ const ROLE_WORDS = new Set([
   'operator',
   'attendant',
   'nurse',
-  'teacher',
+  // 'teacher' was here and is deliberately NOT a role word: a
+  // teaching role ('Certified Teacher of the Visually Impaired ...
+  // Specialist - Washington Service') passed the CS gate on
+  // 'teacher' + 'service' (2026-11-12 verify-401) — no real CS
+  // role is titled Teacher, and 'specialist' in the same title
+  // still needs its own qualifier.
   // 'expert' IS the role at iCIMS-style boards: Teleperformance titles
   // its reps 'Customer Service Expert' / 'Customer Expert' — without
   // it the gate rejects a real CS role outright (2026-11-12 probe).
@@ -2499,6 +2670,18 @@ const ROLE_WORDS = new Set([
   // term and scores 55, a near-miss).
   'expert',
 ]);
+
+/** Posting sources whose provenance IS the company's own page: an
+ *  embedded widget (JazzHR / iSolved / Greenhouse) or JSON-LD in the
+ *  page itself. Their apply URLs are the company's own hiring links
+ *  by construction — the host check is for listings parsed off a
+ *  page, where the page itself may belong to another org (PEAK's
+ *  job-board page, PML's icma.org link). Without this, a Greenhouse
+ *  embed whose absolute_url is the company's real domain (houserx.com)
+ *  dies when the test company is addressed by its .example stand-in
+ *  — and in production a widget on a niche ATS the allowlist never
+ *  heard of would die the same way. */
+const WIDGET_SOURCES = new Set(['jazzhr', 'isolved', 'greenhouse', 'jsonld']);
 
 /** Score postings against the resume. A posting is scored when at
  *  least one resume term matches (exact or synonym) in its title or
@@ -2524,6 +2707,7 @@ export function screenPostings(
   postings: Posting[],
   resumeText: string,
   isUSCompany: boolean = false,
+  allowedHosts: string[] = [],
 ): ScreenedPostings {
   const resumeTerms = extractResumeTerms(resumeText);
   const resumeSet = new Set(resumeTerms);
@@ -2549,8 +2733,42 @@ export function screenPostings(
       noteRejected(p, 'no-match');
       continue;
     }
+    // Attribution: the posting must belong to THIS company. A
+    // listing whose apply link lives on another organization's
+    // site is that org's job, not this company's — PEAK
+    // Grantmaking's board lists other orgs' jobs, the Pennsylvania
+    // Municipal League's page links out to ICMA's board
+    // (2026-11-12 verify-401). Widget / JSON-LD postings are
+    // exempt: their provenance is the company's own page (see
+    // WIDGET_SOURCES). Skipped when no hosts are given.
+    if (
+      allowedHosts.length > 0 &&
+      p.url &&
+      !(p.source && WIDGET_SOURCES.has(p.source)) &&
+      !isAllowedApplyHost(p.url, allowedHosts)
+    ) {
+      rejectedNoMatch += 1;
+      noteRejected(p, 'no-match');
+      continue;
+    }
     if (isCsResume) {
-      const titleWords = new Set(tokenize(p.title));
+      // The gate reads the ROLE PHRASE, not the whole title. A
+      // trailing division/department suffix ('– Account Management,
+      // Marketing, and Customer Programs Division') names the org
+      // chart, not the role — 'Customer' there is not the role
+      // serving customers (San Jose Clean Energy's energy-program
+      // managers passed on it, 2026-11-12 verify-401). Only the
+      // last dash-segment is stripped: 'Manager – Customer Service
+      // – Operations Division' keeps its 'Customer Service'. And
+      // 'on-call' is a schedule, not the verb 'call' — tokenize
+      // splits it into 'on' + 'call', so a housekeeping
+      // 'Environmental Services Technician-PRN on-call' passed the
+      // gate on 'call'. Both are neutralized here, for the gate
+      // only: scoring still reads the full title.
+      const gateTitle = p.title
+        .replace(/\s+[–—-]\s+[^–—\n-]*\b(division|department)\b[^\n]*$/i, '')
+        .replace(/\bon-call\b/gi, 'oncall');
+      const titleWords = new Set(tokenize(gateTitle));
       // Literal words only: namesCsWork must see the word itself in
       // the title. The old check used synonym-credited terms, so a
       // 'Specialist' title credited 'agent' and passed as CS work.
@@ -2580,7 +2798,12 @@ export function screenPostings(
         continue;
       }
     }
-    const loc = locationVerdict(p.location, `${p.title} ${p.description}`, isUSCompany);
+    // The title itself may state the place when the location line
+    // is blank (Public Storage's '... Manager Location Whitestown
+    // In United States ...', 2026-11-12 verify-401) — the location
+    // check reads the effective location, and the lead carries it.
+    const effLoc = p.location || locationFromTitle(p.title);
+    const loc = locationVerdict(effLoc, `${p.title} ${p.description}`, isUSCompany);
     if (loc.verdict === 'reject') {
       rejectedLocation += 1;
       noteRejected(p, 'location');
@@ -2636,7 +2859,7 @@ export function screenPostings(
     leads.push({
       company,
       title: p.title,
-      location: p.location,
+      location: effLoc,
       locationFlag: loc.flag,
       salaryText: parsePay(p.description),
       applyUrl: p.url,
