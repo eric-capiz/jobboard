@@ -854,7 +854,12 @@ function locationIn(text: string): string {
  *  or a truncated state name — 'Virg' maps by name prefix) or it
  *  returns '' — a plain title slug (/job/customer-service-
  *  representative/123/) proves no location and must never become
- *  one. Never a guess. */
+ *  one. Never a guess. Also the PageUp shape, /jobs/<role-slug>-
+ *  <city>-<st>-<state>-united-states[-<uuid>] (careers.kenyon.edu),
+ *  handled by locationFromTrailingCountrySlug below: the slug must
+ *  end in an explicit country marker (-united-states, -usa, -us),
+ *  before which a US state (abbreviation and/or full name, agreeing
+ *  when both are present) and before that a single-token city. */
 export function locationFromJobSlug(rawUrl: string): string {
   let path = '';
   try {
@@ -863,6 +868,13 @@ export function locationFromJobSlug(rawUrl: string): string {
     return '';
   }
   const segs = path.replace(/\/+$/, '').split('/').filter(Boolean);
+  // PageUp shape: /jobs/<role-slug>-<city>-<st>-<state>-united-
+  // states[-<uuid>] — the same rescue as the Phenom slug, for the
+  // trailing-location-suffix shape (Philander Chase's two leads,
+  // 2026-11-12: blank location, own apply URLs say Gambier, OH).
+  if (segs.length === 2 && segs[0].toLowerCase() === 'jobs') {
+    return locationFromTrailingCountrySlug(segs[1]);
+  }
   if (segs.length !== 3 || segs[0].toLowerCase() !== 'job') return '';
   if (!/^\d+$/.test(segs[2])) return '';
   const tokens = segs[1].split('-').filter(Boolean);
@@ -892,6 +904,114 @@ export function locationFromJobSlug(rawUrl: string): string {
   const st = stateOf(last);
   if (!st) return '';
   return `${first}, ${st}`;
+}
+
+/** The location a PageUp-style job URL carries in its slug:
+ *  /jobs/<role-slug>-<city>-<st>-<state>-united-states[-<uuid>]
+ *  (careers.kenyon.edu: /jobs/customer-service-and-sales-
+ *  associate-part-time-gambier-oh-ohio-united-states-ecbb1ca2-
+ *  22bd-412d-a2f7-711e87e71a04, /jobs/technology-support-
+ *  specialist-gambier-oh-ohio-united-states). Same rescue as the
+ *  Phenom slug above, for the trailing-location-suffix shape round
+ *  21 fix #3 missed: Philander Chase's two leads read blank and
+ *  passed as 'no location listed — US company' while their own
+ *  apply URLs say Gambier, OH on-site (2026-11-12). The slug must
+ *  end in an explicit country marker (-united-states, -usa, -us;
+ *  a UUID tail after the marker is allowed) — the marker is what
+ *  proves the tail is a location block, not title words. Before
+ *  it, a US state (2-letter abbreviation and/or full name — when
+ *  both are present they MUST agree) and before that a single-
+ *  token city. A standalone 'remote' token in the city slot (or
+ *  as the whole location block) reads Remote. Anything else
+ *  returns '' — a plain title slug, a state abbreviation with no
+ *  country marker, and a marker with no resolvable state all
+ *  prove no location and must never become one. Never a guess:
+ *  only a single-token city is read (a multi-word city boundary
+ *  cannot be told from the tail alone), and a wrong city is
+ *  harmless anyway — it still reads as an on-site location and
+ *  the lead is location-rejected, never auto-added. */
+function locationFromTrailingCountrySlug(slug: string): string {
+  const tokens = slug.split('-').filter(Boolean);
+  if (tokens.length < 3) return '';
+  if (!tokens.every((t) => /^[A-Za-z0-9]+$/.test(t))) return '';
+  const lower = tokens.map((t) => t.toLowerCase());
+  // The country marker, at the end of the slug modulo a UUID tail.
+  // Take the rightmost marker, so a 'us'/'usa' inside the role
+  // slug cannot shadow the real marker at the tail.
+  let markerStart = -1; // index of the first marker token
+  let markerEnd = -1; // index just past the last marker token
+  for (let i = 0; i < lower.length; i++) {
+    if (lower[i] === 'united' && lower[i + 1] === 'states') {
+      markerStart = i;
+      markerEnd = i + 2;
+    } else if (lower[i] === 'usa' || lower[i] === 'us') {
+      markerStart = i;
+      markerEnd = i + 1;
+    }
+  }
+  if (markerStart < 0) return '';
+  // After the marker only a PageUp UUID may follow (hex groups
+  // 8-4-4-4-12, or one 32-hex token); anything else is not the
+  // trailing-location shape.
+  const tail = lower.slice(markerEnd);
+  const isUuidTail =
+    tail.length === 0 ||
+    (tail.length === 5 &&
+      [8, 4, 4, 4, 12].every((n, i) => tail[i].length === n && /^[0-9a-f]+$/.test(tail[i]))) ||
+    (tail.length === 1 && tail[0].length === 32 && /^[0-9a-f]+$/.test(tail[0]));
+  if (!isUuidTail) return '';
+  // The location block is the tokens before the marker; at least
+  // one role word must precede it, so a bare 'remote-united-
+  // states' proves nothing.
+  const loc = lower.slice(0, markerStart);
+  if (loc.length < 2) return '';
+  const stateOfName = (name: string): string => {
+    const hit = STATE_NAMES.find(([n]) => n === name);
+    return hit ? hit[1].toUpperCase() : '';
+  };
+  const stateOfAbbr = (tok: string): string => {
+    if (!/^[a-z]{2}$/.test(tok)) return '';
+    const hit = STATE_NAMES.find(([, a]) => a === tok);
+    return hit ? hit[1].toUpperCase() : '';
+  };
+  let n = loc.length;
+  let st = '';
+  // Full state name: two tokens ('new york') before one ('ohio').
+  if (n >= 2) {
+    const two = stateOfName(`${loc[n - 2]} ${loc[n - 1]}`);
+    if (two) {
+      st = two;
+      n -= 2;
+    }
+  }
+  if (!st && n >= 1) {
+    const one = stateOfName(loc[n - 1]);
+    if (one) {
+      st = one;
+      n -= 1;
+    }
+  }
+  // Abbreviation before the name, when present; it must agree.
+  if (n >= 1) {
+    const ab = stateOfAbbr(loc[n - 1]);
+    if (ab) {
+      if (st && ab !== st) return '';
+      if (!st) st = ab;
+      n -= 1;
+    }
+  }
+  if (!st) {
+    // No state: only a standalone 'remote' location token proves
+    // anything — the role slug's own words prove no place.
+    return loc[n - 1] === 'remote' ? 'Remote' : '';
+  }
+  // The token before the state is the city. A missing city (the
+  // whole location block was just the state) proves nothing.
+  if (n < 1) return '';
+  const city = loc[n - 1];
+  if (!/^[a-z]{2,}$/.test(city)) return '';
+  if (city === 'remote') return `Remote, ${st}`;
+  return `${city.charAt(0).toUpperCase()}${city.slice(1)}, ${st}`;
 }
 
 /** The place a job TITLE states when the location line is blank:
@@ -1175,6 +1295,15 @@ export function parseCareersPage(html: string, pageUrl: string): Posting[] {
   const clean = html
     .replace(/<script[\s\S]*?<\/script>/gi, '')
     .replace(/<style[\s\S]*?<\/style>/gi, '');
+  // A detail page IS one job, so its own location is the role's
+  // location: carry it onto any posting parsed with a blank location
+  // (Strategy F's slug-derived title has no card to read one from,
+  // so the SmartRecruiters APPLY NOW parse on a Public Storage
+  // detail page went out blank and scored 60 while the page itself
+  // says Whitestown, Indiana — 2026-11-12 verify-401). List pages
+  // hold many roles, so no single page location exists there and
+  // this stays '' — list behavior is untouched.
+  const pageLocation = isJobDetailUrl(pageUrl) ? locationIn(clean) : '';
   const postings: Posting[] = [];
   const seen = new Set<string>();
   const seenUrls = new Set<string>(); // URLs already pushed, so Strategy F can skip them.
@@ -1190,8 +1319,13 @@ export function parseCareersPage(html: string, pageUrl: string): Posting[] {
     seenUrls.add(url);
     // A card with no readable location still carries one in its
     // Phenom slug — read it there rather than passing the role on
-    // as blank-location (Sitel's Retention role, 2026-11-12).
-    postings.push({ title, location: location || locationFromJobSlug(url), url, description: '', postedDate: '' });
+    // as blank-location (Sitel's Retention role, 2026-11-12). On a
+    // job-detail page the page itself states the place, so a parse
+    // that is still blank after the slug takes the page location
+    // (Public Storage detail page, round 22 fix 1).
+    // Same for the PageUp trailing-location slug (Philander Chase,
+    // 2026-11-12: Gambier, OH in the apply URL, blank on the card).
+    postings.push({ title, location: location || locationFromJobSlug(url) || pageLocation, url, description: '', postedDate: '' });
   };
   // Strategy A: job blocks. The splitter fires on a class/id that
   // mentions a job word — but NOT a bare location element: a
@@ -2900,6 +3034,28 @@ function jobDedupeKey(title: string, company: string): string {
   return `${normalizeKey(title)}|${normalizeKey(company)}`;
 }
 
+/** Board-wide apply-URL normalizer for the auto-add dedupe: the same
+ *  posting filed under two roster companies (e.g. a Davis Theatre
+ *  listing that is the exact Troy University posting) must land on
+ *  the board once, not once per company. Query strings and fragments
+ *  are tracking noise (?utm_source=, ?oga=true), a trailing slash is
+ *  cosmetic, the host is case-insensitive, and the scheme is
+ *  irrelevant — all stripped so those variants count as the same
+ *  posting. A URL that
+ *  will not parse falls back to its trimmed, lowercased raw form so
+ *  it still dedupes deterministically instead of throwing. */
+function normalizeApplyUrl(rawUrl: string): string {
+  const raw = (rawUrl ?? '').trim();
+  if (!raw) return '';
+  try {
+    const u = new URL(raw);
+    const path = u.pathname.replace(/\/+$/, '');
+    return `${u.hostname.toLowerCase()}${path}`;
+  } catch {
+    return raw.toLowerCase();
+  }
+}
+
 function deriveTailoredFileName(company: string): string {
   const clean = (company ?? '').trim().replace(/[\\/:*?"<>|]/g, '').trim();
   return clean ? `Eric_${clean}_Resume` : 'Eric_Resume';
@@ -2921,7 +3077,12 @@ export interface AutoAddedLead {
  *  in the exact shape the UI's addJob creates. Only leads at 60%+
  *  with a confirmed US-remote location qualify — needsReview leads
  *  never auto-add, whatever the score, and neither do sub-60 leads.
- *  Dedupe is by title+company against the board AND within the batch.
+ *  Dedupe is by title+company against the board AND within the batch,
+ *  and ALSO by normalized applyUrl board-wide and within the batch:
+ *  the same posting filed under two roster companies (same title AND
+ *  same applyUrl) is added once. The title+company dedupe stays —
+ *  it catches re-posts whose URL changed — the URL dedupe catches
+ *  the cross-company duplicates it cannot see.
  *  The write is guarded by the state doc's updatedAt (optimistic
  *  concurrency): if another writer moved the doc between the read and
  *  the write, the update matches nothing and the whole step retries
@@ -2942,11 +3103,21 @@ export async function autoAddLeadsToBoard(
     const existing = new Set<string>(
       (doc.state.jobs as any[]).map((j) => jobDedupeKey(j.title ?? '', j.company ?? '')),
     );
+    const existingUrls = new Set<string>(
+      (doc.state.jobs as any[])
+        .map((j) => normalizeApplyUrl(j.applyUrl ?? ''))
+        .filter((u) => u !== ''),
+    );
     const seen = new Set<string>();
+    const seenUrls = new Set<string>();
     const fresh = qualifying.filter((l) => {
       const k = jobDedupeKey(l.title, l.company);
       if (existing.has(k) || seen.has(k)) return false;
+      // Board-wide URL dedupe: same posting under another company.
+      const u = normalizeApplyUrl(l.applyUrl ?? '');
+      if (u !== '' && (existingUrls.has(u) || seenUrls.has(u))) return false;
       seen.add(k);
+      if (u !== '') seenUrls.add(u);
       return true;
     });
     if (fresh.length === 0) return { added: 0, addedLeads: [] };

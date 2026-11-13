@@ -6242,6 +6242,266 @@ async function testRound21() {
   );
 }
 
+async function testRound22Fix1() {
+  // Round 22 fix 1 (2026-11-12): a Public Storage DETAIL page
+  // produced two parses of one role — Strategy A read the located
+  // posting off the job-info block (rejected on location, correct),
+  // while Strategy F's slug-derived parse off the SmartRecruiters
+  // APPLY NOW anchor went out with a BLANK location and scored 60,
+  // so it would auto-add in the sweep. The page IS one job, so its
+  // own location now carries onto blank parses from detail pages.
+  const jobsMod = freshRequire(`${OUT}/find-jobs.cjs`);
+  const csResume =
+    'Customer service representative with phone support experience, technical support, troubleshooting, billing questions, and help desk work for members';
+  const detailUrl =
+    'https://www.publicstoragejobs.com/jobs/customer-service-self-storage-manager-location-whitestown-in-united-states-jobs-category-customer-service-744000161367179';
+  const detailHtml = `<html><body>
+<div class="job-info">
+  <h2>Customer Service - Self Storage Manager</h2>
+  <ul class="listing-details"><li>Location: Whitestown, Indiana, us</li><li>Full Time</li></ul>
+  <a href="${detailUrl}">View job</a>
+</div>
+<div class="apply-button"><a href="https://jobs.smartrecruiters.com/PublicStorage/744000161367179-customer-service-self-storage-manager?oga=true&amp;utm_source=HireClixCS">APPLY NOW</a></div>
+</body></html>`;
+  const parsed = jobsMod.parseCareersPage(detailHtml, detailUrl);
+  const slugParsed = parsed.find(
+    (p) => p.title === 'Customer Service Self Storage Manager' && p.url.includes('smartrecruiters.com'),
+  );
+  check(
+    'round22 fix1: Strategy F parse off a detail page carries the page location',
+    !!slugParsed && slugParsed.location === 'Whitestown, Indiana, us',
+    parsed,
+  );
+  check(
+    'round22 fix1: no blank-location parse survives off a detail page',
+    parsed.length > 0 && parsed.every((p) => p.location !== ''),
+    parsed,
+  );
+  // End to end: the detail page yields 0 leads after screening —
+  // every parse is rejected on the on-site location.
+  const screened = jobsMod.screenPostings(
+    'Public Storage',
+    parsed,
+    csResume,
+    true,
+    ['publicstorage.com', 'publicstoragejobs.com'],
+  );
+  check(
+    'round22 fix1: Public Storage detail page yields 0 leads after screening',
+    screened.leads.length === 0 && screened.rejectedLocation === parsed.length,
+    screened,
+  );
+  // Guard: list pages are unaffected — a card with no location on a
+  // list page stays blank-location (it is not one job's detail page,
+  // so no page location exists to carry).
+  const listHtml = `<html><body>
+<div class="job-listing"><h3>Customer Service Representative</h3><p>Location: Remote</p><a href="/jobs/customer-service-representative">Apply</a></div>
+<div class="job-listing"><h3>Customer Service Representative</h3><a href="/jobs/customer-service-representative-2">Apply</a></div>
+</body></html>`;
+  const listParsed = jobsMod.parseCareersPage(listHtml, 'https://listco.example/careers');
+  check(
+    'round22 fix1: list page with a location-less card stays blank-location',
+    listParsed.length === 2 &&
+      listParsed[0]?.location === 'Remote' &&
+      listParsed[1]?.location === '',
+    listParsed,
+  );
+}
+
+async function testRound22() {
+  // Batch 22 (2026-11-12): cross-company applyUrl dedupe in auto-add.
+  // autoAddLeadsToBoard deduped only by title+company, so the same
+  // posting filed under two roster companies — the Davis Theatre
+  // duplicates were the exact same postings as the verified Troy
+  // University jobs — would land on the board twice. The URL dedupe
+  // below sits alongside the title+company dedupe, not instead of it.
+  const jobsMod = freshRequire(`${OUT}/find-jobs.cjs`);
+  const seedState = () => {
+    const col = new FakeCollection();
+    col.docs.push({
+      _id: 'jobboard',
+      state: { version: 1, jobs: [], masterResumes: [], settings: {} },
+      updatedAt: '2026-11-12T00:00:00.000Z',
+    });
+    return col;
+  };
+  const boardJobs = (col) => col.docs.find((d) => d._id === 'jobboard')?.state?.jobs ?? [];
+  const mkLead = (over) => ({
+    company: 'Troy University',
+    title: 'Call Center Representative',
+    location: 'Remote',
+    locationFlag: '',
+    salaryText: '',
+    applyUrl: 'https://troy.example/jobs/call-center-rep',
+    description: '',
+    postedDate: '',
+    matchScore: 70,
+    strengths: [],
+    gaps: [],
+    reasons: [],
+    needsReview: false,
+    sourceType: 'html',
+    ...over,
+  });
+
+  // (1) Same applyUrl under two different companies -> added ONCE.
+  // Same title too (the Davis Theatre / Troy University shape), and
+  // again with a different title, so the URL — not the title — is
+  // what dedupes.
+  const col1 = seedState();
+  const cross = await jobsMod.autoAddLeadsToBoard(col1, [
+    mkLead({ company: 'Troy University' }),
+    mkLead({ company: 'Davis Theatre', applyUrl: 'https://troy.example/jobs/call-center-rep' }),
+    mkLead({ company: 'Davis Theatre', title: 'Box Office Associate', applyUrl: 'https://troy.example/jobs/call-center-rep' }),
+  ], 'demo-customer-service');
+  check(
+    'round22: same applyUrl under two companies adds once',
+    cross.added === 1 && boardJobs(col1).length === 1 && boardJobs(col1)[0]?.company === 'Troy University',
+    cross,
+  );
+  // The same URL already on the board blocks a later batch too.
+  const crossAgain = await jobsMod.autoAddLeadsToBoard(col1, [
+    mkLead({ company: 'Davis Theatre', applyUrl: 'https://troy.example/jobs/call-center-rep' }),
+  ], 'demo-customer-service');
+  check(
+    'round22: applyUrl already on the board blocks a later batch',
+    crossAgain.added === 0 && boardJobs(col1).length === 1,
+    crossAgain,
+  );
+
+  // (2) The URL dedupe must not over-dedupe: distinct URLs with
+  // distinct titles both add. (Same title+company with a different
+  // URL still adds once — the pre-existing title+company dedupe
+  // fires there, and it stays in place.)
+  const col2 = seedState();
+  const sameKey = await jobsMod.autoAddLeadsToBoard(col2, [
+    mkLead({ applyUrl: 'https://troy.example/jobs/call-center-rep' }),
+    mkLead({ applyUrl: 'https://troy.example/jobs/call-center-rep-2' }),
+  ], 'demo-customer-service');
+  check(
+    'round22: title+company dedupe still fires for a re-posted URL',
+    sameKey.added === 1 && boardJobs(col2).length === 1,
+    sameKey,
+  );
+  const col2b = seedState();
+  const distinctTitles = await jobsMod.autoAddLeadsToBoard(col2b, [
+    mkLead({ title: 'Call Center Representative', applyUrl: 'https://troy.example/jobs/a' }),
+    mkLead({ title: 'Customer Service Representative', applyUrl: 'https://troy.example/jobs/b' }),
+  ], 'demo-customer-service');
+  check(
+    'round22: different URLs with different titles both add (no over-dedupe)',
+    distinctTitles.added === 2 && boardJobs(col2b).length === 2,
+    distinctTitles,
+  );
+
+  // (3) A URL differing only by query params / trailing slash /
+  // host case counts as a duplicate.
+  const col3 = seedState();
+  const tracked = await jobsMod.autoAddLeadsToBoard(col3, [
+    mkLead({ company: 'Troy University', applyUrl: 'https://troy.example/jobs/call-center-rep' }),
+    mkLead({ company: 'Davis Theatre', applyUrl: 'https://troy.example/jobs/call-center-rep?utm_source=indeed' }),
+    mkLead({ company: 'Davis Theatre', title: 'Box Office Associate', applyUrl: 'https://TROY.example/jobs/call-center-rep/?oga=true' }),
+    mkLead({ company: 'Davis Theatre', title: 'Usher', applyUrl: 'https://troy.example/jobs/call-center-rep#apply' }),
+  ], 'demo-customer-service');
+  check(
+    'round22: query params, trailing slash, host case and fragment do not defeat the URL dedupe',
+    tracked.added === 1 && boardJobs(col3).length === 1,
+    tracked,
+  );
+
+  // Scheme is irrelevant: the same posting over http vs https is one
+  // posting (merge-time fold-in — the normalizer drops the scheme;
+  // same host+path can only be the same posting).
+  const col4 = seedState();
+  const scheme = await jobsMod.autoAddLeadsToBoard(col4, [
+    mkLead({ company: 'Troy University', applyUrl: 'https://troy.example/jobs/call-center-rep' }),
+    mkLead({ company: 'Davis Theatre', applyUrl: 'http://troy.example/jobs/call-center-rep' }),
+  ], 'demo-customer-service');
+  check(
+    'round22: http vs https variants of the same posting add once',
+    scheme.added === 1 && boardJobs(col4).length === 1,
+    scheme,
+  );
+}
+
+async function testRound22Fix3() {
+  // Round 22 fix 3 (2026-11-12): URL-slug trailing location suffix.
+  // Philander Chase's two leads read blank and passed as 'no
+  // location listed — US company', while their own PageUp apply
+  // URLs state Gambier, OH on-site (evidence:
+  // ~/workspace/jobboard/r22-live/philander-chase.json).
+  const jobsMod = freshRequire(`${OUT}/find-jobs.cjs`);
+
+  // (1) Both real Philander Chase URL shapes read Gambier, OH —
+  // with the UUID tail, and without it.
+  check(
+    'round22 fix3: both Philander Chase PageUp slugs read Gambier, OH',
+    jobsMod.locationFromJobSlug(
+      'https://careers.kenyon.edu/jobs/customer-service-and-sales-associate-part-time-gambier-oh-ohio-united-states-ecbb1ca2-22bd-412d-a2f7-711e87e71a04',
+    ) === 'Gambier, OH' &&
+      jobsMod.locationFromJobSlug(
+        'https://careers.kenyon.edu/jobs/technology-support-specialist-gambier-oh-ohio-united-states',
+      ) === 'Gambier, OH',
+    null,
+  );
+  // Abbr-only, name-only, and -usa markers read the same place.
+  check(
+    'round22 fix3: abbr-only, name-only, and -usa suffixes read Gambier, OH',
+    jobsMod.locationFromJobSlug('https://careers.example.edu/jobs/customer-service-representative-gambier-oh-united-states') === 'Gambier, OH' &&
+      jobsMod.locationFromJobSlug('https://careers.example.edu/jobs/customer-service-representative-gambier-ohio-united-states') === 'Gambier, OH' &&
+      jobsMod.locationFromJobSlug('https://careers.example.edu/jobs/customer-service-representative-gambier-oh-usa') === 'Gambier, OH',
+    null,
+  );
+  // (2) A plain title slug with no location suffix reads nothing.
+  check(
+    'round22 fix3: plain title slug and marker-with-no-state read nothing',
+    jobsMod.locationFromJobSlug('https://careers.example.edu/jobs/customer-service-representative') === '' &&
+      jobsMod.locationFromJobSlug('https://careers.example.edu/jobs/customer-service-representative-united-states') === '',
+    null,
+  );
+  // (3) A state abbreviation with NO country marker must not fire —
+  // the marker is what proves the tail is a location block.
+  check(
+    'round22 fix3: state abbr without a country marker reads nothing',
+    jobsMod.locationFromJobSlug('https://careers.example.edu/jobs/customer-service-representative-gambier-oh') === '' &&
+      jobsMod.locationFromJobSlug('https://careers.example.edu/jobs/customer-service-representative-gambier-ohio') === '',
+    null,
+  );
+  // Disagreeing abbr + name, and a non-UUID tail after the marker,
+  // both read nothing.
+  check(
+    'round22 fix3: disagreeing abbr/name and non-UUID tail read nothing',
+    jobsMod.locationFromJobSlug('https://careers.example.edu/jobs/customer-service-representative-gambier-oh-texas-united-states') === '' &&
+      jobsMod.locationFromJobSlug('https://careers.example.edu/jobs/customer-service-representative-gambier-oh-ohio-united-states-foo') === '',
+    null,
+  );
+  // (4) A standalone 'remote' token in the location block reads
+  // Remote — with and without a state.
+  check(
+    'round22 fix3: remote PageUp slug reads Remote',
+    jobsMod.locationFromJobSlug('https://careers.example.edu/jobs/customer-service-representative-remote-united-states') === 'Remote' &&
+      jobsMod.locationFromJobSlug('https://careers.example.edu/jobs/customer-service-representative-remote-oh-ohio-united-states') === 'Remote, OH',
+    null,
+  );
+  // End to end (FakePage): the two mirrored Philander Chase cards
+  // carry no location span, and the location comes from the slug
+  // through push() — so they parse as Gambier, OH, not blank.
+  const kenyonHtml = `<html><body>
+<div class="job-list">
+  <div class="job-card"><a href="https://careers.kenyon.edu/jobs/customer-service-and-sales-associate-part-time-gambier-oh-ohio-united-states-ecbb1ca2-22bd-412d-a2f7-711e87e71a04">Customer Service and Sales Associate, Part-Time</a></div>
+  <div class="job-card"><a href="https://careers.kenyon.edu/jobs/technology-support-specialist-gambier-oh-ohio-united-states">Technology Support Specialist</a></div>
+</div>
+</body></html>`;
+  const kenyonParsed = jobsMod.parseCareersPage(kenyonHtml, 'https://careers.pageuppeople.com/695/cw/en-us/filter/?search-keyword=');
+  check(
+    'round22 fix3: mirrored Philander Chase cards read Gambier, OH from the slug, not blank',
+    kenyonParsed.length === 2 &&
+      kenyonParsed[0]?.location === 'Gambier, OH' &&
+      kenyonParsed[1]?.location === 'Gambier, OH',
+    kenyonParsed.map((p) => ({ title: p.title, location: p.location })),
+  );
+}
+
 await testFindCompanies();
 await testFindCompaniesTransientError();
 await testFindCompaniesDupeStretch();
@@ -6284,6 +6544,9 @@ await testRound18b();
 await testRound19();
 await testRound20();
 await testRound21();
+await testRound22Fix1();
+await testRound22();
+await testRound22Fix3();
 await testPaginationAndSearchScan();
 await testTestCompany();
 await testJazzhr();
