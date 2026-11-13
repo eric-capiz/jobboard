@@ -4,20 +4,27 @@
  * matched to the resume the user selected — whatever its field. It never
  * touches aggregators, never takes a URL from the client (the server
  * pages its own companies collection — no seed fallback exists), and
- * never writes anything: leads are returned to the app, which adds 60%+
- * matches to the Pipeline and leaves the rest as near misses.
+ * by default never writes anything: leads are returned to the app,
+ * which adds 60%+ matches to the Pipeline and leaves the rest as near
+ * misses. (Opt-in server auto-add, for headless callers such as the
+ * sweep workers: see autoAddLeadsToBoard — the caller passes
+ * autoAdd: true and the function appends qualifying leads to the
+ * board itself.)
  *
  * Chunked + idempotent: the server pages the companies collection by
  * insertion order with a cursor the client passes back; the function
  * processes that slice and returns the next cursor. A timed-out chunk is
- * simply retried — no state is written server-side, so a retry can never
- * duplicate anything.
+ * simply retried. By default no state is written server-side, so a
+ * retry can never duplicate anything; with autoAdd on, a retry is
+ * still safe — the append dedupes by title+company against the board
+ * and is guarded by the state doc's updatedAt.
  *
  * Auth mirrors /api/state: the x-sync-key header must match SYNC_KEY.
  */
 
 import {
   authorized,
+  getAppStateCollection,
   getCompaniesCollection,
   isBoardUrl,
   type CompanyDoc,
@@ -2603,11 +2610,124 @@ export function screenPostings(
 }
 
 /* ------------------------------------------------------------------ */
+/* Server auto-add (sweep path)                                        */
+/* ------------------------------------------------------------------ */
+
+/** Board dedupe + tailored-file helpers — mirrors src/domain/index.ts
+ *  (jobDedupeKey / deriveTailoredFileName). KEEP IN SYNC: the UI's
+ *  client-side auto-add uses the domain copies; the server cannot
+ *  import the frontend bundle, so these live here too. */
+function normalizeKey(value: string): string {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function jobDedupeKey(title: string, company: string): string {
+  return `${normalizeKey(title)}|${normalizeKey(company)}`;
+}
+
+function deriveTailoredFileName(company: string): string {
+  const clean = (company ?? '').trim().replace(/[\\/:*?"<>|]/g, '').trim();
+  return clean ? `Eric_${clean}_Resume` : 'Eric_Resume';
+}
+
+function newJobId(): string {
+  return typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+export interface AutoAddedLead {
+  title: string;
+  company: string;
+  matchScore: number;
+}
+
+/** Append qualifying leads to the board (the state doc's jobs array),
+ *  in the exact shape the UI's addJob creates. Only leads at 60%+
+ *  with a confirmed US-remote location qualify — needsReview leads
+ *  never auto-add, whatever the score, and neither do sub-60 leads.
+ *  Dedupe is by title+company against the board AND within the batch.
+ *  The write is guarded by the state doc's updatedAt (optimistic
+ *  concurrency): if another writer moved the doc between the read and
+ *  the write, the update matches nothing and the whole step retries
+ *  from a fresh read (up to 3 attempts) instead of clobbering. A
+ *  chunk whose leads are all already on the board costs one read and
+ *  no write. */
+export async function autoAddLeadsToBoard(
+  appStateCol: Collection<any>,
+  leads: FinderLead[],
+  resumeLabel: string,
+): Promise<{ added: number; addedLeads: AutoAddedLead[] }> {
+  const qualifying = leads.filter((l) => l.matchScore >= 60 && !l.needsReview);
+  if (qualifying.length === 0 || !resumeLabel) return { added: 0, addedLeads: [] };
+  const now = new Date().toISOString();
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const doc = await appStateCol.findOne({ _id: 'jobboard' } as never);
+    if (!doc || !doc.state || !Array.isArray(doc.state.jobs)) return { added: 0, addedLeads: [] };
+    const existing = new Set<string>(
+      (doc.state.jobs as any[]).map((j) => jobDedupeKey(j.title ?? '', j.company ?? '')),
+    );
+    const seen = new Set<string>();
+    const fresh = qualifying.filter((l) => {
+      const k = jobDedupeKey(l.title, l.company);
+      if (existing.has(k) || seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+    if (fresh.length === 0) return { added: 0, addedLeads: [] };
+    const newJobs = fresh.map((l) => ({
+      id: newJobId(),
+      title: l.title,
+      company: l.company,
+      location: l.location,
+      salaryText: l.salaryText || '',
+      source: 'Career Page',
+      postedDate: l.postedDate || '',
+      applyUrl: l.applyUrl,
+      description: l.description || '',
+      matchScore: l.matchScore,
+      strengths: l.strengths ?? [],
+      gaps: l.gaps ?? [],
+      masterResumeName: resumeLabel,
+      tailoredResumeText: '',
+      tailoredFileName: deriveTailoredFileName(l.company),
+      stageId: 'new',
+      notes: 'Found via Finder.',
+      activities: [],
+      createdAt: now,
+      updatedAt: now,
+    }));
+    const nextState = { ...doc.state, jobs: [...(doc.state.jobs as any[]), ...newJobs] };
+    const res = await appStateCol.updateOne(
+      { _id: 'jobboard', updatedAt: doc.updatedAt } as never,
+      { $set: { state: nextState, updatedAt: new Date() } },
+      {},
+    );
+    if (res.matchedCount === 1) {
+      return {
+        added: newJobs.length,
+        addedLeads: newJobs.map((j) => ({ title: j.title, company: j.company, matchScore: j.matchScore })),
+      };
+    }
+    // matchedCount 0: another writer moved the doc — re-read and retry.
+  }
+  return { added: 0, addedLeads: [] };
+}
+
+/* ------------------------------------------------------------------ */
 /* Collection paging (the user's own company database)                 */
 /* ------------------------------------------------------------------ */
 
 export interface FindJobsDeps {
   companiesCol: Collection<CompanyDoc>;
+  /** The app-state collection (dealboard.app_state) — only used when
+   *  the caller passes autoAdd: true. The UI flow never passes it. */
+  appStateCol?: Collection<any>;
 }
 
 export interface FindJobsResult {
@@ -2616,6 +2736,12 @@ export interface FindJobsResult {
   totalCompanies: number;
   nextCursor: number | null;
   done: boolean;
+  /** Leads appended to the board by this call (server auto-add only;
+   *  0 unless the caller passed autoAdd: true). */
+  autoAdded: number;
+  /** The leads that landed on the board, so a headless caller can
+   *  report exactly what was added without re-reading state. */
+  autoAddedLeads: AutoAddedLead[];
   stats: {
     postingsSeen: number;
     boardErrors: number;
@@ -2655,12 +2781,16 @@ export interface FindJobsResult {
     searchSkippedTime: number;
     /** Total milliseconds spent inside the portal search step. */
     searchMs: number;
+    /** Leads appended to the board by this call (server auto-add
+     *  only; 0 for plain UI calls). Flat like the rest of stats so
+     *  the sweep client can sum it. */
+    autoAdded: number;
   };
 }
 
 export async function runFindJobs(
   deps: FindJobsDeps,
-  body: { resumeText?: string; cursor?: number; limit?: number },
+  body: { resumeText?: string; cursor?: number; limit?: number; autoAdd?: boolean; resumeLabel?: string },
   opts: { renderPage?: RenderPageFn | null } = {},
 ): Promise<FindJobsResult> {
   const resumeText = typeof body.resumeText === 'string' ? body.resumeText : '';
@@ -2786,6 +2916,25 @@ export async function runFindJobs(
   }
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, slice.length) }, () => worker()));
 
+  // Opt-in server auto-add (sweep path): qualifying leads land on the
+  // board as they are found, so a headless caller that never touches
+  // the UI still fills the Pipeline. The UI Find Jobs flow does its
+  // own client-side auto-add and does NOT pass autoAdd — the server
+  // never writes during a UI run, so the two paths cannot duplicate
+  // or clobber each other.
+  let autoAdded = 0;
+  let autoAddedLeads: AutoAddedLead[] = [];
+  if (
+    body.autoAdd === true &&
+    typeof body.resumeLabel === 'string' &&
+    body.resumeLabel.length > 0 &&
+    deps.appStateCol
+  ) {
+    const added = await autoAddLeadsToBoard(deps.appStateCol, leads, body.resumeLabel);
+    autoAdded = added.added;
+    autoAddedLeads = added.addedLeads;
+  }
+
   let prefix = 0;
   while (completed.has(prefix)) prefix += 1;
   const nextCursor = cursor + prefix;
@@ -2796,6 +2945,8 @@ export async function runFindJobs(
     totalCompanies: total,
     nextCursor: done ? null : nextCursor,
     done,
+    autoAdded,
+    autoAddedLeads,
     stats: {
       postingsSeen,
       boardErrors,
@@ -2816,6 +2967,7 @@ export async function runFindJobs(
       searchBoardRedirect,
       searchSkippedTime,
       searchMs: searchMsTotal,
+      autoAdded,
     },
   };
 }
@@ -2841,8 +2993,14 @@ async function handlerInner(req: VercelRequest, res: VercelResponse): Promise<vo
   }
   const body = req.body ?? {};
   const result = await runFindJobs(
-    { companiesCol: await getCompaniesCollection() },
-    { resumeText: body.resumeText, cursor: body.cursor, limit: body.limit },
+    {
+      companiesCol: await getCompaniesCollection(),
+      // The board write needs the state collection only when the
+      // caller asked for server auto-add; the UI path never passes
+      // autoAdd and never pays for the extra handle.
+      appStateCol: body.autoAdd === true ? await getAppStateCollection() : undefined,
+    },
+    { resumeText: body.resumeText, cursor: body.cursor, limit: body.limit, autoAdd: body.autoAdd, resumeLabel: body.resumeLabel },
     { renderPage: renderPageHtml },
   );
   res.status(200).json(result);

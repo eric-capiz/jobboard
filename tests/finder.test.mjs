@@ -5671,6 +5671,160 @@ async function testPaginationAndSearchScan() {
   );
 }
 
+async function testRound19() {
+  // Batch 19 (2026-11-12, Eric's order 17:07 MST): server auto-add.
+  // find-jobs with autoAdd: true appends qualifying leads to the board
+  // itself, so headless callers (sweeps) fill the Pipeline as jobs are
+  // found; the UI flow keeps its own client-side auto-add and never
+  // passes the flag.
+  const jobsMod = freshRequire(`${OUT}/find-jobs.cjs`);
+  const resumeText =
+    'Customer support specialist with Zendesk, chat support, and troubleshooting experience for SaaS customers';
+  const supportHtml = `<html><body>
+<div class="job-listing"><h3>Customer Support Specialist</h3><p>Location: Remote</p><a href="/jobs/support-specialist">Apply</a></div>
+<div class="job-listing"><h3>Warehouse Associate</h3><p>Location: Remote</p><a href="/jobs/warehouse">Apply</a></div>
+</body></html>`;
+  const manualHtml = `<html><body>
+<div class="job-listing"><h3>Customer Support Specialist</h3><a href="/jobs/support-manual">Apply</a></div>
+</body></html>`;
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u === 'https://autoadd.example/careers') return { ok: true, text: async () => supportHtml };
+    if (u === 'https://manualco.example/careers') return { ok: true, text: async () => manualHtml };
+    return { ok: true, text: async () => '<html><body>No careers here.</body></html>' };
+  };
+  const seedState = () => {
+    const col = new FakeCollection();
+    col.docs.push({
+      _id: 'jobboard',
+      state: { version: 1, jobs: [], masterResumes: [], settings: {} },
+      updatedAt: '2026-11-12T00:00:00.000Z',
+    });
+    return col;
+  };
+  const boardJobs = (col) => col.docs.find((d) => d._id === 'jobboard')?.state?.jobs ?? [];
+
+  // --- direct unit tests of the append itself ----------------------
+  const mkLead = (over) => ({
+    company: 'AutoAdd Co',
+    title: 'Customer Support Specialist',
+    location: 'Remote',
+    locationFlag: '',
+    salaryText: '',
+    applyUrl: 'https://autoadd.example/jobs/1',
+    description: '',
+    postedDate: '',
+    matchScore: 70,
+    strengths: [],
+    gaps: [],
+    reasons: [],
+    needsReview: false,
+    sourceType: 'html',
+    ...over,
+  });
+  const col0 = seedState();
+  const direct = await jobsMod.autoAddLeadsToBoard(col0, [
+    mkLead({}),
+    mkLead({ title: 'Customer Service Representative', applyUrl: 'https://autoadd.example/jobs/2', matchScore: 65 }),
+    mkLead({ title: 'Support Technician', applyUrl: 'https://autoadd.example/jobs/3', matchScore: 55 }),
+    mkLead({ title: 'Customer Support Lead', applyUrl: 'https://autoadd.example/jobs/4', matchScore: 80, needsReview: true }),
+    mkLead({}), // duplicate of the first lead in the same batch
+  ], 'demo-customer-service');
+  check('round19: only 60+ non-review leads auto-add (2 of 5)', direct.added === 2, direct);
+  check(
+    'round19: added leads are the 70 and the 65',
+    direct.addedLeads.length === 2 &&
+      direct.addedLeads.some((l) => l.title === 'Customer Support Specialist' && l.matchScore === 70) &&
+      direct.addedLeads.some((l) => l.title === 'Customer Service Representative' && l.matchScore === 65),
+    direct.addedLeads,
+  );
+  const jobs0 = boardJobs(col0);
+  check('round19: board holds exactly the 2 added jobs', jobs0.length === 2, jobs0);
+  const j0 = jobs0.find((j) => j.title === 'Customer Support Specialist');
+  check(
+    'round19: board job has the UI shape (stage new, Career Page, resume table, tailored file, no tailored text)',
+    j0?.stageId === 'new' &&
+      j0?.source === 'Career Page' &&
+      j0?.masterResumeName === 'demo-customer-service' &&
+      j0?.tailoredResumeText === '' &&
+      j0?.tailoredFileName === 'Eric_AutoAdd Co_Resume' &&
+      j0?.notes === 'Found via Finder.' &&
+      Array.isArray(j0?.activities) &&
+      typeof j0?.id === 'string' &&
+      j0.id.length > 0 &&
+      typeof j0?.createdAt === 'string' &&
+      j0.createdAt.length > 0,
+    j0,
+  );
+  // Re-adding the same leads is a no-op (board dedupe).
+  const again = await jobsMod.autoAddLeadsToBoard(col0, [mkLead({}), mkLead({ title: 'Customer Service Representative', applyUrl: 'https://autoadd.example/jobs/2', matchScore: 65 })], 'demo-customer-service');
+  check('round19: re-adding the same leads adds 0 (board dedupe)', again.added === 0 && boardJobs(col0).length === 2, again);
+  // No resume label means no write at all.
+  const noLabel = await jobsMod.autoAddLeadsToBoard(col0, [mkLead({ title: 'New Role', applyUrl: 'https://autoadd.example/jobs/9', matchScore: 90 })], '');
+  check('round19: auto-add with no resume label writes nothing', noLabel.added === 0 && boardJobs(col0).length === 2, noLabel);
+  // A concurrent writer moving the doc mid-append is retried, not lost.
+  const inner = seedState();
+  let failOnce = true;
+  const flakyCol = {
+    findOne: (f) => inner.findOne(f),
+    updateOne: async (f, u, o) => {
+      if (failOnce) {
+        failOnce = false;
+        return { matchedCount: 0, modifiedCount: 0, upsertedId: null };
+      }
+      return inner.updateOne(f, u, o);
+    },
+  };
+  const retried = await jobsMod.autoAddLeadsToBoard(flakyCol, [mkLead({})], 'demo-customer-service');
+  check('round19: updatedAt guard retries after a concurrent write', retried.added === 1 && boardJobs(inner).length === 1, retried);
+
+  // --- end-to-end through runFindJobs ------------------------------
+  const companiesCol = new FakeCollection();
+  await companiesCol.insertMany([
+    { name: 'AutoAdd Co', website: 'https://autoadd.example', domain: 'autoadd.example', nameKey: 'autoadd co', careersUrl: '', category: 'General', source: 'Wikidata', addedAt: '2026-11-12T00:00:00Z' },
+    { name: 'Manual Co', website: 'https://manualco.example', domain: 'manualco.example', nameKey: 'manual co', careersUrl: '', category: 'General', source: 'Manual', addedAt: '2026-11-12T00:00:00Z' },
+  ]);
+  const appStateCol = seedState();
+  const noFlag = await jobsMod.runFindJobs(
+    { companiesCol, appStateCol },
+    { resumeText, cursor: 0, limit: 15 },
+  );
+  check(
+    'round19: without the flag, leads return but nothing is written',
+    noFlag.leads.length === 2 && noFlag.autoAdded === 0 && boardJobs(appStateCol).length === 0,
+    { leads: noFlag.leads.map((l) => [l.title, l.matchScore, l.needsReview]), autoAdded: noFlag.autoAdded },
+  );
+  check(
+    'round19: Manual-company lead with no location is needsReview',
+    noFlag.leads.some((l) => l.company === 'Manual Co' && l.needsReview === true),
+    noFlag.leads,
+  );
+  const withFlag = await jobsMod.runFindJobs(
+    { companiesCol, appStateCol },
+    { resumeText, cursor: 0, limit: 15, autoAdd: true, resumeLabel: 'demo-customer-service' },
+  );
+  check(
+    'round19: with the flag, the 71-score lead lands on the board and the review lead does not',
+    withFlag.autoAdded === 1 &&
+      withFlag.stats.autoAdded === 1 &&
+      withFlag.autoAddedLeads.length === 1 &&
+      withFlag.autoAddedLeads[0]?.title === 'Customer Support Specialist' &&
+      boardJobs(appStateCol).length === 1 &&
+      boardJobs(appStateCol)[0]?.company === 'AutoAdd Co',
+    { autoAdded: withFlag.autoAdded, stats: withFlag.stats.autoAdded, board: boardJobs(appStateCol) },
+  );
+  const rerun = await jobsMod.runFindJobs(
+    { companiesCol, appStateCol },
+    { resumeText, cursor: 0, limit: 15, autoAdd: true, resumeLabel: 'demo-customer-service' },
+  );
+  check('round19: re-running the same chunk adds 0 (no duplicates)', rerun.autoAdded === 0 && boardJobs(appStateCol).length === 1, rerun);
+  const noLabelRun = await jobsMod.runFindJobs(
+    { companiesCol, appStateCol },
+    { resumeText, cursor: 0, limit: 15, autoAdd: true },
+  );
+  check('round19: flag without a resume label adds nothing', noLabelRun.autoAdded === 0 && boardJobs(appStateCol).length === 1, noLabelRun);
+}
+
 await testFindCompanies();
 await testFindCompaniesTransientError();
 await testFindCompaniesDupeStretch();
@@ -5710,6 +5864,7 @@ await testRound11();
 await testRound17();
 await testRound18();
 await testRound18b();
+await testRound19();
 await testPaginationAndSearchScan();
 await testTestCompany();
 await testJazzhr();

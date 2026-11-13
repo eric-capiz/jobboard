@@ -210,6 +210,14 @@ export async function getCompaniesCollection(): Promise<Collection<CompanyDoc>> 
   return col;
 }
 
+/** The JobBoard app-state doc (the board itself lives here as
+ *  state.jobs, _id 'jobboard'). Read by the server auto-add path
+ *  only — the UI syncs the whole state through /api/state instead. */
+export async function getAppStateCollection(): Promise<Collection<any>> {
+  const db = await getDb();
+  return db.collection<any>('app_state');
+}
+
 export interface ExistingKeys {
   pairs: Set<string>;
   sourceIds: Set<string>;
