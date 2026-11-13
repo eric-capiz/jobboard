@@ -1,0 +1,71 @@
+# JobBoard UI/API — Cloud Run Service spec (declarative record).
+#
+# Deploy with: ./cloud-run/deploy-service.sh <PROJECT_ID>
+#   (that script uses `gcloud run deploy --source` with flags that mirror
+#    this file exactly; this file is the source of truth for the intended
+#    config. It is NOT applied directly — `gcloud run services replace`
+#    needs a pre-built image, while deploy-from-source builds it.)
+#
+# Image placeholder: replace PROJECT_ID with the real GCP project ID.
+# Secrets are references only — no credential value ever appears here.
+# The runtime service account needs roles/secretmanager.secretAccessor
+# on mongodb-uri, sync-key and vite-sync-key (set-env.sh grants it).
+#
+# NOTE: VITE_SYNC_KEY's load-bearing copy is the BUILD arg
+# (cloud-run/Dockerfile.service bakes it into the browser bundle at
+# build time). The runtime secret ref below is belt-and-braces per the
+# migration spec; the server image does not read it at runtime.
+# NOTE: service name is `jobboard-service` per the migration spec.
+# Piece (a)'s Dockerfile header comment shows `jobboard` as an example
+# name — if the coordinator renames the service, change the name here
+# AND in deploy-service.sh (one word each).
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: jobboard-service
+  labels:
+    app: jobboard
+    component: service
+  annotations:
+    run.googleapis.com/ingress: all
+spec:
+  template:
+    metadata:
+      labels:
+        app: jobboard
+        component: service
+      annotations:
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "2"
+        run.googleapis.com/execution-environment: gen2
+    spec:
+      containerConcurrency: 80
+      timeoutSeconds: 300
+      containers:
+        - image: gcr.io/PROJECT_ID/jobboard-service:latest
+          ports:
+            - name: http1
+              containerPort: 8080
+          resources:
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          env:
+            - name: MONGODB_URI
+              valueFrom:
+                secretKeyRef:
+                  name: mongodb-uri
+                  key: latest
+            - name: SYNC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: sync-key
+                  key: latest
+            - name: VITE_SYNC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: vite-sync-key
+                  key: latest
+  traffic:
+    - percent: 100
+      latestRevision: true

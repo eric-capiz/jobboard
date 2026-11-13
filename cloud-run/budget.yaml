@@ -1,0 +1,37 @@
+# JobBoard $1 billing-budget tripwire — declarative record.
+#
+# Budgets are created with `gcloud billing budgets create` (see
+# budget-alert.sh, the executable version of this file) or the Cloud
+# Billing API — there is no `gcloud ... apply -f` for budgets, so this
+# YAML is the record of what was created, not something to apply.
+# Replace <PROJECT_ID> and <BILLING_ACCOUNT_ID> with the real values.
+#
+# What it is: a smoke detector, NOT a shut-off. It emails when spend
+# crosses a threshold; it does not stop Cloud Run or cap spending.
+# Cost data can lag up to ~24h. The $300/90-day trial credit absorbs
+# small overages; the alert is the tripwire.
+displayName: jobboard-1-dollar-tripwire
+billingAccountId: "<BILLING_ACCOUNT_ID>"
+budgetFilter:
+  projects:
+    - "projects/<PROJECT_ID>"
+  # All services in the project (Cloud Run service + job + build).
+  # Scoped to this one project only — not the whole billing account.
+amount:
+  specifiedAmount:
+    currencyCode: USD
+    units: "1"
+thresholdRules:
+  - thresholdPercent: 0.5   # $0.50 actual spend
+    spendBasis: CURRENT_SPEND
+  - thresholdPercent: 0.9   # $0.90 actual spend
+    spendBasis: CURRENT_SPEND
+  - thresholdPercent: 1.0   # $1.00 actual spend
+    spendBasis: CURRENT_SPEND
+  - thresholdPercent: 1.0   # $1.00 forecasted spend (early warning)
+    spendBasis: FORECASTED_SPEND
+allUpdatesRule:
+  # Default: email alerts to billing admins and users of the account.
+  disableDefaultIamRecipients: false
+  # No Pub/Sub topic, no extra Monitoring channels (day-one minimum).
+  # Add one later if email alone ever gets missed.

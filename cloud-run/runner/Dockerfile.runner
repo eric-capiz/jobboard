@@ -1,0 +1,147 @@
+# JobBoard finder-runner image (Cloud Run Job).
+#
+# Build context is the repo root. Files are copied selectively (no
+# .dockerignore needed): the local node_modules/, the sweep archives
+# and the 4.5MB state backups never enter the build context.
+#
+# Stage 1 bundles the runner server (cloud-run/runner/build.sh:
+# esbuild, ESM; mongodb, @sparticuz/chromium-min and puppeteer-core
+# external). No vite build runs here: the runner never serves the SPA
+# (that is the service image's job), so dist/ is not built or copied.
+#
+# Stage 2 is the runtime: node:22-slim + the Chromium system
+# libraries + production deps only, the bundled server, the sweep
+# driver, the fixture canary, and the demo resumes (RESUME_PATH
+# defaults at /app/resumes/demo-customer-service.txt).
+#
+# CHROMIUM: @sparticuz/chromium-min ships its binary as a Brotli
+# pack, NOT in the npm package. The runner resolves it at startup
+# (server.mjs warmup) by downloading the pinned v153.0.0 pack
+# (~70MB) from the @sparticuz/chromium GitHub releases into /tmp and
+# extracting it there; later renders in the same container reuse it.
+# The download needs egress to github.com at container start only.
+# The system libraries below are what that headless-shell binary
+# needs on Debian slim — the @sparticuz/chromium-min README does NOT
+# enumerate them (it only says to install Chromium's dependencies
+# from the distribution's repositories when using a Dockerfile), so
+# this is Puppeteer's canonical documented Debian list, kept whole
+# rather than trimmed: headless_shell needs only a subset, but
+# trimming is untested and a missing lib fails the launch at 3am
+# mid-sweep. What each group is for:
+#   libnss3 + libnspr4   cert validation / crypto (Chromium will not
+#                        start HTTPS without NSS)
+#   libatk1.0-0, libatk-bridge2.0-0, libatspi2.0-0 (via libatk) —
+#                        accessibility tree (linked at startup)
+#   libgbm1 + libdrm2 (libgbm pulls it) — graphics buffers / GPU
+#                        process, even headless
+#   libasound2           audio service (linked, never used)
+#   libcups2             printing subsystem (linked)
+#   libx11-6, libx11-xcb1, libxcb1, libxcomposite1, libxcursor1,
+#   libxdamage1, libxext6, libxfixes3, libxi6, libxrandr2,
+#   libxrender1, libxss1, libxtst6 — X11 client libs (headless_shell
+#                        still links them)
+#   libgtk-3-0           GTK (linked by the shell build)
+#   libpango-1.0-0, libpangocairo-1.0-0, libcairo2, libfontconfig1,
+#   fonts-liberation — text layout / font rendering (the pack also
+#                        extracts its own fonts; these are the system
+#                        fallback so a page never renders tofu)
+#   libdbus-1-3, libexpat1, libglib2.0-0, libgcc-s1, libstdc++6,
+#   libc6 — D-Bus, XML, GLib and the C/C++ runtimes
+#   ca-certificates      TLS trust store for the pack download + all
+#                        HTTPS fetches
+#   lsb-release, wget, xdg-utils — the Puppeteer list's utilities
+#                        (xdg-utils is pulled by some Chromium helpers)
+#
+# Build (in GCP Cloud Shell; Cloud Build builds in GCP — no local
+# Docker ever):
+#   gcloud builds submit --tag gcr.io/<PROJECT>/jobboard-runner:latest \
+#     --file cloud-run/runner/Dockerfile.runner .
+# or via ./cloud-run/deploy-job.sh <PROJECT> (builds, then replaces
+# the job from cloud-run/runner/job.yaml).
+#
+# The default CMD runs the finder server (handy for a debug service);
+# the Job overrides the command with the sweep driver (see job.yaml).
+
+# syntax=docker/dockerfile:1
+
+# ---- Stage 1: bundle -------------------------------------------------
+FROM node:22-slim AS build
+WORKDIR /app
+
+# Full deps first (layer cache: rebuilds skip this when deps unchanged).
+# esbuild (used by build.sh) is not a direct dependency — it arrives
+# via vite's tree, same as the service image's build stage.
+COPY package.json package-lock.json ./
+RUN npm ci
+
+# Sources needed for the runner bundle: api/ is bundled by build.sh;
+# cloud-run/runner holds the server entry + driver + canary.
+COPY api ./api
+COPY cloud-run/runner ./cloud-run/runner
+
+RUN ./cloud-run/runner/build.sh
+
+# ---- Stage 2: runtime -----------------------------------------------
+FROM node:22-slim AS runtime
+WORKDIR /app
+ENV NODE_ENV=production \
+    PORT=8080 \
+    WARMUP_CHROMIUM=1
+
+# Chromium system libraries (see header for what each group is for).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    fonts-liberation \
+    libasound2 \
+    libatk-bridge2.0-0 \
+    libatk1.0-0 \
+    libc6 \
+    libcairo2 \
+    libcups2 \
+    libdbus-1-3 \
+    libexpat1 \
+    libfontconfig1 \
+    libgbm1 \
+    libgcc-s1 \
+    libglib2.0-0 \
+    libgtk-3-0 \
+    libnspr4 \
+    libnss3 \
+    libpango-1.0-0 \
+    libpangocairo-1.0-0 \
+    libstdc++6 \
+    libx11-6 \
+    libx11-xcb1 \
+    libxcb1 \
+    libxcomposite1 \
+    libxcursor1 \
+    libxdamage1 \
+    libxext6 \
+    libxfixes3 \
+    libxi6 \
+    libxrandr2 \
+    libxrender1 \
+    libxss1 \
+    libxtst6 \
+    lsb-release \
+    wget \
+    xdg-utils \
+  && rm -rf /var/lib/apt/lists/*
+
+# Production deps only. mongodb, @sparticuz/chromium-min and
+# puppeteer-core are the externals the server bundle requires at
+# runtime (the rest of the prod tree is unused by the runner but
+# harmless — and identical to the service image's install).
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev && npm cache clean --force
+
+COPY --from=build /app/cloud-run/runner/dist-server ./runner/dist-server
+COPY --from=build /app/cloud-run/runner/sweep-driver.mjs ./runner/sweep-driver.mjs
+COPY --from=build /app/cloud-run/runner/canary-fixtures.mjs ./runner/canary-fixtures.mjs
+# Demo resumes: the driver needs a resume FILE. Only the .txt masters
+# are copied (the .docx is a build artifact of the same text).
+COPY demo-resumes/demo-customer-service.txt demo-resumes/demo-frontend.txt demo-resumes/liar-frontend.txt ./resumes/
+
+USER node
+EXPOSE 8080
+CMD ["node", "runner/dist-server/server.mjs"]

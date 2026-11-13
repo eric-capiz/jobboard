@@ -1,0 +1,109 @@
+# JobBoard finder-runner — Cloud Run Job spec (declarative record).
+#
+# Deploy with: ./cloud-run/deploy-job.sh <PROJECT_ID>
+#   (that script builds the runner image with Cloud Build, substitutes
+#   PROJECT_ID into a temp copy of this file, and runs
+#   `gcloud run jobs replace` — create-or-update. It does NOT execute
+#   the job. Run a sweep on demand with:
+#     gcloud run jobs execute jobboard-finder --region us-central1 \
+#       --project <PROJECT_ID>)
+#
+# Image placeholder: replace PROJECT_ID with the real GCP project ID.
+# Secrets are references only — no credential value ever appears here:
+#   MONGODB_URI  env var from Secret Manager secret `mongodb-uri`
+#   SYNC_KEY     mounted as a FILE at /secrets/sync-key from secret
+#                `sync-key` (the driver reads it from the file at
+#                runtime and passes it to the managed finder server
+#                in-memory only; it is never printed or checkpointed)
+# The runtime service account needs roles/secretmanager.secretAccessor
+# on both secrets (set-env.sh grants it to the Compute Engine default
+# service account, which is also this job's default identity).
+#
+# WHAT RUNS: one container, one task (parallelism 1, taskCount 1).
+# The container's command is the sweep driver, which spawns the
+# finder server as a child on 127.0.0.1:8080 (FINDER_MANAGED_SERVER=1)
+# and loops /api/find-jobs chunks until the roster is done or the
+# 24h task timeout hits. The driver checkpoints the cursor to
+# /tmp/sweep-checkpoint.json after every chunk; a retried task attempt
+# is a NEW container, so it restarts from cursor 0 — safe (server
+# auto-add dedupes by title+company) but wasteful. See runner-NOTES.md.
+#
+# RESOURCES: cpu 1, memory 2Gi. The finder renders JS boards in a real
+# Chromium (single-process, ~512MB minimum for the loader) and runs 5
+# concurrent plain-HTML fetches per chunk; 2Gi leaves headroom for a
+# cold Chromium + the Node heap. A full sweep is ~70k vCPU-s, ~29% of
+# the Cloud Run Jobs free tier (240k vCPU-s/month) — see the throttle
+# math in runner-NOTES.md. The driver caps renders at 120/hour and
+# sleeps 5s after any chunk that rendered.
+#
+# NOTE: job name is `jobboard-finder` per the migration spec. The
+# image tag is `jobboard-runner` (the image), the job is
+# `jobboard-finder` (the execution) — do not rename one without the
+# other in deploy-job.sh.
+apiVersion: run.googleapis.com/v1
+kind: Job
+metadata:
+  name: jobboard-finder
+  labels:
+    app: jobboard
+    component: finder
+spec:
+  template:
+    metadata:
+      annotations:
+        run.googleapis.com/execution-environment: gen2
+    spec:
+      parallelism: 1
+      taskCount: 1
+      template:
+        spec:
+          taskTimeout: 86400s
+          maxRetries: 3
+          restartPolicy: Never
+          containers:
+            - name: runner
+              image: gcr.io/PROJECT_ID/jobboard-runner:latest
+              command: ["node", "runner/sweep-driver.mjs"]
+              resources:
+                limits:
+                  cpu: "1"
+                  memory: 2Gi
+              env:
+                - name: FINDER_BASE_URL
+                  value: "http://127.0.0.1:8080"
+                - name: FINDER_MANAGED_SERVER
+                  value: "1"
+                - name: FINDER_PORT
+                  value: "8080"
+                - name: RESUME_PATH
+                  value: "/app/resumes/demo-customer-service.txt"
+                - name: RESUME_LABEL
+                  value: "demo-customer-service"
+                - name: SYNC_KEY_PATH
+                  value: "/secrets/sync-key"
+                - name: CHECKPOINT_PATH
+                  value: "/tmp/sweep-checkpoint.json"
+                - name: AUTO_ADD
+                  value: "true"
+                - name: LIMIT
+                  value: "25"
+                - name: RENDER_DELAY_MS
+                  value: "5000"
+                - name: MAX_RENDERS_PER_HOUR
+                  value: "120"
+                - name: MONGODB_URI
+                  valueFrom:
+                    secretKeyRef:
+                      name: mongodb-uri
+                      key: latest
+              volumeMounts:
+                - name: sync-key
+                  mountPath: /secrets
+                  readOnly: true
+          volumes:
+            - name: sync-key
+              secret:
+                secretName: sync-key
+                items:
+                  - key: latest
+                    path: sync-key

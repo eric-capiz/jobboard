@@ -1,0 +1,71 @@
+# JobBoard UI/API service image (Cloud Run).
+#
+# Build context is the repo root. Files are copied selectively (no
+# .dockerignore needed): the local node_modules/ and the sweep
+# archives never enter the build context, and the build stays small.
+#
+# Stage 1 builds the SPA (vite build; needs VITE_SYNC_KEY as a build
+# arg so the browser bundle can authenticate to /api/* — without it
+# the SPA builds but sync no-ops, per src/sync.ts) and bundles the
+# Node adapter (cloud-run/server/build.sh).
+#
+# Stage 2 is the runtime: node:22-slim, production deps only, dist/
+# + the bundled server. NO Chromium in this image: the service never
+# renders (JOBBOARD_NO_RENDER=1 is forced in server.mjs and set here
+# too). Rendering belongs to the finder runner image.
+#
+# Deploy (from the repo root; runs wherever gcloud is already
+# authenticated — no setup step by Eric is assumed or required):
+#   gcloud run deploy jobboard-service --source . \
+#     --dockerfile cloud-run/Dockerfile.service \
+#     --build-arg VITE_SYNC_KEY=<from Secret Manager> \
+#     --set-env-vars MONGODB_URI=<secret>,SYNC_KEY=<secret> \
+#     --region <region> --allow-unauthenticated
+# VITE_SYNC_KEY must be supplied at BUILD time (it is baked into the
+# browser bundle); MONGODB_URI / SYNC_KEY are RUNTIME env vars and
+# must never be baked into the image.
+
+# syntax=docker/dockerfile:1
+
+# ---- Stage 1: build -------------------------------------------------
+FROM node:22-slim AS build
+WORKDIR /app
+
+# Full deps first (layer cache: rebuilds skip this when deps unchanged).
+COPY package.json package-lock.json ./
+RUN npm ci
+
+# Sources needed for `npm run build` (tsc + vite build) and the
+# server bundle. api/ is bundled by build.sh; cloud-run/ holds the
+# server entry + this Dockerfile's sibling build script.
+COPY index.html vite.config.ts tailwind.config.js postcss.config.js tsconfig.json ./
+COPY src ./src
+COPY api ./api
+COPY cloud-run ./cloud-run
+
+# Baked into the browser bundle at build time (see header). Build
+# arg only — never written to any file outside the built assets.
+ARG VITE_SYNC_KEY
+ENV VITE_SYNC_KEY=$VITE_SYNC_KEY
+
+RUN npm run build
+RUN ./cloud-run/server/build.sh
+
+# ---- Stage 2: runtime -----------------------------------------------
+FROM node:22-slim AS runtime
+WORKDIR /app
+ENV NODE_ENV=production \
+    PORT=8080 \
+    JOBBOARD_NO_RENDER=1
+
+# Production deps only. mongodb is the one external the server bundle
+# requires at runtime (bundled with --external:mongodb).
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev && npm cache clean --force
+
+COPY --from=build /app/dist ./dist
+COPY --from=build /app/cloud-run/server/dist-server ./cloud-run/server/dist-server
+
+USER node
+EXPOSE 8080
+CMD ["node", "cloud-run/server/dist-server/server.mjs"]
