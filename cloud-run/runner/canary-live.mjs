@@ -56,7 +56,7 @@ function log(msg) {
 }
 
 function sleep(ms) {
-  return new Promise((r) => setTimeout(ms));
+  return new Promise((r) => setTimeout(r, ms));
 }
 
 async function waitForHealth(base, timeoutMs) {
