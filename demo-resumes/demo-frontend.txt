@@ -1,0 +1,37 @@
+ERIC CAPIZ
+Frontend Developer
+El Paso, TX | ericcapiz@gmail.com | 443-307-3937 | linkedin.com/in/eric-capiz | www.ericcapiz.com | https://github.com/eric-capiz
+
+SUMMARY
+Frontend developer (React, TypeScript, Next.js) with 4 years of experience spanning enterprise clients (Toyota, Bridgestone) and a sole-developer role building an edge device platform, specializing in design systems and component architecture (Storybook, LitElement web components).
+
+WORK EXPERIENCE
+
+iCrossing | Frontend Developer — Remote | Jul 2022 - Jan 2025
+● Built a React SPA for Toyota's Pick Up Where You Left Off feature and a reusable component library that cut new feature development time by 40%.
+● Centralized AEM components into a unified React codebase, cutting page load times by 1.25 seconds and improving Core Web Vitals across 15+ templates.
+● Designed and maintained 20+ Storybook components (React + LitElement) for Bridgestone's Kumiko design system, adopted by 3 product teams and reducing UI inconsistencies by 60%.
+
+NexTech Solutions | Frontend Developer — Remote | Oct 2021 - Jul 2022
+● Developed the React SPA for the MANTLE platform as the sole frontend developer, reducing device configuration time from 90 hours to 90 minutes.
+● Built a real-time provisioning dashboard with server-sent events, enabling live status monitoring for hundreds of distributed edge nodes.
+● Integrated RESTful APIs with the backend team to enable centralized device orchestration and automated asset syncing across the platform.
+
+INDEPENDENT PROJECTS | 2025 - PRESENT
+
+REZ-IQ | Creator | http://reziq-phi.vercel.app | 2025 - Present
+● Built a free AI resume analysis web app (Next.js, TypeScript, Tailwind, MongoDB) that compares a resume against a job description and delivers an evidence-based fit verdict; users approve suggested edits before exporting a clean, ATS-friendly DOCX or PDF.
+● Engineered multi-provider LLM fallback (Groq, Cerebras, Gemini) for reliability, with file storage on Cloudflare R2 and authentication via Auth.js.
+
+Lead Reach | Creator | https://lead-reach.vercel.app | 2025 - Present
+● Built a private outreach workspace (Next.js App Router, React, TypeScript, Tailwind, MongoDB/Mongoose) for finding local businesses and managing outreach campaigns, using Google Places and Geocoding to search by category and location and filter leads by website presence. Users save qualified leads, assign reusable email templates with merge fields, and track outreach status in a dashboard, with data isolated per account.
+
+SKILLS
+Frontend – React, Next.js, TypeScript, JavaScript, HTML/CSS, Tailwind, Responsive Design
+Backend – Node.js, MongoDB/Mongoose, Auth.js, REST APIs
+State Management & UI – Redux, Context API, Material UI, Storybook
+Tools & Workflow – Git, Jira, Agile/Scrum, NPM, Figma, Vercel
+
+EDUCATION
+DeVry University — Bachelor of Multimedia Design & Development, 2014
+BloomTech (formerly Lambda School) — Fullstack Development Bootcamp, 2020
