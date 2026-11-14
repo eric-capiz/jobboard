@@ -76,7 +76,7 @@ jobs:
         run: npm ci
 
       - name: Build runner bundle
-        run: ./cloud-run/runner/build.sh
+        run: bash cloud-run/runner/build.sh
 
       - name: Write sync key file
         run: printf '%s' "$SYNC_KEY" > /tmp/sync-key && chmod 600 /tmp/sync-key
