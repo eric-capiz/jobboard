@@ -1,0 +1,174 @@
+# JobBoard finder sweep — Chromium rendering on GitHub Actions (free, 7GB RAM).
+#
+# Why this exists: the Render web service (512MB) cannot run Chromium
+# (Pollinations + local test 2026-11-14: @sparticuz/chromium-min needs
+# ~200-250MB + Node heap, past the ceiling; it OOMs). The finder-runner
+# (cloud-run/runner) is the same code with rendering ENABLED, and it
+# runs here on ubuntu-latest where Chromium downloads and runs fine.
+# The runner talks directly to the app's MongoDB (MONGODB_URI) and
+# auto-adds qualifying leads (score >= 60, remote-US, deduped) to the
+# board — the Render app reads the same MongoDB, so the board updates.
+#
+# Secrets required (repo Settings > Secrets and variables > Actions):
+#   MONGODB_URI — the JobBoard Atlas connection string
+#   SYNC_KEY    — the x-sync-key value for /api/* auth
+#
+# Modes:
+#   canary — live 14-employer + Day Kimball test via the runner.
+#            Proves Chromium works on this host before any sweep.
+#   sweep  — chunked full-roster sweep with the sweep driver; resumes
+#            from sweep-checkpoint.json (committed to main after each
+#            run) and stops when the board holds >= 1600 jobs.
+#
+# Schedule: every 6h, sweep mode, guarded by the board count (skips
+# when the board already holds >= 1600 verified jobs).
+name: JobBoard finder sweep (Chromium)
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'canary (14-employer live test) or sweep (full roster)'
+        required: true
+        default: 'canary'
+        type: choice
+        options: [canary, sweep]
+      resume:
+        description: 'Resume to match against'
+        required: true
+        default: 'demo-customer-service'
+        type: choice
+        options: [demo-customer-service, demo-frontend, liar-frontend]
+      max_chunks:
+        description: 'Max 25-company chunks for a sweep run (0 = no cap)'
+        required: false
+        default: '400'
+      start_cursor:
+        description: 'Starting cursor (-1 = resume from committed checkpoint)'
+        required: false
+        default: '-1'
+  schedule:
+    - cron: '0 */6 * * *'
+
+permissions:
+  contents: write
+
+jobs:
+  finder:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    env:
+      MONGODB_URI: ${{ secrets.MONGODB_URI }}
+      SYNC_KEY: ${{ secrets.SYNC_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build runner bundle
+        run: ./cloud-run/runner/build.sh
+
+      - name: Write sync key file
+        run: printf '%s' "$SYNC_KEY" > /tmp/sync-key && chmod 600 /tmp/sync-key
+
+      - name: Resolve mode and resume
+        id: cfg
+        run: |
+          MODE="${{ inputs.mode || 'sweep' }}"
+          RESUME="${{ inputs.resume || 'demo-customer-service' }}"
+          MAX_CHUNKS="${{ inputs.max_chunks || '400' }}"
+          START_CURSOR="${{ inputs.start_cursor || '-1' }}"
+          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
+          echo "resume=$RESUME" >> "$GITHUB_OUTPUT"
+          echo "max_chunks=$MAX_CHUNKS" >> "$GITHUB_OUTPUT"
+          echo "start_cursor=$START_CURSOR" >> "$GITHUB_OUTPUT"
+          echo "mode=$MODE resume=$RESUME max_chunks=$MAX_CHUNKS start_cursor=$START_CURSOR"
+
+      - name: Board count guard (skip sweep when board >= 1600)
+        id: guard
+        if: steps.cfg.outputs.mode == 'sweep'
+        run: |
+          node -e "
+            const key = process.env.SYNC_KEY;
+            fetch('https://jobboard-rt89.onrender.com/api/state', { headers: { 'x-sync-key': key }, signal: AbortSignal.timeout(60000) })
+              .then(r => r.json())
+              .then(d => {
+                const n = Array.isArray(d?.state?.jobs) ? d.state.jobs.length : -1;
+                console.log('board jobs =', n);
+                require('fs').appendFileSync(process.env.GITHUB_OUTPUT, 'board=' + n + '\n');
+                require('fs').appendFileSync(process.env.GITHUB_OUTPUT, 'skip=' + (n >= 1600 ? 'true' : 'false') + '\n');
+              })
+              .catch(e => {
+                console.log('guard fetch failed (proceeding anyway):', e.message);
+                require('fs').appendFileSync(process.env.GITHUB_OUTPUT, 'board=-1\n');
+                require('fs').appendFileSync(process.env.GITHUB_OUTPUT, 'skip=false\n');
+              });
+          "
+
+      - name: Live canary (14 employers + Day Kimball)
+        if: steps.cfg.outputs.mode == 'canary'
+        run: |
+          RESUME_PATH="demo-resumes/${{ steps.cfg.outputs.resume }}.txt" \
+          SYNC_KEY="$SYNC_KEY" \
+          OUT_PATH="canary-live-results.json" \
+          node cloud-run/runner/canary-live.mjs
+
+      - name: Seed start cursor
+        if: steps.cfg.outputs.mode == 'sweep' && steps.guard.outputs.skip != 'true' && steps.cfg.outputs.start_cursor != '-1'
+        run: |
+          node -e "
+            const fs = require('fs');
+            const c = Number('${{ steps.cfg.outputs.start_cursor }}');
+            fs.writeFileSync('sweep-checkpoint.json', JSON.stringify({ lastCursor: c, checked: 0, leads: [], autoAdded: 0, statsTotals: {}, failedCursors: [], renderTimestamps: [], startedAt: new Date().toISOString(), updatedAt: new Date().toISOString(), done: false }, null, 2));
+            console.log('seeded checkpoint cursor =', c);
+          "
+
+      - name: Sweep (chunked, auto-add, resume from checkpoint)
+        if: steps.cfg.outputs.mode == 'sweep' && steps.guard.outputs.skip != 'true'
+        run: |
+          MAX_CHUNKS="${{ steps.cfg.outputs.max_chunks }}"
+          if [ "$MAX_CHUNKS" = "0" ]; then unset MAX_CHUNKS; fi
+          RESUME_PATH="demo-resumes/${{ steps.cfg.outputs.resume }}.txt" \
+          RESUME_LABEL="${{ steps.cfg.outputs.resume }}" \
+          SYNC_KEY_PATH="/tmp/sync-key" \
+          CHECKPOINT_PATH="$PWD/sweep-checkpoint.json" \
+          MAX_CHUNKS="${MAX_CHUNKS:-}" \
+          AUTO_ADD=true \
+          LIMIT=25 \
+          node cloud-run/runner/sweep-driver.mjs 2>&1 | tee sweep-driver.log
+          echo "driver exit: ${PIPESTATUS[0]}"
+
+      - name: Commit checkpoint (sweep resume state)
+        if: steps.cfg.outputs.mode == 'sweep' && steps.guard.outputs.skip != 'true'
+        run: |
+          git config user.name "jobboard-finder"
+          git config user.email "finder@jobboard.local"
+          git add sweep-checkpoint.json || true
+          if git diff --cached --quiet; then
+            echo "checkpoint unchanged, nothing to commit"
+          else
+            git commit -m "finder sweep checkpoint: $(node -e "const c=require('./sweep-checkpoint.json'); console.log('cursor='+c.lastCursor+' checked='+c.checked+' leads='+c.leads.length+' autoAdded='+c.autoAdded)")"
+            git push origin main
+            echo "checkpoint committed + pushed"
+          fi
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: finder-${{ steps.cfg.outputs.mode }}-${{ github.run_number }}
+          path: |
+            canary-live-results.json
+            sweep-checkpoint.json
+            sweep-driver.log
+          if-no-files-found: ignore
