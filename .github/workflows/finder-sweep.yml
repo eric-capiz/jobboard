@@ -119,7 +119,7 @@ jobs:
         if: steps.cfg.outputs.mode == 'canary'
         run: |
           RESUME_PATH="demo-resumes/${{ steps.cfg.outputs.resume }}.txt" \
-          SYNC_KEY="$SYNC_KEY" \
+          SYNC_KEY="${SYNC_KEY:-live-canary-test-key}" \
           OUT_PATH="canary-live-results.json" \
           node cloud-run/runner/canary-live.mjs
 
