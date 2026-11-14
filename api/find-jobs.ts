@@ -44,7 +44,7 @@ const MAX_LIMIT = 25;
 /** At most 2 renders per chunk invocation: a render is slow (cold
  *  ~30s, warm ~5-10s), and one slow company must never eat a chunk.
  *  The sweep client re-calls with a fresh budget for the next chunk. */
-const MAX_RENDERS_PER_CALL = 2;
+const MAX_RENDERS_PER_CALL = 25;
 /** Renders may only START in the first 30s of a chunk: a render
  *  started later could still be running when maxDuration (60s) hits. */
 const RENDER_WINDOW_MS = 30000;
