@@ -47,7 +47,7 @@ const MAX_LIMIT = 25;
 const MAX_RENDERS_PER_CALL = 25;
 /** Renders may only START in the first 30s of a chunk: a render
  *  started later could still be running when maxDuration (60s) hits. */
-const RENDER_WINDOW_MS = 30000;
+const RENDER_WINDOW_MS = 300000;
 
 /* ------------------------------------------------------------------ */
 /* Page-fetch helpers                                                    */
