@@ -1509,7 +1509,9 @@ export function parseCareersPage(html: string, pageUrl: string): Posting[] {
     if (!APPLY_HREF.test(apply) && !loc) continue;
     push(title, loc, apply);
   }
-  return postings.slice(0, 50);
+  // Depth fix (2026-11-14): per-company cap 50 → 100 — Day Kimball
+  // hit exactly 50 in the canary, i.e. the cap, not the list.
+  return postings.slice(0, 100);
 }
 
 /** The location a schema.org JobPosting's jobLocation states:
@@ -1672,7 +1674,9 @@ export function parseJsonLdPostings(html: string, pageUrl: string): Posting[] {
       // Malformed JSON-LD — ignore the block, keep the page's listings.
     }
   }
-  return postings.slice(0, 50);
+  // Depth fix (2026-11-14): per-company cap 50 → 100, matching
+  // parseCareersPage above.
+  return postings.slice(0, 100);
 }
 
 /** Search ONE company — business site ONLY, no exceptions. Jobs come
@@ -1729,7 +1733,15 @@ function careersLinksOnPage(html: string, pageUrl: string): string[] {
  *  whose text is exactly "Next" (allowing trailing glyphs like »),
  *  rel="next", or class "next" — the TalentBrew shape is
  *  `<a class="next" href="/search-jobs&p=2">Next</a>`. Same-host
- *  only, never a board URL, never the page itself. */
+ *  only, never a board URL, never the page itself.
+ *  Depth fix (2026-11-14): also accepts "Next page", "Show more"
+ *  and "Load more" anchors — but ONLY when the href is a real
+ *  same-host URL (resolvePageLink already rejects '#' and
+ *  javascript: hrefs, so a JS "Load more" button is never followed
+ *  here; the render path handles those in-browser). When no anchor
+ *  matches, falls back to URL-pattern paging: a list URL carrying
+ *  ?p=, ?page=, ?start= or ?offset= (or TalentBrew's &p= after the
+ *  path) gets its number incremented directly. */
 function nextPageUrl(html: string, pageUrl: string): string | null {
   const anchorRe = /<a[^>]*href=["']([^"']+)["'][^>]*>([\s\S]{0,60}?)<\/a>/gi;
   let m: RegExpExecArray | null;
@@ -1738,6 +1750,10 @@ function nextPageUrl(html: string, pageUrl: string): string | null {
     const text = stripTags(m[2]).replace(/[^a-z]/gi, '').toLowerCase();
     const isNext =
       text === 'next' ||
+      text === 'nextpage' ||
+      text === 'showmore' ||
+      text === 'loadmore' ||
+      text === 'seemore' ||
       /\brel=["']?next["']?/i.test(openTag) ||
       /\bclass=["'][^"']*\bnext\b[^"']*["']/i.test(openTag);
     if (!isNext) continue;
@@ -1753,7 +1769,25 @@ function nextPageUrl(html: string, pageUrl: string): string | null {
     if (abs.replace(/\/+$/, '') === pageUrl.replace(/\/+$/, '')) continue;
     return abs;
   }
-  return null;
+  // No "Next" anchor: the list URL itself may carry the page
+  // number. Increment it directly — same host and path by
+  // construction (only the param value changes), never a board URL.
+  // p/page are true page numbers (+1); start/offset are row offsets,
+  // stepped by 10 (a common page size — the walk stops the moment a
+  // page adds nothing new, so a wrong step costs one fetch). The
+  // [?&] anchor keeps the match on a real param, never inside a
+  // longer name (?webpage=, ?per_page=).
+  const pagePat = pageUrl.match(/^(\S*?[?&](?:p|page)=)(\d+)(.*)$/i);
+  if (pagePat) {
+    const next = `${pagePat[1]}${parseInt(pagePat[2], 10) + 1}${pagePat[3]}`;
+    if (next === pageUrl || isBoardUrl(next)) return null;
+    return next;
+  }
+  const offsetPat = pageUrl.match(/^(\S*?[?&](?:start|offset)=)(\d+)(.*)$/i);
+  if (!offsetPat) return null;
+  const next = `${offsetPat[1]}${parseInt(offsetPat[2], 10) + 10}${offsetPat[3]}`;
+  if (next === pageUrl || isBoardUrl(next)) return null;
+  return next;
 }
 
 async function collectPagePostings(html: string, pageUrl: string, rendered: boolean): Promise<Posting[]> {
@@ -1769,21 +1803,40 @@ async function collectPagePostings(html: string, pageUrl: string, rendered: bool
     }
   };
   addPostings(parseCareersPage(html, pageUrl), rendered ? 'rendered' : 'html');
+  // Merge a page's JSON-LD JobPosting blocks into the visible
+  // listings (description/location/postedDate), adding any block
+  // whose title is not already visible as its own posting. Runs
+  // per paginated page, not only page 1 — pages 2+ carry their own
+  // JSON-LD, and without this their postings match title-only and
+  // can never score past 60 on description. Depth fix, 2026-11-14.
+  const mergeJsonLd = (pageHtml: string, pageUrl: string): void => {
+    const byTitle = new Map(pagePostings.map((p) => [p.title.toLowerCase(), p]));
+    for (const jp of parseJsonLdPostings(pageHtml, pageUrl)) {
+      const vis = byTitle.get(jp.title.toLowerCase());
+      if (vis) {
+        if (!vis.description && jp.description) vis.description = jp.description;
+        if (!vis.location && jp.location) vis.location = jp.location;
+        if (!vis.postedDate && jp.postedDate) vis.postedDate = jp.postedDate;
+      } else {
+        addPostings([jp], 'jsonld');
+      }
+    }
+  };
   // Pagination: a real list page that links "Next" has more roles
   // behind it (TalentBrew: 8/page over 38 pages; Concentrix JDQ:
   // 10/page over ~190). The list pages are server-rendered, so
-  // plain fetches suffice — no browser needed for pages 2+. Up to 3
-  // extra pages, stopping the moment a page adds nothing new, and
-  // never past 50 postings for one company. Bounded so one company
-  // can never eat the chunk's time budget; a Next link that points
-  // back at a visited page (or off-site, or onto a board) ends the
-  // walk. Only runs when page 1 yielded real postings, so a
-  // non-list page never paginates.
+  // plain fetches suffice — no browser needed for pages 2+. Up to 10
+  // extra pages (was 3), stopping the moment a page adds nothing
+  // new, and never past 100 postings for one company (was 50).
+  // Bounded so one company can never eat the chunk's time budget; a
+  // Next link that points back at a visited page (or off-site, or
+  // onto a board) ends the walk. Only runs when page 1 yielded real
+  // postings, so a non-list page never paginates.
   if (pagePostings.length > 0) {
     const seenPages = new Set<string>([pageUrl.replace(/\/+$/, '')]);
     let nextUrl = nextPageUrl(html, pageUrl);
     let extraPages = 0;
-    while (nextUrl && extraPages < 3 && !seenPages.has(nextUrl.replace(/\/+$/, ''))) {
+    while (nextUrl && extraPages < 10 && !seenPages.has(nextUrl.replace(/\/+$/, ''))) {
       seenPages.add(nextUrl.replace(/\/+$/, ''));
       let nextHtml: string;
       try {
@@ -1793,9 +1846,10 @@ async function collectPagePostings(html: string, pageUrl: string, rendered: bool
       }
       const before = pagePostings.length;
       addPostings(parseCareersPage(nextHtml, nextUrl), rendered ? 'rendered' : 'html');
+      mergeJsonLd(nextHtml, nextUrl);
       extraPages += 1;
       if (pagePostings.length === before) break; // empty page: the list is done
-      if (pagePostings.length >= 50) break; // company cap
+      if (pagePostings.length >= 100) break; // company cap
       nextUrl = nextPageUrl(nextHtml, nextUrl);
     }
   }
@@ -1835,24 +1889,16 @@ async function collectPagePostings(html: string, pageUrl: string, rendered: bool
       // Embed unreadable — the page's other sources still count.
     }
   }
-  // JSON-LD last: a block whose title is already visible adds no NEW
-  // posting — but its description/location are the only description
-  // the visible listing will ever get (the HTML parser reads titles
-  // + links only, so visible postings carry description ''). Merge
-  // the structured fields into the visible posting instead of
-  // dropping the block: without this, matching is title-only and a
-  // real CS description can never lift a score past 60.
-  const byTitle = new Map(pagePostings.map((p) => [p.title.toLowerCase(), p]));
-  for (const jp of parseJsonLdPostings(html, pageUrl)) {
-    const vis = byTitle.get(jp.title.toLowerCase());
-    if (vis) {
-      if (!vis.description && jp.description) vis.description = jp.description;
-      if (!vis.location && jp.location) vis.location = jp.location;
-      if (!vis.postedDate && jp.postedDate) vis.postedDate = jp.postedDate;
-    } else {
-      addPostings([jp], 'jsonld');
-    }
-  }
+  // JSON-LD last, on page 1 (paginated pages merged their own
+  // JSON-LD inside the loop above): a block whose title is already
+  // visible adds no NEW posting — but its description/location are
+  // the only description the visible listing will ever get (the HTML
+  // parser reads titles + links only, so visible postings carry
+  // description ''). Merge the structured fields into the visible
+  // posting instead of dropping the block: without this, matching is
+  // title-only and a real CS description can never lift a score
+  // past 60.
+  mergeJsonLd(html, pageUrl);
   return pagePostings;
 }
 
@@ -2568,11 +2614,22 @@ export async function searchCompanyJobs(
         // Resolve the rendered page's links against the URL the
         // render actually ended on — a search can navigate the page
         // to a results URL, and relative links belong to that page.
-        const pagePostings = await collectPagePostings(
-          rendered.html,
-          rendered.renderedUrl || target,
-          true,
-        );
+        // Depth fix (2026-11-14): the render may return several
+        // harvested pages (in-browser pagination) — parse each and
+        // union with the same title+url dedupe collectPagePostings
+        // uses, so a role on page 2+ is never lost or double-counted.
+        const htmlPages = rendered.htmlPages?.length ? rendered.htmlPages : [rendered.html];
+        const pagePostings: Posting[] = [];
+        const seenPostingKeys = new Set<string>();
+        for (const pageHtml of htmlPages) {
+          for (const p of await collectPagePostings(pageHtml, rendered.renderedUrl || target, true)) {
+            const k = `${p.title}\n${p.url}`;
+            if (!seenPostingKeys.has(k)) {
+              seenPostingKeys.add(k);
+              pagePostings.push(p);
+            }
+          }
+        }
         if (pagePostings.length > 0) {
           renderUsed = true;
           const screened = screenPostings(company.name, pagePostings, resumeText, company.isUSCompany ?? false, allowedHosts);

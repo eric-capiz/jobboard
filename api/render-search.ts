@@ -438,6 +438,36 @@ export function selectSearchInput(info: SearchFormInfo): SearchSelection | null 
   return { input: best, button, formAction };
 }
 
+/** Pick the portal's separate location box from a scan, if one
+ *  exists: an input whose name/id/placeholder/label signals a
+ *  place (location, city, state, zip, where). scoreSearchInput
+ *  already penalises location inputs (-3) so they are never picked
+ *  as the keyword box — this is the complement: the box to fill
+ *  with "Remote" before re-submitting. Null when no visible input
+ *  matches. Depth fix (2026-11-14). */
+export function selectLocationInput(info: SearchFormInfo): SearchInputDescriptor | null {
+  let best: SearchInputDescriptor | null = null;
+  let bestScore = 0;
+  for (const d of info.inputs) {
+    if (!d.visible) continue;
+    if (
+      ['hidden', 'password', 'checkbox', 'radio', 'file', 'submit', 'button', 'reset'].includes(
+        d.type,
+      )
+    ) {
+      continue;
+    }
+    const signal = `${d.name} ${d.id} ${d.placeholder} ${d.ariaLabel} ${d.cls || ''} ${d.title || ''} ${d.labelText || ''}`.toLowerCase();
+    if (!/location|city|state|zip|postal|where/.test(signal)) continue;
+    const score = /location/.test(signal) ? 2 : 1;
+    if (score > bestScore) {
+      best = d;
+      bestScore = score;
+    }
+  }
+  return best;
+}
+
 /** The page already displays a results list: a results-count line
  *  ("Showing 1-25 of 4,659 jobs") backed by at least one job link.
  *  Bare job links alone are NOT listings — a homepage's trending-role
@@ -702,6 +732,56 @@ async function clickButton(page: SearchablePage, buttonIndex: number): Promise<b
 }
 
 type AttemptResult = 'no-form' | 'failed' | 'settled' | 'board';
+
+/** Fill the location box with "Remote" through real keystrokes —
+ *  React-controlled portals ignore script-set values, same as the
+ *  keyword box. Clears residue first via keyboard, like
+ *  submitViaEnter. Returns false when the fill could not be
+ *  attempted. Depth fix (2026-11-14). */
+async function fillLocationInput(page: SearchablePage, inputIndex: number): Promise<boolean> {
+  let handle: SearchableHandle | null = null;
+  try {
+    handle = await page.evaluateHandle(
+      (idx: number) => document.querySelectorAll('input')[idx],
+      inputIndex,
+    );
+  } catch {
+    return false;
+  }
+  const el = handle?.asElement() ?? null;
+  try {
+    if (!el) return false;
+    try {
+      await el.click();
+    } catch {
+      try {
+        await el.evaluate((node) => (node as HTMLInputElement).focus());
+      } catch {
+        // Focus failure still leaves typing a chance.
+      }
+    }
+    try {
+      await page.keyboard.down('Control');
+      await page.keyboard.press('a');
+      await page.keyboard.up('Control');
+      await page.keyboard.press('Backspace');
+    } catch {
+      // Clearing is best-effort.
+    }
+    try {
+      await el.type('Remote', { delay: 20 });
+    } catch {
+      return false;
+    }
+    return true;
+  } finally {
+    try {
+      await handle?.dispose();
+    } catch {
+      // Disposal is housekeeping, never load-bearing.
+    }
+  }
+}
 
 /** The no-form rescue: a portal whose search lives behind a "Search
  *  jobs / Find jobs" toggle button — a collapsed panel, or a header
@@ -1394,10 +1474,78 @@ async function driveGatesAfterSearch(
   return droveGate ? 'picked' : null;
 }
 
+/** The term ladder: submit search terms in order until listings
+ *  appear. Depth fix (2026-11-14): after the resume role term,
+ *  "remote" (many portals return nothing on an empty submit and
+ *  match on keyword — it is the highest-signal single term for
+ *  this board), then "customer service" (when the resume's first
+ *  two terms are a title variant the portal doesn't index, e.g.
+ *  "client services"). "customer service" is skipped when the
+ *  resume term already is that phrase. Each step needs ≥6s
+ *  remaining, the same gate attemptSearch needs. When every term
+ *  ran without listings and a separate location box exists, fill it
+ *  with "Remote" and re-submit the last term tried once — the
+ *  portal-native equivalent of the location rule, and what a human
+ *  does on these portals. onTermHit reports the term that produced
+ *  listings (or the location-fill re-submit's term), so the caller
+ *  can record which rung of the ladder hit. Never throws. */
+async function runTermLadder(
+  page: SearchablePage,
+  searchTerm: string,
+  remainMs: () => number,
+  onTermHit?: (term: string) => void,
+): Promise<PortalSearchOutcome> {
+  const terms: string[] = [];
+  if (searchTerm) terms.push(searchTerm);
+  terms.push('remote');
+  if (!searchTerm || !/^\s*customer service\s*$/i.test(searchTerm)) {
+    terms.push('customer service');
+  }
+  let lastTerm: string | null = null;
+  for (const term of terms) {
+    if (remainMs() < 6000) return 'no-results';
+    lastTerm = term;
+    const attempt = await attemptSearch(page, term, remainMs);
+    if (attempt === 'board') return 'board-redirect';
+    if (attempt === 'no-form') return 'no-form';
+    if (attempt === 'failed') return 'submit-failed';
+    if (await listingsNow(page)) {
+      onTermHit?.(term);
+      return 'searched';
+    }
+  }
+  // Location fill: a portal with a separate location box may need
+  // "Remote" in it before its search returns anything. One fill +
+  // one re-submit of the last term tried, time permitting. Never
+  // runs after a navigating gate pick (that rule lives in the
+  // caller — this ladder only runs on the page the submits ran on).
+  if (lastTerm && remainMs() >= 6000) {
+    let info: SearchFormInfo;
+    try {
+      info = (await page.evaluate(scanSearchForm)) as SearchFormInfo;
+    } catch {
+      return 'no-results';
+    }
+    const loc = selectLocationInput(info);
+    if (loc && (await fillLocationInput(page, loc.index))) {
+      const attempt = await attemptSearch(page, lastTerm, remainMs);
+      if (attempt === 'board') return 'board-redirect';
+      if (attempt === 'failed') return 'submit-failed';
+      if (await listingsNow(page)) {
+        onTermHit?.(lastTerm);
+        return 'searched';
+      }
+    }
+  }
+  return 'no-results';
+}
+
 /** The search step: on a rendered careers page that shows no listings,
  *  submit the portal's own search (empty first, then the resume role
- *  term) and wait for results. Never throws — every failure mode is an
- *  outcome the caller can ignore and move on from. */
+ *  term, then the term ladder — "remote", then "customer service" —
+ *  and a "Remote" location fill) and wait for results. Never throws
+ *  — every failure mode is an outcome the caller can ignore and move
+ *  on from. */
 export async function tryPortalSearch(
   page: SearchablePage,
   searchTerm: string,
@@ -1405,6 +1553,7 @@ export async function tryPortalSearch(
   onToggle?: (label: string) => void,
   onCountry?: (label: string) => void,
   onGate?: (label: string) => void,
+  onTermHit?: (term: string) => void,
 ): Promise<PortalSearchOutcome> {
   const remainMs = (): number => deadlineMs - Date.now();
   // A search needs at least ~6s: scan + submit + results wait. Less
@@ -1511,14 +1660,10 @@ export async function tryPortalSearch(
       if (attempt === 'no-form') return 'no-form';
     }
     if (await listingsNow(page)) return 'searched';
-    // The empty search ran but showed nothing — fall through to
-    // the resume-term retry below.
-    if (!searchTerm || remainMs() < 6000) return 'no-results';
-    const second = await attemptSearch(page, searchTerm, remainMs);
-    if (second === 'board') return 'board-redirect';
-    if (second === 'no-form') return 'no-form';
-    if (second === 'failed') return 'submit-failed';
-    return (await listingsNow(page)) ? 'searched' : 'no-results';
+    // The empty search ran but showed nothing — run the term ladder
+    // (resume term, then "remote", then "customer service", then a
+    // "Remote" location fill + last-term re-submit).
+    return runTermLadder(page, searchTerm, remainMs, onTermHit);
   }
   if (first === 'failed') return 'submit-failed';
   if (await listingsNow(page)) return 'searched';
@@ -1530,16 +1675,11 @@ export async function tryPortalSearch(
   // retry only re-submits the same site search, 2026-11-12 local
   // round). The gate runs last, so a working term retry is never
   // pre-empted by a gate pick, and no submit ever follows a pick.
-  let tail: PortalSearchOutcome;
-  if (!searchTerm || remainMs() < 6000) {
-    tail = 'no-results';
-  } else {
-    const second = await attemptSearch(page, searchTerm, remainMs);
-    if (second === 'board') return 'board-redirect';
-    if (second === 'no-form') tail = 'no-form';
-    else if (second === 'failed') return 'submit-failed';
-    else tail = (await listingsNow(page)) ? 'searched' : 'no-results';
-  }
+  // The empty search ran but showed nothing — run the term ladder
+  // (resume term, then "remote", then "customer service", then a
+  // "Remote" location fill + last-term re-submit) before concluding,
+  // then drive any gate still standing behind the box (below).
+  const tail = await runTermLadder(page, searchTerm, remainMs, onTermHit);
   if (tail === 'searched') return 'searched';
   const gated = await driveGatesAfterSearch(page, remainMs, searchTerm, onCountry, onGate);
   if (gated === 'board-redirect') return 'board-redirect';

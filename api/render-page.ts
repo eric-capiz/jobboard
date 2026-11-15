@@ -118,11 +118,72 @@ export function bannerVisibleInPage(): boolean {
   return false;
 }
 
+/** Find and click the page's pagination control — a "Next" link or
+ *  a "Load more" button — in one in-page pass. The control may live
+ *  in a shadow root, so the scan walks the tree like the
+ *  cookie-accept scan. Runs in the browser via page.evaluate, so it
+ *  must stay self-contained: no imports, no closures over module
+ *  state. Returns the kind clicked, or null when no control was
+ *  found. A synthetic .click() is enough here: pagination controls
+ *  are plain navigation/buttons (the cookie-accept step uses the
+ *  same call), and a click that does nothing is caught by the
+ *  caller's unchanged-HTML stop rule. Depth fix (2026-11-14). */
+export function clickPagerControl(): { kind: 'next' | 'loadmore'; label: string } | null {
+  const collect = (root: Document | ShadowRoot): HTMLElement[] => {
+    const out = Array.from(root.querySelectorAll('a, button, [role="button"]')) as HTMLElement[];
+    root.querySelectorAll('*').forEach((el) => {
+      const sr = (el as HTMLElement).shadowRoot;
+      if (sr) out.push(...collect(sr));
+    });
+    return out;
+  };
+  const els = collect(document);
+  const isVisible = (el: HTMLElement): boolean => {
+    const r = el.getBoundingClientRect();
+    return r.width > 0 && r.height > 0;
+  };
+  const textOf = (el: HTMLElement): string =>
+    (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
+  // Next first: label "Next" / "Next page" (a trailing ›/» glyph
+  // is stripped first), a bare ›/», rel="next", or an aria-label
+  // naming next.
+  const next = els.find((el) => {
+    if (!isVisible(el)) return false;
+    const t = textOf(el).replace(/[›»]+$/g, '').trim();
+    if (/^(next|next page)$/i.test(t)) return true;
+    if (/^[›»]$/.test(textOf(el))) return true;
+    if ((el as HTMLAnchorElement).rel === 'next') return true;
+    const aria = (el.getAttribute('aria-label') || '').trim();
+    if (/^(next|next page)$/i.test(aria)) return true;
+    return false;
+  });
+  if (next) {
+    next.click();
+    return { kind: 'next', label: textOf(next).slice(0, 60) };
+  }
+  // Then Load-more / Show-more / See-more.
+  const more = els.find((el) => {
+    if (!isVisible(el)) return false;
+    return /load more|show more|see more/i.test(textOf(el));
+  });
+  if (more) {
+    more.click();
+    return { kind: 'loadmore', label: textOf(more).slice(0, 60) };
+  }
+  return null;
+}
+
 export interface RenderPageResult {
   /** The rendered DOM HTML — the post-search results page when the
    *  portal search ran. Empty when the render ended on a board domain
    *  (no source to extract from). */
   html: string;
+  /** Every page the in-browser pagination loop harvested (page 1
+   *  first, then each Next / Load-more round), when the render ran
+   *  one — depth fix, 2026-11-14. Undefined when the render never
+   *  paginated; the caller then parses `html` alone. Populated by
+   *  render-page.ts; consumed by find-jobs.ts. */
+  htmlPages?: string[];
   /** The portal-search outcome, or null when the search step never
    *  ran (render failed before it, or the load itself redirected
    *  onto a board). This is what makes the search step observable:
@@ -189,6 +250,20 @@ export interface RenderPageResult {
    *  resolver's action log; searchCountryClicked above is kept
    *  for the US-pick continuity. */
   searchGateClicked?: string | null;
+  /** The search term whose submit first produced listings
+   *  ("remote", "customer service", or the resume role term) —
+   *  undefined when no term hit. Depth fix (2026-11-14): proves
+   *  which rung of the term ladder unlocked the portal. */
+  searchTermHit?: string;
+  /** How many pages the in-browser pagination loop walked (1 =
+   *  the post-search page alone, no pagination). Depth fix
+   *  (2026-11-14). */
+  pagesWalked?: number;
+  /** How the render's depth was achieved: 'paginated' (a Next
+   *  control was followed), 'load-more' (a Load-more / Show-more
+   *  button was clicked), 'search-term-hit' (a term-ladder submit
+   *  produced the listings, no pagination), or 'single-page'. */
+  depthOutcome?: 'paginated' | 'load-more' | 'search-term-hit' | 'single-page';
 }
 
 export type RenderPageFn = (
@@ -512,6 +587,7 @@ export async function renderPageHtml(url: string, searchTerm: string = '', timeo
     let searchToggleClicked: string | null = null;
     let searchCountryClicked: string | null = null;
     let searchGateClicked: string | null = null;
+    let searchTermHit: string | undefined;
     // The search runs on its own clock: at least SEARCH_MIN_MS from
     // now, even when the load + settle phases already ate the 20s
     // budget — otherwise the step returns 'skipped-time' without
@@ -526,6 +602,8 @@ export async function renderPageHtml(url: string, searchTerm: string = '', timeo
       searchCountryClicked = label;
     }, (label) => {
       searchGateClicked = label;
+    }, (term) => {
+      searchTermHit = term;
     });
     const searchMs = Date.now() - searchStart;
     // No-form diagnosis: what the scan actually saw on the page, so
@@ -541,9 +619,78 @@ export async function renderPageHtml(url: string, searchTerm: string = '', timeo
       }
     }
     if (searchOutcome === 'board-redirect') {
-      return { html: '', searchOutcome, searchMs, renderedUrl: page.url(), cookieClicks, searchToggleClicked, searchCountryClicked, searchGateClicked };
+      return { html: '', searchOutcome, searchMs, renderedUrl: page.url(), cookieClicks, searchToggleClicked, searchCountryClicked, searchGateClicked, searchTermHit };
     }
-    const html = await page.content();
+    // Depth fix (2026-11-14): in-browser pagination / Load-more.
+    // The plain-HTML walk cannot follow JS-portal pagination (its
+    // fetch of page 2 returns the empty shell), so page 2+ of a
+    // rendered portal is unreachable without this. Only runs when
+    // the page has listings (the search step said 'has-listings' or
+    // 'searched') — a page with no listings has nothing to
+    // paginate. Max 6 rounds, ~1–2s each, bounded by the render's
+    // absolute cap (30s from render start): a click that navigates
+    // off-origin or onto a board ends the loop and keeps the pages
+    // harvested so far; a round whose harvest is identical to a
+    // previous page (the click did nothing, or the pager looped)
+    // ends it too. The exact (title, url) dedupe happens in the
+    // caller (find-jobs.ts unions htmlPages by title+url), so a
+    // duplicate page costs nothing but a round.
+    const absRemain = (): number => renderStart + RENDER_ABSOLUTE_CAP_MS - Date.now();
+    const htmlPages: string[] = [];
+    const seenHarvests = new Set<string>();
+    let pagesWalked = 0;
+    let paginationKind: 'next' | 'loadmore' | null = null;
+    const hasListings = searchOutcome === 'has-listings' || searchOutcome === 'searched';
+    if (hasListings) {
+      try {
+        const firstHtml = await page.content();
+        htmlPages.push(firstHtml);
+        seenHarvests.add(firstHtml);
+        pagesWalked = 1;
+        for (let round = 0; round < 6 && absRemain() > 3000; round++) {
+          let clicked: { kind: 'next' | 'loadmore'; label: string } | null = null;
+          try {
+            clicked = (await page.evaluate(clickPagerControl)) as
+              | { kind: 'next' | 'loadmore'; label: string }
+              | null;
+          } catch {
+            break;
+          }
+          if (!clicked) break;
+          await waitForDomStable(page, absRemain, 2000, 500);
+          // A click that navigated off-origin or onto a board ends
+          // the loop — keep the pages harvested so far, never the
+          // board page.
+          let pageUrl = '';
+          try {
+            pageUrl = page.url();
+          } catch {
+            break;
+          }
+          if (isBoardUrl(pageUrl)) break;
+          try {
+            if (new URL(pageUrl).origin !== new URL(url).origin) break;
+          } catch {
+            break;
+          }
+          let nextHtml: string;
+          try {
+            nextHtml = await page.content();
+          } catch {
+            break;
+          }
+          if (seenHarvests.has(nextHtml)) break;
+          seenHarvests.add(nextHtml);
+          htmlPages.push(nextHtml);
+          pagesWalked += 1;
+          paginationKind = clicked.kind;
+        }
+      } catch {
+        // Harvest failure — keep whatever pages were collected; the
+        // caller still gets page 1 via the fallback below.
+      }
+    }
+    const html = htmlPages.length > 0 ? htmlPages[0] : await page.content();
     // Visibility, not just text: the banner's copy can stay in the
     // DOM after the banner hides (Foundever: banner text in the
     // sample with a click already landed). An element carrying the
@@ -555,8 +702,17 @@ export async function renderPageHtml(url: string, searchTerm: string = '', timeo
     } catch {
       bannerVisible = false;
     }
+    const depthOutcome: 'paginated' | 'load-more' | 'search-term-hit' | 'single-page' =
+      paginationKind === 'next'
+        ? 'paginated'
+        : paginationKind === 'loadmore'
+          ? 'load-more'
+          : searchTermHit
+            ? 'search-term-hit'
+            : 'single-page';
     return {
       html,
+      htmlPages: htmlPages.length > 1 ? htmlPages : undefined,
       searchOutcome,
       searchMs,
       renderedUrl: page.url(),
@@ -569,6 +725,9 @@ export async function renderPageHtml(url: string, searchTerm: string = '', timeo
       searchToggleClicked,
       searchCountryClicked,
       searchGateClicked,
+      searchTermHit,
+      pagesWalked,
+      depthOutcome,
     };
   } catch {
     // A failed render still reports WHY instead of a bare null, so the
