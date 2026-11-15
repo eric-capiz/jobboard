@@ -1,36 +1,63 @@
-# JobBoard finder sweep — Chromium rendering on GitHub Actions (free, 7GB RAM).
+# JobBoard finder sweep — PARALLEL MATRIX (live 2026-11-14)
 #
-# Why this exists: the Render web service (512MB) cannot run Chromium
-# (Pollinations + local test 2026-11-14: @sparticuz/chromium-min needs
-# ~200-250MB + Node heap, past the ceiling; it OOMs). The finder-runner
-# (cloud-run/runner) is the same code with rendering ENABLED, and it
-# runs here on ubuntu-latest where Chromium downloads and runs fine.
-# The runner talks directly to the app's MongoDB (MONGODB_URI) and
-# auto-adds qualifying leads (score >= 60, remote-US, deduped) to the
-# board — the Render app reads the same MongoDB, so the board updates.
+# Design: split the 40,179-company roster into 20 disjoint cursor
+# ranges ("shards") and run one Actions job per shard, up to 20
+# concurrent (GitHub free-tier max for private repos). Each shard
+# runs the SAME sweep-driver.mjs with its own checkpoint file and a
+# SWEEP_END cap — no driver changes needed.
 #
-# Secrets required (repo Settings > Secrets and variables > Actions):
-#   MONGODB_URI — the JobBoard Atlas connection string
-#   SYNC_KEY    — the x-sync-key value for /api/* auth
+# Shard math (ROSTER_TOTAL=40179, SHARD_SIZE=2009, SHARDS=20):
+#   shard i covers cursor range [i*2009, min((i+1)*2009, 40179))
+#   20 * 2009 = 40180 >= 40179, so shard 19 ends at 40179.
+#   Each shard = ~81 chunks of 25 companies.
 #
-# Modes:
-#   canary — live 14-employer + Day Kimball test via the runner.
-#            Proves Chromium works on this host before any sweep.
-#   sweep  — chunked full-roster sweep with the sweep driver; resumes
-#            from sweep-checkpoint.json (committed to main after each
-#            run) and stops when the board holds >= 1600 jobs.
+# Why this is safe:
+#   - Shards are disjoint by cursor, so no company is checked twice
+#     (a re-run re-checks only its own shard; server auto-add dedupes
+#     by title+company anyway, so overlap is wasteful, never a dup).
+#   - Each shard keeps its OWN checkpoint file
+#     (sweep-checkpoint-shard-<i>.json), seeded with lastCursor=start.
+#     A re-run resumes that shard instead of restarting it.
+#   - fail-fast: false — one bad shard never cancels the other 19.
+#   - Jobs only ever come from each company's own careers page (the
+#     runner server does the fetching); verify-before-add still holds
+#     (score >= 60, remote-US, deduped) — unchanged from the live flow.
 #
-# Schedule: every 6h, sweep mode, guarded by the board count (skips
-# when the board already holds >= 1600 verified jobs).
+# Wall-time estimate (from measured evidence):
+#   - Render sweep 2026-11-14: 40,031 companies in ~3h51m sequential,
+#     ~8.7s per 25-company chunk (plain HTML, render forced OFF).
+#   - Actions canary 2026-11-14 run #4: 15 employers in 2m17s with
+#     Chromium (8/15 rendered) — rendered chunks run ~15-40s.
+#   - Blended chunk ~15-20s -> one shard (~81 chunks) ~20-30 min
+#     + ~2 min setup (npm ci + Chromium download).
+#   - FULL SWEEP WALL TIME: ~25-35 min (vs ~4-7h sequential).
+#
+# FREE-TIER MINUTES — READ THIS BEFORE ENABLING A SCHEDULE:
+#   Parallelism cuts wall time, NOT total compute. One full matrix
+#   sweep = 20 jobs x ~25 min = ~500 runner-minutes, plus the merge
+#   job (~2 min). GitHub free tier = 2,000 Actions minutes/month for
+#   a PRIVATE repo (public repos are unlimited). So a full matrix
+#   sweep costs ~1/4 of the monthly budget. The live workflow's
+#   6-hour cron (4 runs/day) would burn the budget in ONE day.
+#   This draft is therefore workflow_dispatch ONLY. If a schedule is
+#   wanted, use at most a daily cron (see commented block below) and
+#   only while the board is below target — or make the repo public.
+#
+# Target: board >= 7293 verified jobs (Eric raised it from 1600 on
+# already on the board, raised 2026-11-14). The board-count guard in
+# every shard skips the sweep when the board already holds >= 7293.
+#
+# Secrets required (same as live): MONGODB_URI, SYNC_KEY.
+# Modes: canary (unchanged single-job live test) or sweep (matrix).
 name: JobBoard finder sweep (Chromium)
 
 on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'canary (14-employer live test) or sweep (full roster)'
+        description: 'canary (14-employer live test) or sweep (20-shard matrix)'
         required: true
-        default: 'canary'
+        default: 'sweep'
         type: choice
         options: [canary, sweep]
       resume:
@@ -39,24 +66,31 @@ on:
         default: 'demo-customer-service'
         type: choice
         options: [demo-customer-service, demo-frontend, liar-frontend]
-      max_chunks:
-        description: 'Max 25-company chunks for a sweep run (0 = no cap)'
-        required: false
-        default: '400'
-      start_cursor:
-        description: 'Starting cursor (-1 = resume from committed checkpoint)'
-        required: false
-        default: '-1'
-  schedule:
-    - cron: '0 */6 * * *'
+  # schedule: DISABLED on purpose — one matrix sweep is ~500 min,
+  # a quarter of the 2,000 min/month free tier for a private repo.
+  # Uncomment ONLY for a daily run while below target (still ~500
+  # min/day = budget gone in ~4 days; prefer manual dispatch):
+  # schedule:
+  #   - cron: '0 6 * * *'
 
 permissions:
   contents: write
 
+env:
+  ROSTER_TOTAL: '40179'
+  SHARD_SIZE: '2009'
+  SHARD_COUNT: '20'
+  BOARD_TARGET: '7293'
+
 jobs:
-  finder:
+  # ------------------------------------------------------------------
+  # Canary — unchanged from the live workflow (single job, proves
+  # Chromium works on this host before any sweep).
+  # ------------------------------------------------------------------
+  canary:
+    if: inputs.mode == 'canary'
     runs-on: ubuntu-latest
-    timeout-minutes: 350
+    timeout-minutes: 30
     env:
       MONGODB_URI: ${{ secrets.MONGODB_URI }}
       SYNC_KEY: ${{ secrets.SYNC_KEY }}
@@ -81,32 +115,83 @@ jobs:
       - name: Write sync key file
         run: printf '%s' "$SYNC_KEY" > /tmp/sync-key && chmod 600 /tmp/sync-key
 
-      - name: Resolve mode and resume
-        id: cfg
+      - name: Live canary (14 employers + Day Kimball)
         run: |
-          MODE="${{ inputs.mode || 'sweep' }}"
-          RESUME="${{ inputs.resume || 'demo-customer-service' }}"
-          MAX_CHUNKS="${{ inputs.max_chunks || '400' }}"
-          START_CURSOR="${{ inputs.start_cursor || '-1' }}"
-          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
-          echo "resume=$RESUME" >> "$GITHUB_OUTPUT"
-          echo "max_chunks=$MAX_CHUNKS" >> "$GITHUB_OUTPUT"
-          echo "start_cursor=$START_CURSOR" >> "$GITHUB_OUTPUT"
-          echo "mode=$MODE resume=$RESUME max_chunks=$MAX_CHUNKS start_cursor=$START_CURSOR"
+          RESUME_PATH="demo-resumes/${{ inputs.resume }}.txt" \
+          SYNC_KEY="$SYNC_KEY" \
+          OUT_PATH="canary-live-results.json" \
+          node cloud-run/runner/canary-live.mjs
 
-      - name: Board count guard (skip sweep when board >= 1600)
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: finder-canary-${{ github.run_number }}
+          path: canary-live-results.json
+          if-no-files-found: ignore
+
+  # ------------------------------------------------------------------
+  # Sweep — 20 shards in parallel, max 20 concurrent.
+  # ------------------------------------------------------------------
+  sweep:
+    if: inputs.mode == 'sweep'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+    env:
+      MONGODB_URI: ${{ secrets.MONGODB_URI }}
+      SYNC_KEY: ${{ secrets.SYNC_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build runner bundle
+        run: bash cloud-run/runner/build.sh
+
+      - name: Write sync key file
+        run: printf '%s' "$SYNC_KEY" > /tmp/sync-key && chmod 600 /tmp/sync-key
+
+      - name: Resolve shard range
+        id: shard
+        run: |
+          SHARD=${{ matrix.shard }}
+          # Fixed 2009-company slices (ROSTER_TOTAL=40179, 20 shards).
+          START=$(( SHARD * SHARD_SIZE ))
+          END=$(( START + SHARD_SIZE ))
+          if [ "$END" -gt "$ROSTER_TOTAL" ]; then END="$ROSTER_TOTAL"; fi
+          echo "shard=$SHARD" >> "$GITHUB_OUTPUT"
+          echo "start=$START" >> "$GITHUB_OUTPUT"
+          echo "end=$END" >> "$GITHUB_OUTPUT"
+          echo "shard $SHARD covers cursor [$START, $END)"
+
+      - name: Board count guard (skip shard when board >= 7293)
         id: guard
-        if: steps.cfg.outputs.mode == 'sweep'
         run: |
           node -e "
             const key = process.env.SYNC_KEY;
+            const target = Number(process.env.BOARD_TARGET);
             fetch('https://jobboard-rt89.onrender.com/api/state', { headers: { 'x-sync-key': key }, signal: AbortSignal.timeout(60000) })
               .then(r => r.json())
               .then(d => {
                 const n = Array.isArray(d?.state?.jobs) ? d.state.jobs.length : -1;
-                console.log('board jobs =', n);
+                console.log('board jobs =', n, 'target =', target);
                 require('fs').appendFileSync(process.env.GITHUB_OUTPUT, 'board=' + n + '\n');
-                require('fs').appendFileSync(process.env.GITHUB_OUTPUT, 'skip=' + (n >= 1600 ? 'true' : 'false') + '\n');
+                require('fs').appendFileSync(process.env.GITHUB_OUTPUT, 'skip=' + (n >= target ? 'true' : 'false') + '\n');
               })
               .catch(e => {
                 console.log('guard fetch failed (proceeding anyway):', e.message);
@@ -115,64 +200,115 @@ jobs:
               });
           "
 
-      - name: Live canary (14 employers + Day Kimball)
-        if: steps.cfg.outputs.mode == 'canary'
+      - name: Seed shard checkpoint (resume-safe)
+        if: steps.guard.outputs.skip != 'true'
         run: |
-          RESUME_PATH="demo-resumes/${{ steps.cfg.outputs.resume }}.txt" \
-          SYNC_KEY="${SYNC_KEY:-live-canary-test-key}" \
-          OUT_PATH="canary-live-results.json" \
-          node cloud-run/runner/canary-live.mjs
+          CKPT="sweep-checkpoint-shard-${{ steps.shard.outputs.shard }}.json"
+          if [ -f "$CKPT" ]; then
+            echo "shard checkpoint already on main, resuming: $CKPT"
+            node -e "const c=require('./$CKPT'); console.log('resume cursor='+c.lastCursor+' checked='+c.checked+' leads='+c.leads.length+' autoAdded='+c.autoAdded+' done='+c.done)"
+          else
+            node -e "
+              const fs = require('fs');
+              const start = Number('${{ steps.shard.outputs.start }}');
+              fs.writeFileSync('$CKPT', JSON.stringify({ driver: 'jobboard-runner-sweep-driver', version: 1, resumeLabel: '${{ inputs.resume }}', checked: 0, leads: [], autoAdded: 0, statsTotals: {}, failedCursors: [], renderTimestamps: [], lastCursor: start, startedAt: new Date().toISOString(), updatedAt: new Date().toISOString(), done: false }, null, 2));
+              console.log('seeded shard checkpoint cursor =', start);
+            "
+          fi
 
-      - name: Seed start cursor
-        if: steps.cfg.outputs.mode == 'sweep' && steps.guard.outputs.skip != 'true' && steps.cfg.outputs.start_cursor != '-1'
+      - name: Sweep shard (auto-add, resume from shard checkpoint)
+        if: steps.guard.outputs.skip != 'true'
         run: |
-          node -e "
-            const fs = require('fs');
-            const c = Number('${{ steps.cfg.outputs.start_cursor }}');
-            fs.writeFileSync('sweep-checkpoint.json', JSON.stringify({ lastCursor: c, checked: 0, leads: [], autoAdded: 0, statsTotals: {}, failedCursors: [], renderTimestamps: [], startedAt: new Date().toISOString(), updatedAt: new Date().toISOString(), done: false }, null, 2));
-            console.log('seeded checkpoint cursor =', c);
-          "
-
-      - name: Sweep (chunked, auto-add, resume from checkpoint)
-        if: steps.cfg.outputs.mode == 'sweep' && steps.guard.outputs.skip != 'true'
-        run: |
-          MAX_CHUNKS="${{ steps.cfg.outputs.max_chunks }}"
-          if [ "$MAX_CHUNKS" = "0" ]; then unset MAX_CHUNKS; fi
-          RESUME_PATH="demo-resumes/${{ steps.cfg.outputs.resume }}.txt" \
-          RESUME_LABEL="${{ steps.cfg.outputs.resume }}" \
+          RESUME_PATH="demo-resumes/${{ inputs.resume }}.txt" \
+          RESUME_LABEL="${{ inputs.resume }}" \
           SYNC_KEY_PATH="/tmp/sync-key" \
-          CHECKPOINT_PATH="$PWD/sweep-checkpoint.json" \
-          MAX_CHUNKS="${MAX_CHUNKS:-}" \
+          CHECKPOINT_PATH="$PWD/sweep-checkpoint-shard-${{ steps.shard.outputs.shard }}.json" \
+          SWEEP_END="${{ steps.shard.outputs.end }}" \
           AUTO_ADD=true \
           LIMIT=25 \
           MAX_RENDERS_PER_HOUR=2000 \
           RENDER_DELAY_MS=0 \
-          node cloud-run/runner/sweep-driver.mjs 2>&1 | tee sweep-driver.log
+          node cloud-run/runner/sweep-driver.mjs 2>&1 | tee "sweep-driver-shard-${{ steps.shard.outputs.shard }}.log"
           DRIVER_EXIT="${PIPESTATUS[0]}"
           echo "driver exit: $DRIVER_EXIT"
           exit "$DRIVER_EXIT"
 
-      - name: Commit checkpoint (sweep resume state)
-        if: steps.cfg.outputs.mode == 'sweep' && steps.guard.outputs.skip != 'true'
-        run: |
-          git config user.name "jobboard-finder"
-          git config user.email "finder@jobboard.local"
-          git add sweep-checkpoint.json || true
-          if git diff --cached --quiet; then
-            echo "checkpoint unchanged, nothing to commit"
-          else
-            git commit -m "finder sweep checkpoint: $(node -e "const c=require('./sweep-checkpoint.json'); console.log('cursor='+c.lastCursor+' checked='+c.checked+' leads='+c.leads.length+' autoAdded='+c.autoAdded)")"
-            git push origin main
-            echo "checkpoint committed + pushed"
-          fi
-
-      - name: Upload results
+      - name: Upload shard results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: finder-${{ steps.cfg.outputs.mode }}-${{ github.run_number }}
+          name: finder-sweep-shard-${{ steps.shard.outputs.shard }}-${{ github.run_number }}
           path: |
-            canary-live-results.json
-            sweep-checkpoint.json
-            sweep-driver.log
+            sweep-checkpoint-shard-${{ steps.shard.outputs.shard }}.json
+            sweep-driver-shard-${{ steps.shard.outputs.shard }}.log
           if-no-files-found: ignore
+
+  # ------------------------------------------------------------------
+  # Merge — runs after ALL shards (even if some failed), downloads
+  # every shard checkpoint, merges them into one sweep-checkpoint.json
+  # (+ the per-shard files), and commits to main so the next run can
+  # resume any unfinished shard. Skipped only if the whole matrix was
+  # cancelled.
+  # ------------------------------------------------------------------
+  merge:
+    needs: sweep
+    if: always() && needs.sweep.result != 'cancelled' && inputs.mode == 'sweep'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download all shard artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: finder-sweep-shard-*-${{ github.run_number }}
+          path: shard-results
+          merge-multiple: true
+
+      - name: Merge shard checkpoints
+        run: |
+          node -e "
+            const fs = require('fs');
+            const path = require('path');
+            const dir = 'shard-results';
+            const files = fs.existsSync(dir) ? fs.readdirSync(dir).filter(f => /^sweep-checkpoint-shard-\d+\.json$/.test(f)) : [];
+            console.log('shard checkpoints found:', files.length);
+            const merged = { driver: 'jobboard-runner-sweep-driver', version: 1, resumeLabel: '${{ inputs.resume }}', checked: 0, leads: [], autoAdded: 0, statsTotals: {}, failedCursors: [], renderTimestamps: [], lastCursor: 0, startedAt: new Date().toISOString(), updatedAt: new Date().toISOString(), done: false, shards: [] };
+            const seen = new Set();
+            for (const f of files.sort()) {
+              const c = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf-8'));
+              const shard = Number(f.match(/shard-(\d+)\.json$/)[1]);
+              merged.checked += c.checked ?? 0;
+              merged.autoAdded += c.autoAdded ?? 0;
+              for (const l of (Array.isArray(c.leads) ? c.leads : [])) {
+                const k = (l.company || l.companyName || '') + '|' + (l.title || '');
+                if (k === '|' || !seen.has(k)) { seen.add(k); merged.leads.push(l); }
+              }
+              merged.failedCursors.push(...(Array.isArray(c.failedCursors) ? c.failedCursors : []));
+              merged.renderTimestamps.push(...(Array.isArray(c.renderTimestamps) ? c.renderTimestamps : []));
+              for (const [k, v] of Object.entries(c.statsTotals ?? {})) merged.statsTotals[k] = (merged.statsTotals[k] ?? 0) + v;
+              merged.lastCursor = Math.max(merged.lastCursor, c.lastCursor ?? 0);
+              merged.shards.push({ shard, lastCursor: c.lastCursor ?? 0, checked: c.checked ?? 0, leads: Array.isArray(c.leads) ? c.leads.length : 0, autoAdded: c.autoAdded ?? 0, done: !!c.done, failedCursors: c.failedCursors ?? [] });
+            }
+            merged.done = merged.shards.length > 0 && merged.shards.every(s => s.done);
+            fs.writeFileSync('sweep-checkpoint.json', JSON.stringify(merged, null, 2));
+            // Keep the per-shard files in the repo so the next run resumes unfinished shards.
+            for (const f of files) fs.copyFileSync(path.join(dir, f), f);
+            console.log('merged: checked=' + merged.checked + ' leads=' + merged.leads.length + ' autoAdded=' + merged.autoAdded + ' shards=' + merged.shards.length + ' done=' + merged.done);
+          "
+
+      - name: Commit merged checkpoint (+ shard files)
+        run: |
+          git config user.name "jobboard-finder"
+          git config user.email "finder@jobboard.local"
+          git add sweep-checkpoint.json sweep-checkpoint-shard-*.json || true
+          if git diff --cached --quiet; then
+            echo "checkpoints unchanged, nothing to commit"
+          else
+            git commit -m "finder matrix sweep checkpoint: $(node -e "const c=require('./sweep-checkpoint.json'); console.log('checked='+c.checked+' leads='+c.leads.length+' autoAdded='+c.autoAdded+' shards='+c.shards.length+' done='+c.done)")"
+            git push origin main
+            echo "merged checkpoint committed + pushed"
+          fi
