@@ -145,8 +145,12 @@ jobs:
           MAX_CHUNKS="${MAX_CHUNKS:-}" \
           AUTO_ADD=true \
           LIMIT=25 \
+          MAX_RENDERS_PER_HOUR=2000 \
+          RENDER_DELAY_MS=0 \
           node cloud-run/runner/sweep-driver.mjs 2>&1 | tee sweep-driver.log
-          echo "driver exit: ${PIPESTATUS[0]}"
+          DRIVER_EXIT="${PIPESTATUS[0]}"
+          echo "driver exit: $DRIVER_EXIT"
+          exit "$DRIVER_EXIT"
 
       - name: Commit checkpoint (sweep resume state)
         if: steps.cfg.outputs.mode == 'sweep' && steps.guard.outputs.skip != 'true'
