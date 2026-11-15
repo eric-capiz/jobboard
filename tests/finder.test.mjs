@@ -2717,10 +2717,13 @@ async function testPortalSearch() {
       termWins.pressedKeys.filter((k) => k === 'Enter').length === 2,
     { typed: termWins.typedTerms, keys: termWins.pressedKeys },
   );
-  // Both submits, still nothing: no-results, no crash.
+  // The full ladder runs (empty, resume term, "remote" — the
+  // "customer service" rung is skipped because the resume term
+  // already is that phrase), still nothing: no-results, no crash.
   const noResults = new FakePage({
     scanResult: portalScan,
     counts: [
+      { jobLinks: 0, resultsText: false },
       { jobLinks: 0, resultsText: false },
       { jobLinks: 0, resultsText: false },
       { jobLinks: 0, resultsText: false },
@@ -2728,11 +2731,69 @@ async function testPortalSearch() {
     onEnter: (term, page) => page.setUrl('https://portal.example/careers/results'),
   });
   check(
-    'portal-search: two submits, still nothing, is no-results',
+    'portal-search: full ladder, still nothing, is no-results',
     (await runSearch(noResults)) === 'no-results' &&
-      JSON.stringify(noResults.typedTerms) === JSON.stringify(['customer service']) &&
-      noResults.pressedKeys.filter((k) => k === 'Enter').length === 2,
+      JSON.stringify(noResults.typedTerms) === JSON.stringify(['customer service', 'remote']) &&
+      noResults.pressedKeys.filter((k) => k === 'Enter').length === 3,
     { typed: noResults.typedTerms, keys: noResults.pressedKeys },
+  );
+  // The "remote" rung unlocks a portal the resume term did not:
+  // empty and "software engineer" show nothing, "remote" finds
+  // listings — the "customer service" rung never runs. onEnter
+  // navigates to a fresh URL per submit so waitForChange sees the
+  // change at once (a fixed URL would burn the 8s button-fallback
+  // wait on every repeat submit and starve the ladder's budget).
+  let remoteN = 0;
+  const remoteWins = new FakePage({
+    scanResult: portalScan,
+    counts: [
+      { jobLinks: 0, resultsText: false },
+      { jobLinks: 0, resultsText: false },
+      { jobLinks: 0, resultsText: false },
+      { jobLinks: 4, resultsText: true },
+    ],
+    onEnter: (term, page) => page.setUrl(`https://portal.example/careers/results?n=${++remoteN}`),
+  });
+  check(
+    'portal-search: remote rung finds listings the resume term missed',
+    (await runSearch(remoteWins, 'software engineer')) === 'searched' &&
+      JSON.stringify(remoteWins.typedTerms) === JSON.stringify(['software engineer', 'remote']) &&
+      remoteWins.pressedKeys.filter((k) => k === 'Enter').length === 3,
+    { typed: remoteWins.typedTerms, keys: remoteWins.pressedKeys },
+  );
+  // The "Remote" location fill unlocks a portal whose keyword
+  // submits all showed nothing: the ladder runs dry, the location
+  // box is filled with "Remote", and the last term re-submitted
+  // finds listings. onEnter navigates to a fresh URL per submit
+  // (see the "remote" test above) so the ladder + fill fit the
+  // 30s budget instead of burning it on button-fallback waits.
+  const locScan = {
+    inputs: [
+      mkInput({ index: 0, name: 'keyword', placeholder: 'Search by Keyword', formIndex: 0 }),
+      mkInput({ index: 1, name: 'location', placeholder: 'City, State or Zip', formIndex: 0 }),
+    ],
+    buttons: [mkButton({ index: 0, text: 'Search', formIndex: 0 })],
+    forms: [{ action: '/jobs', method: 'get' }],
+  };
+  let locN = 0;
+  const locWins = new FakePage({
+    scanResult: locScan,
+    counts: [
+      { jobLinks: 0, resultsText: false },
+      { jobLinks: 0, resultsText: false },
+      { jobLinks: 0, resultsText: false },
+      { jobLinks: 0, resultsText: false },
+      { jobLinks: 4, resultsText: true },
+    ],
+    onEnter: (term, page) => page.setUrl(`https://portal.example/careers/results?n=${++locN}`),
+  });
+  check(
+    'portal-search: Remote location fill + last-term re-submit finds listings',
+    (await runSearch(locWins)) === 'searched' &&
+      JSON.stringify(locWins.typedTerms) ===
+        JSON.stringify(['customer service', 'remote', 'Remote', 'remote']) &&
+      locWins.pressedKeys.filter((k) => k === 'Enter').length === 4,
+    { typed: locWins.typedTerms, keys: locWins.pressedKeys },
   );
   // The search box is the site's header search, not the portal's:
   // the empty submit strands the page on ?s= with no listings, and
