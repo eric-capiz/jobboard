@@ -136,7 +136,7 @@ jobs:
   sweep:
     if: inputs.mode == 'sweep'
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 350
     strategy:
       fail-fast: false
       max-parallel: 20
