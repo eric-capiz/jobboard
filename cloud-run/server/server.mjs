@@ -90,6 +90,7 @@ import companiesMigrateHandler from '../../api/companies/migrate.ts';
 import findCompaniesHandler from '../../api/find-companies.ts';
 import findJobsHandler from '../../api/find-jobs.ts';
 import testCompanyHandler from '../../api/test-company.ts';
+import checkLinkHandler from '../../api/check-link.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -107,6 +108,7 @@ const ROUTES = new Map([
   ['/api/find-companies', findCompaniesHandler],
   ['/api/find-jobs', findJobsHandler],
   ['/api/test-company', testCompanyHandler],
+  ['/api/check-link', checkLinkHandler],
 ]);
 
 /* ------------------------------------------------------------------ */
