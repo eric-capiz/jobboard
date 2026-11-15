@@ -1,0 +1,32 @@
+# One-off fix: re-label the 43 big employers imported 2026-11-14 from
+# source='Manual' to source='Import' so their jobs can auto-add.
+# Run once via workflow_dispatch, then delete this file.
+name: Fix import source (one-off)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      MONGODB_URI: ${{ secrets.MONGODB_URI }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Re-label 43 employers Manual -> Import
+        run: node cloud-run/runner/fix-manual-source.mjs
