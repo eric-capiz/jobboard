@@ -77,7 +77,7 @@ permissions:
   contents: write
 
 env:
-  ROSTER_TOTAL: '40179'
+  ROSTER_TOTAL: '40187'
   SHARD_SIZE: '2009'
   SHARD_COUNT: '20'
   BOARD_TARGET: '7293'
