@@ -1,0 +1,28 @@
+{
+  "https://acme.wd5.myworkdayjobs.com/wday/cxs/acme/ACME-Careers/job/Chicago--IL/Frontend-Engineer_R-1002": {
+    "body": {
+      "jobPostingInfo": {
+        "externalUrl": "https://acme.wd5.myworkdayjobs.com/en-US/ACME-Careers/job/Chicago--IL/Frontend-Engineer_R-1002",
+        "jobDescription": "<p>Build React interfaces for our customer portal. Hybrid role: 3 days per week in the Chicago office. You must be able to commute to our Chicago, Illinois office three days each week. This is not a fully remote position. You will work with our product team to build accessible, responsive web interfaces using React, TypeScript, and modern CSS. Our engineering team collaborates in person on Tuesdays, Wednesdays, and Thursdays at our downtown Chicago office, and works from home on Mondays and Fridays. We are looking for an engineer with at least three years of experience building production web applications. Benefits include health insurance, paid time off, and a 401(k) with company match.</p>",
+        "jobReqId": "R-1002",
+        "location": "Chicago, IL",
+        "startDate": "2026-11-12",
+        "title": "Frontend Engineer"
+      }
+    },
+    "status": 200
+  },
+  "https://acme.wd5.myworkdayjobs.com/wday/cxs/acme/ACME-Careers/job/New-York--NY/Customer-Support-Specialist_R-1001": {
+    "body": {
+      "jobPostingInfo": {
+        "externalUrl": "https://acme.wd5.myworkdayjobs.com/en-US/ACME-Careers/job/New-York--NY/Customer-Support-Specialist_R-1001",
+        "jobDescription": "<p>This is a fully remote position open to candidates anywhere in the United States. You will provide customer support by phone, email, and chat to customers across the country. This is a 100% remote role with no office requirement and no relocation required. We are looking for candidates who live anywhere in the United States and are authorized to work in the US. You will work from your home office, collaborating with a distributed team across US time zones. Benefits include health insurance, paid time off, and a home office stipend. Apply today to join our fully remote customer support team serving customers throughout the United States.</p>",
+        "jobReqId": "R-1001",
+        "location": "Remote - United States",
+        "startDate": "2026-11-10",
+        "title": "Customer Support Specialist"
+      }
+    },
+    "status": 200
+  }
+}
