@@ -1,0 +1,14 @@
+{
+  "checked": 500,
+  "crawlable": 14,
+  "crawlablePct": 2.8,
+  "distribution": {
+    "unresolved": 483,
+    "workday": 8,
+    "icims": 3,
+    "rippling": 1,
+    "taleo": 2,
+    "recruitee": 1,
+    "greenhouse": 2
+  }
+}
