@@ -106,5 +106,10 @@ jobs:
             echo "No changes to commit."
           else
             git commit -m "resolve: ATS distribution $(date -u +%Y-%m-%d)"
-            git push
+            # Rebase onto latest main first: ingest merge jobs push to main
+            # every 30 min, so a plain push from the run's frozen checkout is
+            # routinely rejected non-fast-forward. Retry once if another
+            # ingest commit lands mid-push.
+            git pull --rebase origin main
+            git push || { git pull --rebase origin main && git push; }
           fi
