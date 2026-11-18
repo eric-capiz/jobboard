@@ -37,11 +37,14 @@ RUN npm ci
 
 # Sources needed for `npm run build` (tsc + vite build) and the
 # server bundle. api/ is bundled by build.sh; cloud-run/ holds the
-# server entry + this Dockerfile's sibling build script.
+# server entry + this Dockerfile's sibling build script. data/jobs.json
+# is copied too: /api/jobs serves it as the bundled fallback when
+# GitHub is unreachable (RENDER-PLAN.md).
 COPY index.html vite.config.ts tailwind.config.js postcss.config.js tsconfig.json ./
 COPY src ./src
 COPY api ./api
 COPY cloud-run ./cloud-run
+COPY data/jobs.json ./data/jobs.json
 
 # Baked into the browser bundle at build time (see header). Build
 # arg only — never written to any file outside the built assets.
@@ -65,6 +68,7 @@ RUN npm ci --omit=dev && npm cache clean --force
 
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/cloud-run/server/dist-server ./cloud-run/server/dist-server
+COPY --from=build /app/data/jobs.json ./data/jobs.json
 
 USER node
 EXPOSE 8080
