@@ -47,8 +47,15 @@ const { openDb, listLiveJobs, counts } = require('./db.cjs');
 
 function parseArgs(argv) {
   const out = {};
-  for (let i = 2; i < argv.length; i += 2) {
-    out[argv[i].replace(/^--/, '')] = argv[i + 1];
+  for (let i = 2; i < argv.length; i++) {
+    const key = argv[i].replace(/^--/, '');
+    const next = argv[i + 1];
+    if (next === undefined || next.startsWith('--')) {
+      out[key] = true; // boolean flag, e.g. --live
+    } else {
+      out[key] = next;
+      i++;
+    }
   }
   return out;
 }

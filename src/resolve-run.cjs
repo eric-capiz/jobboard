@@ -18,8 +18,15 @@ const SOCIAL = ['facebook.com', 'linkedin.com', 'twitter.com', 'instagram.com',
 
 function args() {
   const out = {};
-  for (let i = 2; i < process.argv.length; i += 2) {
-    out[process.argv[i].replace(/^--/, '')] = process.argv[i + 1];
+  for (let i = 2; i < process.argv.length; i++) {
+    const key = process.argv[i].replace(/^--/, '');
+    const next = process.argv[i + 1];
+    if (next === undefined || next.startsWith('--')) {
+      out[key] = true; // boolean flag, e.g. --live
+    } else {
+      out[key] = next;
+      i++;
+    }
   }
   return out;
 }
