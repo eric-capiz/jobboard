@@ -21,6 +21,20 @@ const cases = [
     expect: { ats: 'greenhouse', slug: 'globex', crawlable: true },
   },
   {
+    name: 'greenhouse embed widget for= token (ingest pilot: Acumen/Ad Council)',
+    domain: 'acumen.org',
+    html: '<script src="https://boards.greenhouse.io/embed/job_board/js?for=acumen"></script>',
+    url: 'https://acumen.org/jobs/',
+    expect: { ats: 'greenhouse', slug: 'acumen', crawlable: true },
+  },
+  {
+    name: 'greenhouse embed path without for= never yields slug "embed"',
+    domain: 'example.com',
+    html: '<script src="https://boards.greenhouse.io/embed/job_board/js"></script>',
+    url: 'https://example.com/jobs',
+    expect: { ats: 'greenhouse', crawlable: false },
+  },
+  {
     name: 'lever',
     domain: 'initech.com',
     html: '<a href="https://jobs.lever.co/initech">See jobs</a>',

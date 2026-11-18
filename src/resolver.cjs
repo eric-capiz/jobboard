@@ -17,10 +17,19 @@ const ATS_PATTERNS = [
     ats: 'greenhouse',
     tokens: ['boards.greenhouse.io', 'job-boards.greenhouse.io', 'boards-api.greenhouse.io'],
     slugFrom: (html, url) => {
+      // Greenhouse embed widget: boards.greenhouse.io/embed/job_board/js?for=<token>
+      // The board token is the for= param — the first path segment is "embed",
+      // which is NEVER a board token (ingest pilot: slug "embed" 404s on
+      // boards-api and both pilot companies errored with 0 jobs).
+      const embed = html.match(/boards\.greenhouse\.io\/embed\/job_board[^"'\s]*[?&]for=([a-z0-9][a-z0-9_-]*)/i)
+        || url.match(/boards\.greenhouse\.io\/embed\/job_board[^"'\s]*[?&]for=([a-z0-9][a-z0-9_-]*)/i);
+      if (embed) return embed[1].toLowerCase();
       const m = html.match(/boards(?:-api)?\.greenhouse\.io\/(?:v1\/boards\/)?([a-z0-9][a-z0-9_-]*)/i)
         || url.match(/job-boards\.greenhouse\.io\/([a-z0-9][a-z0-9_-]*)/i)
         || url.match(/boards\.greenhouse\.io\/([a-z0-9][a-z0-9_-]*)/i);
-      return m ? m[1].toLowerCase() : null;
+      if (!m) return null;
+      const slug = m[1].toLowerCase();
+      return slug === 'embed' ? null : slug;
     },
   },
   {
