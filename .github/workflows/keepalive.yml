@@ -1,0 +1,41 @@
+# .github/workflows/keepalive.yml — keep scheduled workflows enabled
+# (COPY INTO REPO AT PUSH TIME. DO NOT push yet: jobboard is not in the
+# standing push-permission list. Runs ONLY in GitHub Actions.)
+#
+# GitHub auto-disables scheduled workflows after 60 days with no repo
+# activity. The ingest merge commits every 30 minutes while Tier A runs,
+# so this should essentially never fire — it is belt-and-braces for a
+# quiet period (e.g. ingest paused): once a month, if no commit has
+# landed in the last 55 days, make a no-op keepalive commit so the
+# schedules stay enabled. The file it touches (.github/keepalive) is
+# a timestamp only and is never read by any other workflow.
+name: Keepalive
+
+on:
+  schedule:
+    - cron: '0 6 1 * *' # monthly, 1st 06:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Commit keepalive only if the repo has been quiet 55+ days
+        run: |
+          if [ -n "$(git log --since='55 days ago' --oneline | head -1)" ]; then
+            echo "Repo had activity in the last 55 days — nothing to do."
+            exit 0
+          fi
+          echo "No commits in 55 days — writing keepalive."
+          date -u +%Y-%m-%dT%H:%M:%SZ > .github/keepalive
+          git config user.name "jobboard-ingest"
+          git config user.email "jobboard-ingest@users.noreply.github.com"
+          git add .github/keepalive
+          git commit -m "chore: keepalive $(date -u +%Y-%m-%d)"
+          git push

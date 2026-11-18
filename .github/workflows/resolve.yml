@@ -1,0 +1,102 @@
+# .github/workflows/resolve.yml — ATS resolver pilot (COPY INTO REPO AT PUSH TIME)
+# DO NOT push yet: jobboard is not in the standing push-permission list.
+# This workflow runs ONLY in GitHub Actions. Never run --live from the VM:
+# direct fetches to employer sites pop per-site approval cards.
+name: ATS Resolver Pilot
+
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: 'Companies to resolve (pilot = 500)'
+        default: '500'
+  schedule:
+    - cron: '0 7 1 * *' # monthly, 1st 07:00 UTC (Tier C re-probe).
+      # NOTE: do NOT write "first Monday" as '0 7 1-7 * 1' — when both
+      # day-of-month and day-of-week are restricted, cron fires when
+      # EITHER matches, so that would run every Monday AND days 1-7.
+      # Monthly on the 1st is the correct expression for Tier C.
+
+permissions:
+  contents: read
+
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Check Node >= 24 (setup-node pins 24; zero dependencies to install)
+        run: node -e "if (parseInt(process.versions.node.split('.')[0], 10) < 24) { console.error('Node >= 24 required, got ' + process.version); process.exit(1); }"
+      - name: Resolve ATS for shard ${{ matrix.shard }}
+        run: |
+          node src/resolve-run.cjs --live \
+            --shard-file pilot-500.json \
+            --shard ${{ matrix.shard }} --shards 5 \
+            --out results-${{ matrix.shard }}.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: resolver-results-${{ matrix.shard }}
+          path: results-${{ matrix.shard }}.json
+
+  report:
+    needs: resolve
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: resolver-results-*
+          merge-multiple: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Check Node >= 24 (setup-node pins 24; zero dependencies to install)
+        run: node -e "if (parseInt(process.versions.node.split('.')[0], 10) < 24) { console.error('Node >= 24 required, got ' + process.version); process.exit(1); }"
+      - name: Aggregate ATS distribution + write resolved companies file
+        run: |
+          node -e "
+          const fs = require('fs');
+          const files = fs.readdirSync('.').filter(f => f.startsWith('results-'));
+          const dist = {}; let checked = 0, crawlable = 0;
+          const results = [];
+          for (const f of files) {
+            const j = JSON.parse(fs.readFileSync(f, 'utf8'));
+            checked += j.summary.checked; crawlable += j.summary.crawlable;
+            for (const [k, v] of Object.entries(j.summary.distribution)) dist[k] = (dist[k] || 0) + v;
+            results.push(...j.results);
+          }
+          const report = { checked, crawlable, crawlablePct: +(100 * crawlable / checked).toFixed(1), distribution: dist };
+          fs.writeFileSync('ats-distribution.json', JSON.stringify(report, null, 2));
+          console.log(JSON.stringify(report, null, 2));
+          // Merged resolver output — build-companies.cjs (ingest setup job)
+          // reads this to build data/companies.json with tiers.
+          fs.mkdirSync('data', { recursive: true });
+          fs.writeFileSync('data/resolved.json', JSON.stringify({ results }, null, 2));
+          console.log('resolved companies written:', results.length);
+          "
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ats-distribution
+          path: ats-distribution.json
+      - name: Commit distribution + resolved companies file
+        run: |
+          git config user.name "jobboard-ingest"
+          git config user.email "jobboard-ingest@users.noreply.github.com"
+          git add ats-distribution.json data/resolved.json
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "resolve: ATS distribution $(date -u +%Y-%m-%d)"
+            git push
+          fi

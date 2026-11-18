@@ -1,0 +1,222 @@
+# .github/workflows/ingest.yml — verified-job ingest (COPY INTO REPO AT PUSH TIME)
+# DO NOT push yet: jobboard is not in the standing push-permission list.
+# Runs ONLY in GitHub Actions. Never run ingest-run with live fetch from
+# the VM: employer-site fetches pop per-site approval cards.
+#
+# Repo layout at push time (matches resolve.yml): the rebuild lives at the
+# repo root — scripts in src/, data in data/ (resolved.json,
+# us-allowlist.json, companies.json, jobs.db, jobs.json, shards/).
+# (r10 design doc said jobboard-rebuild/; the push landed at root, so the
+# workflows were adapted to root paths instead of moving 36 pushed files.)
+#
+# Design (SYNTHESIS-DRAFT.md build order step 4 + lifecycle):
+# - Tier A companies (resolved + US-verified + ever yielded) every 30 min.
+# - Tier B companies (resolved + US-verified + never yielded) daily 03:00 UTC.
+# - Tier C (unresolved) is never ingested; resolve.yml re-probes it monthly.
+# - Shards own DISJOINT company sets (md5 hash mod N), each with its own
+#   SQLite file (data/shards/jobs-<shard>.db, committed in
+#   the repo so the next run starts from the previous run's history —
+#   closeMissing needs last_seen history to close a job only after
+#   2 consecutive misses).
+# - Shards NEVER push: they upload artifacts. ONE merge job downloads all
+#   shard artifacts, merges them into the persisted canonical jobs.db
+#   (ATTACH-and-upsert, never delete-and-rebuild), writes jobs.json, and
+#   does the single commit+push. No push races.
+# - A partial/errored shard closes NOTHING (ingest.cjs guarantees it) and
+#   the merge warns but does not fail: a failed shard leaves its companies
+#   exactly as the last good merge left them (merge-dbs.cjs round 9: the
+#   old delete-and-rebuild dropped a failed shard's jobs until the next
+#   fully successful run).
+# - Rate limits live in src/fetch-util.cjs (3 rps/host, Retry-After
+#   backoff, per-company circuit breaker: 3 failures = 10 min cooldown).
+#   40 shards run concurrently; if ATS hosts start 429ing, reduce the
+#   shard count (workflow_dispatch `shards` input) — the fetchers already
+#   back off and mark runs partial instead of closing jobs.
+# - First run requires resolve.yml to have run once
+#   (data/resolved.json) and data/us-allowlist.json to
+#   list at least the pilot employers — otherwise every company lands in
+#   tier 'held'/'C' and ingest is a no-op by design (fail-closed: no HQ
+#   evidence, no ingest).
+name: Ingest — verified jobs
+
+on:
+  schedule:
+    - cron: '*/30 * * * *' # Tier A — every 30 minutes
+    - cron: '0 3 * * *' # Tier B — daily 03:00 UTC
+  workflow_dispatch:
+    inputs:
+      tier:
+        description: 'Tier to ingest (A = ever yielded, B = never yielded)'
+        type: choice
+        options: [A, B]
+        default: 'A'
+      shards:
+        description: 'Shard count (pilot = 5, full roster = 40)'
+        default: '40'
+
+permissions:
+  contents: read
+
+# Serializes every job that writes jobs.db (ingest merge, reverify).
+# A run that arrives while another publishes waits instead of
+# interleaving commits.
+concurrency:
+  group: jobs-db-publish
+  cancel-in-progress: false
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      tier: ${{ steps.pick.outputs.tier }}
+      shards: ${{ steps.pick.outputs.shards }}
+      shard_list: ${{ steps.pick.outputs.shard_list }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Check Node >= 24 (setup-node pins 24; zero dependencies to install)
+        run: node -e "if (parseInt(process.versions.node.split('.')[0], 10) < 24) { console.error('Node >= 24 required, got ' + process.version); process.exit(1); }"
+      - name: Pick tier + shard list
+        id: pick
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TIER="${{ inputs.tier }}"
+            SHARDS="${{ inputs.shards }}"
+          else
+            case "${{ github.event.schedule }}" in
+              "*/30 * * * *") TIER="A" ;;
+              "0 3 * * *") TIER="B" ;;
+              *) TIER="A" ;;
+            esac
+            SHARDS="40"
+          fi
+          echo "tier=$TIER" >> "$GITHUB_OUTPUT"
+          echo "shards=$SHARDS" >> "$GITHUB_OUTPUT"
+          echo "shard_list=$(node -e "console.log(JSON.stringify([...Array(Number(process.argv[1])).keys()]))" "$SHARDS")" >> "$GITHUB_OUTPUT"
+          echo "Ingesting tier $TIER across $SHARDS shards"
+      - name: Build companies file (tiers from resolver + allowlist + yield)
+        run: |
+          node src/build-companies.cjs \
+            --resolved data/resolved.json \
+            --allowlist data/us-allowlist.json \
+            --db data/jobs.db \
+            --out companies.json
+          node -e "
+          const c = require('./companies.json');
+          const t = {};
+          for (const x of c) t[x.tier] = (t[x.tier] || 0) + 1;
+          console.log('companies by tier:', JSON.stringify(t));
+          if (!c.some((x) => x.tier === '${{ steps.pick.outputs.tier }}')) {
+            console.log('::warning::No companies in tier ${{ steps.pick.outputs.tier }} — ingest will be a no-op. Populate data/us-allowlist.json and run resolve.yml first.');
+          }
+          "
+      - uses: actions/upload-artifact@v4
+        with:
+          name: companies-file
+          path: companies.json
+
+  ingest:
+    needs: setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.setup.outputs.shard_list) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Check Node >= 24 (setup-node pins 24; zero dependencies to install)
+        run: node -e "if (parseInt(process.versions.node.split('.')[0], 10) < 24) { console.error('Node >= 24 required, got ' + process.version); process.exit(1); }"
+      - uses: actions/download-artifact@v4
+        with:
+          name: companies-file
+      - name: Ingest shard ${{ matrix.shard }} (tier ${{ needs.setup.outputs.tier }})
+        run: |
+          node src/ingest-run.cjs \
+            --companies companies.json \
+            --tier "${{ needs.setup.outputs.tier }}" \
+            --shard "${{ matrix.shard }}" \
+            --shards "${{ needs.setup.outputs.shards }}" \
+            --db "data/shards/jobs-${{ matrix.shard }}.db" \
+            --summary "ingest-summary-${{ matrix.shard }}.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ingest-shard-${{ matrix.shard }}
+          path: |
+            data/shards/jobs-${{ matrix.shard }}.db
+            ingest-summary-${{ matrix.shard }}.json
+          retention-days: 7
+
+  merge:
+    needs: [setup, ingest]
+    # Merge even if some shards failed: their companies keep last good state.
+    if: always() && needs.setup.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Check Node >= 24 (setup-node pins 24; zero dependencies to install)
+        run: node -e "if (parseInt(process.versions.node.split('.')[0], 10) < 24) { console.error('Node >= 24 required, got ' + process.version); process.exit(1); }"
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: ingest-shard-*
+          path: shard-artifacts
+      - uses: actions/download-artifact@v4
+        with:
+          name: companies-file
+      - name: Warn on partial / missing shards (never fail the merge)
+        run: |
+          node -e "
+          const fs = require('fs');
+          const files = fs.readdirSync('shard-artifacts', { recursive: true })
+            .filter((f) => String(f).endsWith('.json'));
+          const want = Number(process.env.SHARDS);
+          const got = new Set(files.map((f) => Number(JSON.parse(fs.readFileSync('shard-artifacts/' + f, 'utf8')).shard)));
+          for (let i = 0; i < want; i++) {
+            if (!got.has(i)) console.log('::warning::Shard ' + i + ' produced no artifact — its companies keep last good state.');
+          }
+          let partial = 0, accepted = 0, rejected = 0;
+          for (const f of files) {
+            const s = JSON.parse(fs.readFileSync('shard-artifacts/' + f, 'utf8'));
+            if (s.partial) partial++;
+            accepted += s.totals.accepted; rejected += s.totals.rejected;
+          }
+          if (partial) console.log('::warning::' + partial + ' shard(s) partial — nothing was closed from those runs.');
+          console.log('shards merged: ' + got.size + '/' + want + ', accepted: ' + accepted + ', rejected: ' + rejected);
+          "
+        env:
+          SHARDS: ${{ needs.setup.outputs.shards }}
+      - name: Merge shard DBs + write public snapshot
+        run: |
+          node src/merge-dbs.cjs \
+            --inputs shard-artifacts \
+            --out data/jobs.db \
+            --snapshot data/jobs.json
+          mkdir -p data/shards
+          for f in shard-artifacts/ingest-shard-*/data/shards/jobs-*.db; do
+            [ -f "$f" ] && cp "$f" data/shards/
+          done
+          cp companies.json data/companies.json
+      - name: Commit + push (single commit for the whole run)
+        run: |
+          git config user.name "jobboard-ingest"
+          git config user.email "jobboard-ingest@users.noreply.github.com"
+          git add data/jobs.db data/jobs.json data/companies.json data/shards/
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "ingest: tier ${{ needs.setup.outputs.tier }} $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            git push
+          fi

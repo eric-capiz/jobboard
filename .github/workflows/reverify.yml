@@ -1,0 +1,93 @@
+# .github/workflows/reverify.yml — liveness sweep + 14-day re-verify cycle
+# (COPY INTO REPO AT PUSH TIME. DO NOT push yet: jobboard is not in the
+# standing push-permission list. Runs ONLY in GitHub Actions.)
+#
+# Two modes, picked from the triggering cron (or workflow_dispatch input):
+# - LIVENESS, daily 04:00 UTC: GET every live job's canonical_url.
+#   404/410 or a redirect off-host / onto a generic careers page expires
+#   the job. Network errors, timeouts, 429/5xx/403 leave it untouched —
+#   a failed fetch is never evidence of closure.
+# - REVERIFY, 1st + 15th 05:00 UTC (~14-day cycle): re-run ingest for
+#   exactly the companies owning live postings whose
+#   verification_expires_at has passed. ACCEPT refreshes the 14-day
+#   expiry; a complete run closes removed jobs; a partial run closes
+#   nothing. Jobs already past expiry are hidden from the public query
+#   by listLiveJobs itself, so a missed reverify run makes the board
+#   smaller, never stale.
+# Either mode rewrites data/jobs.json from the public
+# query, so expired jobs leave the public snapshot the same day.
+# Single committer (this job) — serialized against ingest merges via the
+# shared jobs-db-publish concurrency group.
+name: Reverify + liveness
+
+on:
+  schedule:
+    - cron: '0 4 * * *' # liveness — daily 04:00 UTC
+    - cron: '0 5 1,15 * *' # full re-verify — 1st + 15th 05:00 UTC (~14 days)
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Mode to run'
+        type: choice
+        options: [liveness, reverify]
+        default: 'liveness'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: jobs-db-publish
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Check Node >= 24 (setup-node pins 24; zero dependencies to install)
+        run: node -e "if (parseInt(process.versions.node.split('.')[0], 10) < 24) { console.error('Node >= 24 required, got ' + process.version); process.exit(1); }"
+      - name: Pick mode
+        id: pick
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            MODE="${{ inputs.mode }}"
+          else
+            case "${{ github.event.schedule }}" in
+              "0 4 * * *") MODE="liveness" ;;
+              "0 5 1,15 * *") MODE="reverify" ;;
+              *) MODE="liveness" ;;
+            esac
+          fi
+          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
+          echo "Running $MODE"
+      - name: Run reverify
+        run: |
+          node src/reverify-run.cjs \
+            --db data/jobs.db \
+            --mode "${{ steps.pick.outputs.mode }}" \
+            --companies data/companies.json \
+            --snapshot data/jobs.json \
+            --out reverify-summary.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reverify-summary
+          path: reverify-summary.json
+          retention-days: 30
+      - name: Commit + push if the db or snapshot changed
+        run: |
+          git config user.name "jobboard-ingest"
+          git config user.email "jobboard-ingest@users.noreply.github.com"
+          git add data/jobs.db data/jobs.json
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "reverify: ${{ steps.pick.outputs.mode }} $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            git push
+          fi
