@@ -1,1 +1,2728 @@
-{"companies":[{"domain":"acumen.org","evidenceUrl":"https://acumen.org/contact-us/","hqCountry":"US","notes":"First-party contact page lists HQ: 40 Worth Street, Suite 303, New York, NY 10013 USA. Verified 2026-11-17.","verifiedAt":"2026-11-17"},{"domain":"adcouncil.org","evidenceUrl":"https://www.adcouncil.org/about-us/join-our-team/careers","hqCountry":"US","notes":"First-party careers page (adcouncil.org); Ad Council's own postings list HQ: 815 2nd Avenue, 9th Floor, New York, NY 10017. Corroborated by ZoomInfo/Prospeo. Verified 2026-11-17.","verifiedAt":"2026-11-17"},{"domain":"aenetworks.com","evidenceUrl":"https://www.aegm.com/b2b-terms-of-use/","hqCountry":"US","notes":"First-party Terms of Use (aegm.com) lists HQ: A+E Global Media, 235 East 45th Street, New York, NY 10017. Verified 2026-11-17.","verifiedAt":"2026-11-17"},{"domain":"aaon.com","evidenceUrl":"https://www.aaon.com/","hqCountry":"US","notes":"First-party homepage (aaon.com) lists HQ: 2425 S Yukon Ave, Tulsa, OK 74107. Corroborated by SEC EDGAR (principal executive offices). Verified 2026-11-17.","verifiedAt":"2026-11-17"},{"domain":"abbott.com","evidenceUrl":"https://www.abbott.com/","hqCountry":"US","notes":"First-party site (abbott.com) lists HQ: 100 Abbott Park Road, Abbott Park, IL 60064. Verified 2026-11-17.","verifiedAt":"2026-11-17"},{"domain":"allinahealth.org","evidenceUrl":"https://www.allinahealth.org/-/media/allina-health/files/customer-service/financial-assistance1/ah-financial-asst-plain-lang-summary_somali_print.pdf","hqCountry":"US","notes":"First-party Allina Health document (allinahealth.org) states corporate office at 2925 Chicago Ave S, Minneapolis, MN 55407. Verified 2026-11-17.","verifiedAt":"2026-11-17"},{"domain":"988lifeline.org","evidenceUrl":"https://988lifeline.org/donate/","hqCountry":"US","notes":"First-party donate page (988lifeline.org) lists administrator Vibrant Emotional Health, 80 Pine Street, Floor 19, New York, NY 10005, and states the Lifeline is administered by Vibrant. Workday tenant name is 'opportunityalliance' (board linked from 988's own careers page). Verified 2026-11-17.","verifiedAt":"2026-11-17"},{"domain":"muhlenberg.edu","evidenceUrl":"https://www.muhlenberg.edu/","hqCountry":"US","notes":"First-party site (muhlenberg.edu) lists campus HQ: 2400 Chew Street, Allentown, PA 18104. Verified 2026-11-17.","verifiedAt":"2026-11-17"},{"domain":"acu.edu","evidenceUrl":"https://www.acu.edu/","hqCountry":"US","notes":"First-party site (acu.edu) footer lists HQ: 1600 Campus Court, Abilene, TX 79601. Verified 2026-11-17.","verifiedAt":"2026-11-17"}],"version":1}
+{
+ "companies": [
+  {
+   "domain": "988lifeline.org",
+   "evidenceUrl": "https://988lifeline.org/donate/",
+   "hqCountry": "US",
+   "notes": "First-party donate page (988lifeline.org) lists administrator Vibrant Emotional Health, 80 Pine Street, Floor 19, New York, NY 10005, and states the Lifeline is administered by Vibrant. Workday tenant name is 'opportunityalliance' (board linked from 988's own careers page). Verified 2026-11-17.",
+   "verifiedAt": "2026-11-17"
+  },
+  {
+   "domain": "aamc.org",
+   "evidenceUrl": "https://students-residents.aamc.org/contact-aamc",
+   "hqCountry": "US",
+   "notes": "First-party contact page lists HQ: 655 K St. NW, Suite 100, Washington, DC 20001-2399. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "aaon.com",
+   "evidenceUrl": "https://www.aaon.com/",
+   "hqCountry": "US",
+   "notes": "First-party homepage (aaon.com) lists HQ: 2425 S Yukon Ave, Tulsa, OK 74107. Corroborated by SEC EDGAR (principal executive offices). Verified 2026-11-17.",
+   "verifiedAt": "2026-11-17"
+  },
+  {
+   "domain": "abbott.com",
+   "evidenceUrl": "https://www.abbott.com/",
+   "hqCountry": "US",
+   "notes": "First-party site (abbott.com) lists HQ: 100 Abbott Park Road, Abbott Park, IL 60064. Verified 2026-11-17.",
+   "verifiedAt": "2026-11-17"
+  },
+  {
+   "domain": "acog.org",
+   "evidenceUrl": "https://www.acog.org/contact/grievance-complaints/",
+   "hqCountry": "US",
+   "notes": "First-party contact page lists HQ: 409 12th Street SW, Washington, DC 20024-2188. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "acscan.org",
+   "evidenceUrl": "https://www.fightcancer.org/sites/default/files/state_documents/2024_acs_can_federal_priorities_0.pdf",
+   "hqCountry": "US",
+   "notes": "First-party document on ACS CAN's own site (fightcancer.org) lists HQ: 655 15th Street, NW, Suite 503, Washington, DC 20005. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "acu.edu",
+   "evidenceUrl": "https://www.acu.edu/",
+   "hqCountry": "US",
+   "notes": "First-party site (acu.edu) footer lists HQ: 1600 Campus Court, Abilene, TX 79601. Verified 2026-11-17.",
+   "verifiedAt": "2026-11-17"
+  },
+  {
+   "domain": "acumen.org",
+   "evidenceUrl": "https://acumen.org/contact-us/",
+   "hqCountry": "US",
+   "notes": "First-party contact page lists HQ: 40 Worth Street, Suite 303, New York, NY 10013 USA. Verified 2026-11-17.",
+   "verifiedAt": "2026-11-17"
+  },
+  {
+   "domain": "adcouncil.org",
+   "evidenceUrl": "https://www.adcouncil.org/about-us/join-our-team/careers",
+   "hqCountry": "US",
+   "notes": "First-party careers page (adcouncil.org); Ad Council's own postings list HQ: 815 2nd Avenue, 9th Floor, New York, NY 10017. Corroborated by ZoomInfo/Prospeo. Verified 2026-11-17.",
+   "verifiedAt": "2026-11-17"
+  },
+  {
+   "domain": "adr.org",
+   "evidenceUrl": "https://adr.org/higginbotham-fellows-program/",
+   "hqCountry": "US",
+   "notes": "First-party program page lists AAA Headquarters: 150 East 42nd Street, 17th Floor, New York, NY 10017. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "aenetworks.com",
+   "evidenceUrl": "https://www.aegm.com/b2b-terms-of-use/",
+   "hqCountry": "US",
+   "notes": "First-party Terms of Use (aegm.com) lists HQ: A+E Global Media, 235 East 45th Street, New York, NY 10017. Verified 2026-11-17.",
+   "verifiedAt": "2026-11-17"
+  },
+  {
+   "domain": "aep.com",
+   "evidenceUrl": "https://www.aep.com/assets/docs/investors/AnnualReportsProxies/docs/20annrep/2021ProxyStatement.pdf",
+   "hqCountry": "US",
+   "notes": "First-party proxy statement lists HQ: 1 Riverside Plaza, Columbus, OH 43215. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "aig.com",
+   "evidenceUrl": "https://orgn-aigde.dmp.aig.com/content/dam/aig/emea/germany/documents/report/aig-2023-annual-report.pdf.coredownload.pdf",
+   "hqCountry": "US",
+   "notes": "First-party annual report lists principal executive offices: 1271 Avenue of the Americas, New York, NY 10020. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "air.org",
+   "evidenceUrl": "https://www.air.org/privacy-policy",
+   "hqCountry": "US",
+   "notes": "First-party privacy policy states HQ: 1400 Crystal Drive, 10th Floor, Arlington, VA 22202, and 'AIR is headquartered in Arlington, Virginia, in the United States of America.' Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "albemarle.com",
+   "evidenceUrl": "https://www.albemarle.com/us/en/who-we-are/global-locations?google_search=%7Bsearch_term_string%7D",
+   "hqCountry": "US",
+   "notes": "First-party global locations page lists corporate HQ: 4250 Congress Street, Suite 900, Charlotte, NC 28209. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "alcoa.com",
+   "evidenceUrl": "https://www.alcoa.com/global/en/general/privacy.asp",
+   "hqCountry": "US",
+   "notes": "First-party privacy page lists HQ: 201 Isabella Street, Suite 500, Pittsburgh, PA 15212. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "allenai.org",
+   "evidenceUrl": "https://allenai.org/privacy-policy/2022-07-21",
+   "hqCountry": "US",
+   "notes": "First-party privacy policy lists HQ: 2157 North Northlake Way, Suite 110, Seattle, WA 98103. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "allinahealth.org",
+   "evidenceUrl": "https://www.allinahealth.org/-/media/allina-health/files/customer-service/financial-assistance1/ah-financial-asst-plain-lang-summary_somali_print.pdf",
+   "hqCountry": "US",
+   "notes": "First-party Allina Health document (allinahealth.org) states corporate office at 2925 Chicago Ave S, Minneapolis, MN 55407. Verified 2026-11-17.",
+   "verifiedAt": "2026-11-17"
+  },
+  {
+   "domain": "ally.com",
+   "evidenceUrl": "https://www.ally.com/about/locations/",
+   "hqCountry": "US",
+   "notes": "First-party locations page lists HQ: 500 Woodward Ave, Detroit, MI 48226. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "altamed.org",
+   "evidenceUrl": "http://www.altamed.org/terms_of_service",
+   "hqCountry": "US",
+   "notes": "First-party terms page lists HQ: 2040 Camfield Ave, Los Angeles, CA 90040, and states AltaMed is headquartered in Los Angeles, California. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "amgen.com",
+   "evidenceUrl": "https://www.amgen.com/contact-us/locations",
+   "hqCountry": "US",
+   "notes": "First-party locations page lists HQ: One Amgen Center Drive, Thousand Oaks, CA 91320. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "anchorage.com",
+   "evidenceUrl": "https://www.anchorage.com/platform/self-custody/terms-and-conditions",
+   "hqCountry": "US",
+   "notes": "First-party terms page lists HQ: One Embarcadero Center #2623, San Francisco, CA 94126; company states it is headquartered in San Francisco, California. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "apha.org",
+   "evidenceUrl": "https://www.apha.org/about-apha",
+   "hqCountry": "US",
+   "notes": "First-party About page lists HQ: 800 I Street, NW, Washington, DC 20001. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "archildrens.org",
+   "evidenceUrl": "https://www.archildrens.org/locations/arkansas-childrens/medicine-unit-4c",
+   "hqCountry": "US",
+   "notes": "First-party location page lists HQ: Arkansas Children's Hospital, 1 Children's Way, Little Rock, AR 72202. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "arcinstitute.org",
+   "evidenceUrl": "https://arcinstitute.org/scverse-satellite-workshop-2025",
+   "hqCountry": "US",
+   "notes": "First-party page lists Arc Institute, 3181 Porter Dr., Palo Alto, CA 94304, and states it is located in Palo Alto, California. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "arena.ai",
+   "evidenceUrl": "https://help.arena.ai/articles/5629909088-terms-of-use",
+   "hqCountry": "US",
+   "notes": "First-party Terms of Use lists HQ: 2261 Market St., STE 85064, San Francisco, CA 94114. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "arena.net",
+   "evidenceUrl": "https://arena.net/legal/privacy-policy",
+   "hqCountry": "US",
+   "notes": "First-party privacy policy lists mailing address: 3180 139th Avenue, Suite #500, Bellevue, WA 98005, USA. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "ari.us",
+   "evidenceUrl": "https://ari.us/privacy/",
+   "hqCountry": "US",
+   "notes": "First-party privacy page lists HQ: 750 17th St NW, STE 1200, Washington, DC 20006, United States. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "asia.umgc.edu",
+   "evidenceUrl": "https://www.umgc.edu/administration/policies-and-reporting/sexual-misconduct-title-ix",
+   "hqCountry": "US",
+   "notes": "First-party UMGC page lists UMGC Headquarters: 3501 University Boulevard East, Adelphi, MD 20783; asia.umgc.edu is UMGC's Asia division and the board is UMGC's own (umgc). Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "aspentech.com",
+   "evidenceUrl": "https://www.aspentech.com/en/privacy-and-security",
+   "hqCountry": "US",
+   "notes": "First-party privacy page lists HQ: 20 Crosby Drive, Bedford, MA 01730. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "athene.com",
+   "evidenceUrl": "https://WWW.ATHENE.COM/support/faqs",
+   "hqCountry": "US",
+   "notes": "First-party FAQ page lists HQ: 7700 Mills Civic Parkway, West Des Moines, IA 50266. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "atlantahousing.org",
+   "evidenceUrl": "https://www.atlantahousing.org/wp-content/uploads/2026/10/RFQL-2027-0045-Commercial-and-Residential-Property-Management-Services-Bench.pdf",
+   "hqCountry": "US",
+   "notes": "First-party document lists corporate HQ: 230 John Wesley Dobbs Avenue, NE, Atlanta, GA 30303. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "audubon.org",
+   "evidenceUrl": "https://www.audubon.org/terms-use?nid=4151&origin=conservation&site=seabirds",
+   "hqCountry": "US",
+   "notes": "First-party terms page lists HQ: National Audubon Society, 225 Varick Street, 7th Floor, New York, NY 10014. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "austincc.edu",
+   "evidenceUrl": "https://www.austincc.edu/contact-acc/",
+   "hqCountry": "US",
+   "notes": "First-party contact page lists HQ: Austin Community College District, 6101 Highland Campus Drive, Austin, TX 78752. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "austintexas.gov",
+   "evidenceUrl": "https://services.austintexas.gov/edims/document.cfm?id=451888",
+   "hqCountry": "US",
+   "notes": "First-party City of Austin document lists HQ: Austin City Hall, 301 West 2nd Street, Austin, TX 78701. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "avinc.com",
+   "evidenceUrl": "https://www.avinc.com/2025/05/01/aerovironment-and-bluehalo-complete-transaction-creating-a-global-defense-technology/",
+   "hqCountry": "US",
+   "notes": "First-party press release lists corporate HQ: 241 18th Street South, #650, Arlington, VA 22202, and states AeroVironment is headquartered in Arlington, Virginia. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "baincapital.com",
+   "evidenceUrl": "https://staging.baincapital.com/citizenship/responsible-business",
+   "hqCountry": "US",
+   "notes": "First-party page states Bain Capital's Boston Headquarters (city-only, no street address on a Bain Capital page found; the 200 Clarendon Street address on baincapital.com belongs to Bain Capital Specialty Finance, a separate listed fund). Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "bakerhughes.com",
+   "evidenceUrl": "https://www.bakerhughes.com/sites/bakerhughes/files/2025-04/baker_hughes_annual_report_2024.pdf",
+   "hqCountry": "US",
+   "notes": "First-party annual report (10-K) lists principal executive offices: 575 N. Dairy Ashford Rd., Suite 100, Houston, TX 77079-1121. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "baptisthealth.com",
+   "evidenceUrl": "https://www.baptisthealth.com/careers/why-choose-baptist-health/our-philosophy",
+   "hqCountry": "US",
+   "notes": "First-party page states Baptist Health is headquartered in Louisville and lists HQ: 1901 Campus Place, Louisville, KY 40299. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "barrfoundation.org",
+   "evidenceUrl": "https://www.barrfoundation.org/our-office/",
+   "hqCountry": "US",
+   "notes": "First-party Our Office page lists HQ: Two Atlantic Avenue, Boston, MA 02110. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "barry.edu",
+   "evidenceUrl": "https://www.barry.edu/en/contact-us/",
+   "hqCountry": "US",
+   "notes": "First-party contact page lists HQ: 11300 NE 2nd Avenue, Miami Shores, FL 33161. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "bauer.com",
+   "evidenceUrl": "https://www.bauer.com/pages/terms-conditions",
+   "hqCountry": "US",
+   "notes": "First-party Terms of Use lists Bauer Hockey DMCA agent address: 100 Domain Drive, Exeter, NH 03833. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "baystatehealth.org",
+   "evidenceUrl": "https://www.baystatehealth.org/terms-of-use",
+   "hqCountry": "US",
+   "notes": "First-party terms page lists HQ: Baystate Health, 280 Chestnut Street, 5th floor, Springfield, MA 01199. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "bbyo.org",
+   "evidenceUrl": "https://bbyo.org/media/x4xfelht/jtp-project-privacy-policy-july-2026.pdf",
+   "hqCountry": "US",
+   "notes": "First-party privacy policy lists HQ: BBYO International Office, 1200 Pennsylvania Avenue NW, PO Box #14540, Washington, DC 20004-2403. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "bcbsri.com",
+   "evidenceUrl": "https://www.bcbsri.com/newsroom/press-releases/bcbsri-takes-steps-protect-employees-and-community-covid-19-requires",
+   "hqCountry": "US",
+   "notes": "First-party press release lists HQ: 500 Exchange Street, Providence, RI 02903. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "bcbst.com",
+   "evidenceUrl": "https://www.bcbst.com/docs/members/tva/TVA-2026-CDHP-Silver-Benefits-Summary.pdf",
+   "hqCountry": "US",
+   "notes": "First-party document lists HQ: BlueCross BlueShield of Tennessee, 1 Cameron Hill Circle, Chattanooga, TN 37402. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "bd.com",
+   "evidenceUrl": "https://investors.bd.com/sec-filings/annual-reports/content/0000010795-23-000098/0000010795-23-000098.pdf",
+   "hqCountry": "US",
+   "notes": "First-party 10-K lists principal executive offices: 1 Becton Drive, Franklin Lakes, NJ 07417-1880. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "becu.org",
+   "evidenceUrl": "https://www.becu.org/-/media/Files/PDF/P-6865.pdf?rev=0c8f89679b2e4bb199b0ea9ec48f14e8&",
+   "hqCountry": "US",
+   "notes": "First-party form lists HQ: 12770 Gateway Drive, Tukwila, WA 98168. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "bentley.com",
+   "evidenceUrl": "https://www.bentley.com/en/contact/",
+   "hqCountry": "US",
+   "notes": "First-party contact page lists corporate HQ: 685 Stockton Drive, Exton, PA 19341. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "bentley.edu",
+   "evidenceUrl": "https://www.bentley.edu/newfalconexperience/faq",
+   "hqCountry": "US",
+   "notes": "First-party FAQ page lists HQ: Bentley University, 175 Forest Street, Waltham, MA 02452. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "bethesdahealth.org",
+   "evidenceUrl": "https://bethesdahealth.org/",
+   "hqCountry": "US",
+   "notes": "First-party homepage lists Corporate Office: 12101 Woodcrest Executive Dr., Suite 200, St. Louis, MO 63141. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "biogen.com",
+   "evidenceUrl": "https://investors.biogen.com/static-files/1a17c58d-4d75-4cf8-b69c-5417cf584d0c",
+   "hqCountry": "US",
+   "notes": "First-party 8-K lists principal executive offices: 225 Binney Street, Cambridge, MA 02142. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "bklynlibrary.org",
+   "evidenceUrl": "https://www.bklynlibrary.org/locations/central",
+   "hqCountry": "US",
+   "notes": "First-party locations page lists HQ: 10 Grand Army Plaza, Brooklyn, NY 11238. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "bluemeridian.org",
+   "evidenceUrl": "https://bluemeridian.org/funds/newsroom",
+   "hqCountry": "US",
+   "notes": "First-party newsroom/FAQ lists HQ: 685 Third Avenue, 19th Floor, New York, NY 10017. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "boeing.com",
+   "evidenceUrl": "https://docs.cascade.boeing.com/terms.html",
+   "hqCountry": "US",
+   "notes": "First-party terms page lists HQ: 929 Long Bridge Road, Arlington, VA 22202. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "boozallen.com",
+   "evidenceUrl": "https://www.boozallen.com/menu/office-locations.html",
+   "hqCountry": "US",
+   "notes": "First-party office locations page lists HQ: 8283 Greensboro Drive, McLean, VA 22102. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "boystown.org",
+   "evidenceUrl": "https://www.boystown.org/contact",
+   "hqCountry": "US",
+   "notes": "First-party contact page lists National Headquarters: 14100 Crawford St., Boys Town, NE 68010. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "brown.edu",
+   "evidenceUrl": "https://president.brown.edu/about/contact-information",
+   "hqCountry": "US",
+   "notes": "First-party contact page lists HQ: 1 Prospect Street, Box 1860, Providence, RI 02912. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "bucknell.edu",
+   "evidenceUrl": "https://www.bucknell.edu/admissions-aid/apply-bucknell/undergraduate-admission-requirements/information-transfer-applicants",
+   "hqCountry": "US",
+   "notes": "First-party admissions page lists HQ: One Dent Drive, Lewisburg, PA 17837. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "butterflynetwork.com",
+   "evidenceUrl": "https://english.butterflynetwork.com/website-terms-of-use",
+   "hqCountry": "US",
+   "notes": "First-party Terms of Use lists HQ: 1600 District Avenue, Burlington, MA 01803 (contact page also labels Burlington, MA as HQ). Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "c4ads.org",
+   "evidenceUrl": "https://c4ads.org/careers/",
+   "hqCountry": "US",
+   "notes": "First-party careers page footer lists: 1201 I Street Northwest, Suite 200, Washington, D.C. 20005, United States. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "calvertcountymd.gov",
+   "evidenceUrl": "https://www.calvertcountymd.gov/386/Recruitment",
+   "hqCountry": "US",
+   "notes": "First-party county page lists HQ: 150 Main St., Prince Frederick, MD 20678. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "camdennational.bank",
+   "evidenceUrl": "http://camdennational.bank/getContentAsset/7c7c2430-9202-43d3-91fe-cc9087762e51/3d1daacc-ebfd-47b4-a59b-db3c9d47fbc8/CRA-Performance-Evaluation-11-18-24.pdf?language=en",
+   "hqCountry": "US",
+   "notes": "First-party CRA evaluation lists HQ: 2 Elm Street, Camden, ME 04843. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "campbellsville.edu",
+   "evidenceUrl": "https://www.campbellsville.edu/contact.html",
+   "hqCountry": "US",
+   "notes": "First-party contact page lists HQ: 1 University Drive, Campbellsville, KY 42718. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "cancer.org",
+   "evidenceUrl": "https://education.cancer.org/pages/who-we-are",
+   "hqCountry": "US",
+   "notes": "First-party Who We Are page lists Global Headquarters in Atlanta and business address: 270 Peachtree Street NW, Suite 1300, Atlanta, GA 30303. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "capitalhealth.org",
+   "evidenceUrl": "https://www.capitalhealth.org/sites/default/files/2025-08/CH Psychiatry Residency Program PGY1 Sample Contract.pdf",
+   "hqCountry": "US",
+   "notes": "First-party document lists HQ: 750 Brunswick Avenue, Trenton, NJ 08638. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "capstonedc.com",
+   "evidenceUrl": "https://capstonedc.com/about/washington-dc/page/20/?et_blog",
+   "hqCountry": "US",
+   "notes": "First-party office page lists HQ: 1401 New York Ave NW, Ste 600, Washington, DC 20005. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "casl.org",
+   "evidenceUrl": "https://www.casl.org/",
+   "hqCountry": "US",
+   "notes": "First-party homepage lists address: 2141 S Tan Ct, Chicago, IL 60616, US. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "catalight.org",
+   "evidenceUrl": "https://www.catalight.org/academic-research-community/",
+   "hqCountry": "US",
+   "notes": "First-party page lists HQ: 2730 Shadelands Drive, Walnut Creek, CA 94598. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "cayugahealth.org",
+   "evidenceUrl": "https://cayugahealth.org/services/heart/our-services/",
+   "hqCountry": "US",
+   "notes": "First-party services page lists HQ: 101 Dates Drive, Ithaca, NY 14850. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "cca.edu",
+   "evidenceUrl": "https://www.cca.edu/sustainability/",
+   "hqCountry": "US",
+   "notes": "First-party page lists HQ: 145 Hooper Street, San Francisco, CA 94107. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "centerstone.org",
+   "evidenceUrl": "https://centerstone.org/locations/tennessee/page/8/",
+   "hqCountry": "US",
+   "notes": "First-party locations page lists HQ: 1921 Ransom Place, Nashville, TN 37217. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "centier.com",
+   "evidenceUrl": "https://www.centier.com/wealth-management/safe-harbor-ira",
+   "hqCountry": "US",
+   "notes": "First-party page lists HQ: 600 East 84th Avenue, Merrillville, IN 46410. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "cfainstitute.org",
+   "evidenceUrl": "https://www.cfainstitute.org/sites/default/files/-/media/documents/survey/AI-Pioneers-in-Investment-Management.pdf",
+   "hqCountry": "US",
+   "notes": "First-party document lists HQ: 915 East High Street, Charlottesville, VA 22902. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "change.org",
+   "evidenceUrl": "https://www.change.org/policies/privacy",
+   "hqCountry": "US",
+   "notes": "First-party privacy policy lists HQ: 548 Market Street, #29993, San Francisco, CA 94104-5401, USA. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "charleskochinstitute.org",
+   "evidenceUrl": "https://standtogether.org/terms-of-use",
+   "hqCountry": "US",
+   "notes": "First-party Terms of Use lists HQ: 4201 Wilson Blvd, Arlington, VA 22203. Charles Koch Institute is now Stand Together Trust (charleskochinstitute.org serves Stand Together Trust content; its careers link points to Stand Together). Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "charleys.com",
+   "evidenceUrl": "https://www.charleys.com/privacy/",
+   "hqCountry": "US",
+   "notes": "First-party privacy policy (Gosh Enterprises, Inc., parent of Charleys Philly Steaks) lists contact address: 5000 Arlington Centre Blvd., Suite 5300, Columbus, OH 43220. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "chas.org",
+   "evidenceUrl": "https://chas.org/for-patients/privacy/",
+   "hqCountry": "US",
+   "notes": "First-party privacy page lists HQ: 731 North Iron Bridge Way, Spokane, WA 99202. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "chatham.edu",
+   "evidenceUrl": "https://www.chatham.edu/academics/graduate/athletic-training/admission-requirements.html",
+   "hqCountry": "US",
+   "notes": "First-party page lists HQ: 107 Woodland Road, Pittsburgh, PA 15232. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "childrensdayton.org",
+   "evidenceUrl": "https://childrensdayton.org/locations/main-campus/",
+   "hqCountry": "US",
+   "notes": "First-party locations page lists HQ: 1 Childrens Plaza, Dayton, OH 45404. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "childrensnational.org",
+   "evidenceUrl": "https://www.childrensnational.org/get-care/locations/main-hospital",
+   "hqCountry": "US",
+   "notes": "First-party locations page lists HQ: 111 Michigan Avenue NW, Washington, DC 20010. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "childrensplace.com",
+   "evidenceUrl": "https://www.childrensplace.com/us/help-center/policies/Refer-A-FriendTermsandConditions",
+   "hqCountry": "US",
+   "notes": "First-party terms page lists HQ: 500 Plaza Dr, Secaucus, NJ 07094. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "chop.edu",
+   "evidenceUrl": "https://www.chop.edu/about-us/our-history",
+   "hqCountry": "US",
+   "notes": "First-party page lists HQ: 3401 Civic Center Blvd, Philadelphia, PA 19104. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "chrobinson.com",
+   "evidenceUrl": "https://www.chrobinson.com/en-us/contact/",
+   "hqCountry": "US",
+   "notes": "First-party contact page lists North America Global Headquarters: 14701 Charlson Road, Eden Prairie, MN 55347. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "cigna.com",
+   "evidenceUrl": "http://cigna.com/static/www-cigna-com/docs/ifp/m-25-app-co-945166-medical-application.pdf",
+   "hqCountry": "US",
+   "notes": "First-party document lists HQ: 900 Cottage Grove Road, Bloomfield, CT 06002. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "citi.com",
+   "evidenceUrl": "https://depositaryreceipts.citi.com/adr/common/file.aspx?idf=7638",
+   "hqCountry": "US",
+   "notes": "First-party document lists HQ: 388 Greenwich Street, New York, NY 10013. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "clark.wa.gov",
+   "evidenceUrl": "http://clark.wa.gov/human-resources/contact-information",
+   "hqCountry": "US",
+   "notes": "First-party county page lists HQ: 1300 Franklin Street, Vancouver, WA 98660. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "clemson.edu",
+   "evidenceUrl": "https://www.clemson.edu/ethics/about/staff.html",
+   "hqCountry": "US",
+   "notes": "First-party contact page lists HQ: 240 Hardin Hall, Clemson University, Clemson, SC 29634. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "clevelandclinic.org",
+   "evidenceUrl": "https://my.clevelandclinic.org/locations/directions/109-j-building-sydell-and-arnold-miller-family-pavilion",
+   "hqCountry": "US",
+   "notes": "First-party locations page lists HQ: 9500 Euclid Avenue, Cleveland, OH 44195. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "climatefirstbank.com",
+   "evidenceUrl": "https://www.climatefirstbank.com/documents/2023_Impact-Report_202607078.pdf",
+   "hqCountry": "US",
+   "notes": "First-party 2023 Impact Report lists St. Petersburg location: 182 37th Avenue N, St. Petersburg, FL 33704 (bank HQ, per its relocation to this address). Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "code.org",
+   "evidenceUrl": "http://code.org/en-US/donate",
+   "hqCountry": "US",
+   "notes": "First-party donate page lists HQ: 801 Fifth Avenue, Ste 2100, Seattle, WA 98104. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "coloradomesa.edu",
+   "evidenceUrl": "https://www.coloradomesa.edu/campus-info/contact.html",
+   "hqCountry": "US",
+   "notes": "First-party contact page lists HQ: 1100 North Avenue, Grand Junction, CO 81501. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "columbiabank.com",
+   "evidenceUrl": "https://www.columbiabank.com/globalassets/media/documents/columbia/cb_cra_pe_2020.pdf",
+   "hqCountry": "US",
+   "notes": "First-party CRA document lists HQ: 1301 A Street, Tacoma, WA 98402. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "company.wizards.com",
+   "evidenceUrl": "https://company.wizards.com/en/legal/terms",
+   "hqCountry": "US",
+   "notes": "First-party Terms list Wizards of the Coast LLC, P.O. Box 707, Renton, WA 98057-0707. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "comscore.com",
+   "evidenceUrl": "https://www.comscore.com/About/office-locations",
+   "hqCountry": "US",
+   "notes": "First-party locations page lists Corporate Headquarters: 11950 Democracy Drive, Suite 600, Reston, VA 20190. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "conocophillips.com",
+   "evidenceUrl": "https://www.conocophillips.com/about-us/conocophillipscenter/",
+   "hqCountry": "US",
+   "notes": "First-party ConocoPhillips Center page lists HQ: 925 N. Eldridge Parkway, Houston, TX 77079-2703. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "cooleydickinson.org",
+   "evidenceUrl": "https://plannedgiving.cooleydickinson.org/sites/cdhc/files/2023-10/CDHC_PrintEstatePlanningGuide_final (2).pdf",
+   "hqCountry": "US",
+   "notes": "First-party estate planning guide lists HQ: Cooley Dickinson Hospital, 30 Locust Street, Northampton, MA 01061. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "coverys.com",
+   "evidenceUrl": "https://www.coverys.com/about/company-information",
+   "hqCountry": "US",
+   "notes": "First-party company information page lists HQ: One Financial Center, Boston, MA 02111. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "crossriver.com",
+   "evidenceUrl": "https://www.crossriver.com/legal/privacy-policy",
+   "hqCountry": "US",
+   "notes": "First-party privacy policy lists HQ: 2115 Linwood Ave., Fort Lee, NJ 07024; company states it is headquartered in Fort Lee, New Jersey. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "crystalbridges.org",
+   "evidenceUrl": "https://crystalbridges.org/news/crystal-bridges-and-the-momentary-celebrate-arbor-day?n=t",
+   "hqCountry": "US",
+   "notes": "First-party news page lists HQ: 600 Museum Way, Bentonville, AR 72712. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "csuglobal.edu",
+   "evidenceUrl": "https://csuglobal.edu/blog/what-its-being-csu-global-student",
+   "hqCountry": "US",
+   "notes": "First-party page footer lists HQ: 555 17th St., Ste. 1000, Denver, CO 80202; its own pages also state administrative offices are in Aurora, Colorado. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "curtisswright.com",
+   "evidenceUrl": "https://cdn.curtisswright.com/admin/files/doc_financials/annual/2023/shareholder-information.html",
+   "hqCountry": "US",
+   "notes": "First-party shareholder information page lists corporate HQ: 130 Harbour Place Drive, Suite 300, Davidson, NC 28036. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "czbiohub.org",
+   "evidenceUrl": "https://biohub.org/",
+   "hqCountry": "US",
+   "notes": "First-party site (biohub.org) lists Biohub, San Francisco: 499 Illinois St, San Francisco, CA 94158, US. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "dairylandpower.com",
+   "evidenceUrl": "https://dairylandpower.com/sites/default/files/PDFs/Board/2025/DPC%20Articles%20of%20Incorporation%202025.pdf",
+   "hqCountry": "US",
+   "notes": "First-party articles of incorporation list principal office: 3200 East Avenue South, P.O. Box 817, La Crosse, WI 54602-0817. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "dallascityhall.com",
+   "evidenceUrl": "http://citysecretary2.dallascityhall.com/pdf/COUNCIL%20COMMITTEES/2024/020524_PTE_MIN.pdf",
+   "hqCountry": "US",
+   "notes": "First-party City of Dallas document lists City Hall: 1500 Marilla Street, Dallas, TX 75201. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "datagrail.io",
+   "evidenceUrl": "https://www.datagrail.io/press/datagrail-recognized-as-a-leader-in-the-2025-idc-marketscape-for-worldwide-data-privacy-compliance-software/",
+   "hqCountry": "US",
+   "notes": "First-party press release states HQ: San Francisco, CA (no street address published on first-party pages). Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "deckers.com",
+   "evidenceUrl": "https://ir.deckers.com/sec-filings/all-sec-filings/content/0001628280-26-037664/0001628280-26-037664.pdf",
+   "hqCountry": "US",
+   "notes": "First-party SEC filing lists principal executive offices: 250 Coromar Drive, Goleta, CA 93117. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "dematic.com",
+   "evidenceUrl": "https://www.dematic.com/en-us/contact-us/global-directory/",
+   "hqCountry": "US",
+   "notes": "First-party global directory lists Global Headquarters: 756 W Peachtree St NW, Atlanta, GA 30308. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "denverhealth.org",
+   "evidenceUrl": "https://www.denverhealth.org/about-denver-health",
+   "hqCountry": "US",
+   "notes": "First-party about page lists HQ: 777 Bannock St., Denver, CO 80204. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "dnb.com",
+   "evidenceUrl": "https://www.dnb.com/en-us/about/contact-us.html",
+   "hqCountry": "US",
+   "notes": "First-party contact page lists: 5335 Gate Parkway, Jacksonville, FL 32256. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "dodgeandcox.com",
+   "evidenceUrl": "https://www.dodgeandcox.com/financial-professional/us/en/contact-us.html",
+   "hqCountry": "US",
+   "notes": "First-party contact page lists HQ: 555 California Street, 40th Floor, San Francisco, CA 94104. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "donornetworkwest.org",
+   "evidenceUrl": "https://www.donornetworkwest.org/privacy-policy-and-conditions-of-use/",
+   "hqCountry": "US",
+   "notes": "First-party privacy policy states HQ: 12667 Alcosta Blvd., Suite 500, San Ramon, CA 94583. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "drafthouse.com",
+   "evidenceUrl": "https://drafthouse.com/denver/news/free-movies-boston",
+   "hqCountry": "US",
+   "notes": "First-party page lists HQ/sponsor address: Alamo Drafthouse Cinemas, 3908 Avenue B, Austin, TX 78751. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "draper.com",
+   "evidenceUrl": "https://www.draper.com/privacy-policy",
+   "hqCountry": "US",
+   "notes": "First-party privacy policy lists HQ: 555 Technology Square, Cambridge, MA 02139-3563. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "driscollchildrens.org",
+   "evidenceUrl": "https://driscollchildrens.org/patients/resources/patient-records/",
+   "hqCountry": "US",
+   "notes": "First-party patient records page lists HQ: 3533 S. Alameda St., Corpus Christi, TX 78411. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "edf.org",
+   "evidenceUrl": "http://www.edf.org/offices/new-york-city",
+   "hqCountry": "US",
+   "notes": "First-party New York City office page lists HQ: 257 Park Avenue South, New York, NY 10010. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "educationsuperhighway.org",
+   "evidenceUrl": "https://www.educationsuperhighway.org/wp-content/uploads/NTIA-Challenge-Process-Guidance-May-2023-EducationSuperHighwayComments.pdf",
+   "hqCountry": "US",
+   "notes": "First-party filing on its own site lists HQ: 6 Presidio Terrace, San Francisco, CA 94118 (also on its 2024 Form 990 hosted on its site). Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "eehealth.org",
+   "evidenceUrl": "https://www.eehealth.org/services/pharmacy",
+   "hqCountry": "US",
+   "notes": "First-party pharmacy page lists Elmhurst Hospital: 155 E. Brush Hill Rd., Elmhurst, IL 60126. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "ehtp.org",
+   "evidenceUrl": "https://www.ehtp.org/let-scholars-grow",
+   "hqCountry": "US",
+   "notes": "First-party page states EHTP's office is at 2050 2nd Avenue, New York, NY 10029. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "eightsleep.com",
+   "evidenceUrl": "https://www.eightsleep.com/blog/terms-conditions-dream-stack-giveaway/",
+   "hqCountry": "US",
+   "notes": "First-party terms page lists HQ: Eight Sleep, Inc., 915 Broadway, Office 1301, New York, NY 10010. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "elevancehealth.com",
+   "evidenceUrl": "https://www.elevancehealth.com/contact-us",
+   "hqCountry": "US",
+   "notes": "First-party contact page lists Corporate Headquarters: 220 Virginia Avenue, Indianapolis, IN 46204. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "emcinsurance.com",
+   "evidenceUrl": "https://emcinsurance.com/careers/",
+   "hqCountry": "US",
+   "notes": "First-party careers page lists HQ: 717 Mulberry Street, Des Moines, IA 50306-0712. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "endeavorhealth.org",
+   "evidenceUrl": "https://www.endeavorhealth.org/services/primary-care/welcome/giveaway-terms-conditions",
+   "hqCountry": "US",
+   "notes": "First-party page lists corporate headquarters: 1301 Central St., Evanston, IL 60201. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "energyalliance.org",
+   "evidenceUrl": "https://energyalliance.org/privacy-policy/",
+   "hqCountry": "US",
+   "notes": "First-party privacy policy lists contact details: Global Energy Alliance LLC/Global Energy Alliance Inc., 420 Fifth Avenue, New York, NY 10018, USA. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "epicbrokers.com",
+   "evidenceUrl": "https://www.epicbrokers.com/wp-content/uploads/2021/01/EPIC-Compliance-Alert_Consolidated-Appropriations-Act_2.1.21.pdf",
+   "hqCountry": "US",
+   "notes": "First-party document lists HQ: 1 California Street, Suite 400, San Francisco, CA 94111. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "ethoslife.com",
+   "evidenceUrl": "https://www.ethos.com/agents/technology-license-platform-agreement/",
+   "hqCountry": "US",
+   "notes": "First-party agreement on ethos.com (same company, Ethos Technologies Inc.) gives legal-notices address: 1606 Headway Circle, #9013, Austin, TX 78754. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "everbridge.com",
+   "evidenceUrl": "https://www.everbridge.com/wp-content/uploads/2024/03/Candidate-Privacy-Notice-FINAL-0324.pdf",
+   "hqCountry": "US",
+   "notes": "First-party Candidate Privacy Notice lists Everbridge Inc, 25 Corporate Drive, Burlington, MA 01803, USA. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "fairfield.edu",
+   "evidenceUrl": "https://giftplanning.fairfield.edu/how-give/gifts-will-or-living-trust",
+   "hqCountry": "US",
+   "notes": "First-party gift planning page lists HQ: 1073 North Benson Road, Fairfield, CT 06824. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "fairwayindependentmc.com",
+   "evidenceUrl": "https://www.fairway.com/articles/the-rising-appeal-of-new-construction-mortgages-a-smart-move-in-a-low-inventory-housing-market?nmls=21165",
+   "hqCountry": "US",
+   "notes": "First-party page on the company's main site fairway.com lists Madison Headquarters Location: 4750 S. Biltmore Lane, Madison, WI 53718. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "fau.edu",
+   "evidenceUrl": "https://www.fau.edu/campus/locations/",
+   "hqCountry": "US",
+   "notes": "First-party locations page lists Main Campus: 777 Glades Road, Boca Raton, FL 33431. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "firstinterstatebank.com",
+   "evidenceUrl": "https://www.firstinterstatebank.com/company/commitment/cra",
+   "hqCountry": "US",
+   "notes": "First-party CRA page lists physical address: 1800 6th Ave N, Billings, MT 59101; bank is headquartered in Billings, MT. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "flcancer.com",
+   "evidenceUrl": "https://flcancer.com/wp-content/uploads/2021/08/fcs-patient-payment-policies.pdf",
+   "hqCountry": "US",
+   "notes": "First-party document lists Corporate Headquarters: 4371 Veronica S. Shoemaker Blvd., Fort Myers, FL 33916. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "fleishmanhillard.com",
+   "evidenceUrl": "https://fleishmanhillard.com/office/fleishmanhillard-st-louis/",
+   "hqCountry": "US",
+   "notes": "First-party St. Louis office page lists HQ office: 101 South Hanley, Suite 1500, Clayton, MO 63105, United States; company states its headquarters is in St. Louis. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "flex.com",
+   "evidenceUrl": "https://flex.com/careers/united-states",
+   "hqCountry": "US",
+   "notes": "First-party careers page lists Corporate Headquarters (US): 12515-8 Research Blvd, Suite 300, Austin, TX 78759. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "floridapolytechnic.org",
+   "evidenceUrl": "https://floridapoly.edu/accessibility/",
+   "hqCountry": "US",
+   "notes": "First-party page on the university's main site floridapoly.edu lists HQ: 4700 Research Way, Lakeland, FL 33805. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "flowserve.com",
+   "evidenceUrl": "https://www.flowserve.com/sites/default/files/dam/dhn3hdvdvq/vbenbr1011_en_a4.pdf",
+   "hqCountry": "US",
+   "notes": "First-party brochure lists Headquarters: Flowserve Corporation, 5215 North O'Connor Blvd., Suite 2300, Irving, TX 75039-5421. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "fmc.com",
+   "evidenceUrl": "https://www.fmc.com/sites/default/files/2026-05/2026%20FMC%20Corporate%20Fact%20Sheet%20%282%29.pdf",
+   "hqCountry": "US",
+   "notes": "First-party fact sheet lists Corporate Headquarters: 2929 Walnut Street, Philadelphia, PA 19104. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "fnb-online.com",
+   "evidenceUrl": "https://www.fnb-online.com/documents/crr/940017_2CRRBMK.pdf",
+   "hqCountry": "US",
+   "notes": "First-party corporate responsibility report lists corporate HQ: F.N.B. Corporation, FNB Financial Center, 626 Washington Place, Pittsburgh, PA 15219. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "fordfoundation.org",
+   "evidenceUrl": "https://www.fordfoundation.org/about/about-the-ford-foundation/",
+   "hqCountry": "US",
+   "notes": "First-party about page lists HQ: 320 E 43rd St, New York, NY 10017. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "forrester.com",
+   "evidenceUrl": "https://www.forrester.com/contact-us/",
+   "hqCountry": "US",
+   "notes": "First-party contact page lists HQ: 60 Acorn Park Drive, Cambridge, MA 02140. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "fortlewis.edu",
+   "evidenceUrl": "https://www.fortlewis.edu/life-at-flc/health-safety/emergency-preparedness/bear-safety",
+   "hqCountry": "US",
+   "notes": "First-party page lists HQ: 1000 Rim Drive, Durango, CO 81301. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "foursquare.com",
+   "evidenceUrl": "https://location.foursquare.com/legal/terms/trademark-infringement-policy/",
+   "hqCountry": "US",
+   "notes": "First-party Trademark Infringement Policy on its own subdomain lists HQ: 50 W 23rd St, 8th Floor, New York, NY 10010. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "fragomen.com",
+   "evidenceUrl": "https://www.fragomen.com/insights/fragomen-announces-relocation-of-its-new-york-city-headquarters.html",
+   "hqCountry": "US",
+   "notes": "First-party news page states HQ: 1400 Broadway, New York, NY 10018. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "freemanhealth.com",
+   "evidenceUrl": "https://freemanhealth.com/request-a-medical-record",
+   "hqCountry": "US",
+   "notes": "First-party page lists Freeman Health System mailing address: 1102 West 32nd Street, Joplin, MO 64804. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "freemason.org",
+   "evidenceUrl": "https://freemason.org/what-is-freemasonry/history/",
+   "hqCountry": "US",
+   "notes": "First-party history page states the California Masonic Memorial Temple in San Francisco is home of the Grand Lodge of California and serves as headquarters; address: 1111 California Street, San Francisco, CA 94108. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "frostbank.com",
+   "evidenceUrl": "https://www.frostbank.com/community-reinvestment-act",
+   "hqCountry": "US",
+   "notes": "First-party page lists Frost main office: 111 W. Houston Street, San Antonio, TX 78205. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "fsg.org",
+   "evidenceUrl": "http://www.fsg.org/",
+   "hqCountry": "US",
+   "notes": "First-party site lists FSG: 179 Lincoln Street, Boston, MA 02111, US. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "futureoflife.org",
+   "evidenceUrl": "https://futureoflife.org/about-us/contact-us/",
+   "hqCountry": "US",
+   "notes": "First-party contact page lists HQ: 300 Orchard City Drive, Suite 134, Campbell, CA 95008. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "fvtc.edu",
+   "evidenceUrl": "https://www.fvtc.edu/paying-for-college/tuition",
+   "hqCountry": "US",
+   "notes": "First-party page lists Fox Valley Technical College: 1825 N. Bluemound Drive, Appleton, WI 54914. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "gatesfoundation.org",
+   "evidenceUrl": "https://www.gatesfoundation.org/about/newsroom/press-releases/2008/07/foundation-celebrates-groundbreaking-for-new-headquarters",
+   "hqCountry": "US",
+   "notes": "First-party press release states new headquarters at 500 Fifth Ave. N., Seattle, WA (ZIP not stated on cited page). Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "gbmc.org",
+   "evidenceUrl": "https://www.gbmc.org/about-gbmc",
+   "hqCountry": "US",
+   "notes": "First-party about page lists Greater Baltimore Medical Center: 6701 N. Charles St., Towson, MD 21204. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "gcu.edu",
+   "evidenceUrl": "https://www.gcu.edu/individual-courses/dual-enrollment/homeschool",
+   "hqCountry": "US",
+   "notes": "First-party page lists Grand Canyon University: 3300 West Camelback Road, Phoenix, AZ 85017. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "geisinger.org",
+   "evidenceUrl": "https://www.geisinger.org/health-plan/broker-refresh/document-repository/-/media/onegeisinger/files/pdfs/brokers/document-repository/more-materials/commercial-adr/employer-resources/employer-administrative-handbook.pdf?hash=",
+   "hqCountry": "US",
+   "notes": "First-party handbook states Geisinger Health Plan headquarters centrally located in Danville, PA: 100 N. Academy Ave., Danville, PA 17822. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "genevausa.org",
+   "evidenceUrl": "https://genevausa.org/wp-content/uploads/2018/08/2014-Researcher-of-the-Year.pdf",
+   "hqCountry": "US",
+   "notes": "First-party document states The Geneva Foundation is headquartered in Tacoma, WA: 917 Pacific Avenue, Suite 600, Tacoma, WA 98402. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "genworth.com",
+   "evidenceUrl": "https://investor.genworth.com/sec-filings/all-sec-filings/content/0001193125-24-093246/d757887ds3asr.htm",
+   "hqCountry": "US",
+   "notes": "First-party SEC filing (investor.genworth.com) lists principal executive offices: 6620 West Broad Street, Richmond, VA 23230. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "getindigo.com",
+   "evidenceUrl": "https://www.getindigo.com/privacy-policy",
+   "hqCountry": "US",
+   "notes": "First-party privacy policy lists contact address: 220 Athens Way, Suite 240A, Nashville, TN 37228. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "gevernova.com",
+   "evidenceUrl": "https://www.gevernova.com/news/press-releases/ge-vernova-selects-cambridge-ma-as-its-global-headquarters",
+   "hqCountry": "US",
+   "notes": "First-party press release states global headquarters at 58 Charles Street, Cambridge, MA 02141. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "gfclinic.com",
+   "evidenceUrl": "https://gfclinic.com/department/family-medicine/",
+   "hqCountry": "US",
+   "notes": "First-party site lists main campus: 1400 29th Street South, Great Falls, MT 59405. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "gfs.com",
+   "evidenceUrl": "https://gfs.com/en-us/ideas/gordon-food-service-awarded-prestigious-leed-green-building-certification/",
+   "hqCountry": "US",
+   "notes": "First-party page states headquarters at 1300 Gezon Parkway, Wyoming, MI; full address 1300 Gezon Parkway SW, Wyoming, MI 49509 (ZIP per gfs.com privacy policy). Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "gilead.com",
+   "evidenceUrl": "https://investors.gilead.com/resources/investor-faqs/default.aspx",
+   "hqCountry": "US",
+   "notes": "First-party investor FAQ states world headquarters: 333 Lakeside Drive, Foster City, CA 94404. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "giveit2goodwill.org",
+   "evidenceUrl": "https://giveit2goodwill.org/about/",
+   "hqCountry": "US",
+   "notes": "First-party about page states Goodwill Industries of Middle Tennessee is based in Nashville, TN (city-only; no street address stated on own site). Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "glide.org",
+   "evidenceUrl": "https://www.glide.org/press-releases/glide-memorial-church-expresses-thanks-to-departing-glide-foundation-ceo-karen-hanrahan/",
+   "hqCountry": "US",
+   "notes": "First-party press release states the GLIDE Foundation organizes its services at 330 Ellis Street, San Francisco, CA 94102. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "globalfishingwatch.org",
+   "evidenceUrl": "https://globalfishingwatch.org/wp-content/uploads/GFW_2025-12_Tax_Form_990.pdf",
+   "hqCountry": "US",
+   "notes": "First-party Form 990 hosted on own domain lists HQ: 1025 Connecticut Avenue NW, Suite 200, Washington, DC 20036. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "glwater.org",
+   "evidenceUrl": "https://www.glwater.org/wp-content/uploads/2018/06/07-GLWA-Flint-Water-Service-Contract.pdf",
+   "hqCountry": "US",
+   "notes": "First-party document states Great Lakes Water Authority principal place of business: 735 Randolph, Detroit, MI 48226. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "gogoair.com",
+   "evidenceUrl": "http://www.gogoair.com/policies/privacy-policy/",
+   "hqCountry": "US",
+   "notes": "First-party privacy policy states Gogo Business Aviation principal office: 105 Edgeview Drive, Suite 300, Broomfield, CO 80021. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "goodwillaz.org",
+   "evidenceUrl": "https://www.goodwillaz.org/donate/monetary-donations/",
+   "hqCountry": "US",
+   "notes": "First-party page lists Goodwill of Central and Northern Arizona: 2626 W. Beryl Ave., Phoenix, AZ 85021. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "goodwillindy.org",
+   "evidenceUrl": "https://www.goodwillindy.org/history/",
+   "hqCountry": "US",
+   "notes": "First-party history page states current headquarters building at 1635 W. Michigan St., Indianapolis, IN (ZIP not stated on cited page). Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "goodyear.com",
+   "evidenceUrl": "https://corporate.goodyear.com/us/en/investors/governance/contact-the-board.html",
+   "hqCountry": "US",
+   "notes": "First-party page lists The Goodyear Tire & Rubber Company: 200 Innovation Way, Akron, OH 44316-0001. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "grda.com",
+   "evidenceUrl": "https://grda.com/privacy-policy/",
+   "hqCountry": "US",
+   "notes": "First-party privacy policy lists Grand River Dam Authority: 8142 Oklahoma 412B, Chouteau, OK 74337 (Oklahoma state agency; HQ in Chouteau, OK). Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "greatamericaninsurancegroup.com",
+   "evidenceUrl": "https://greatamericaninsurancegroup.com/docs/default-source/default-document-library/financial-strength/property-casualty-group.pdf?sfvrsn=99017ab1_26",
+   "hqCountry": "US",
+   "notes": "First-party document lists Corporate Headquarters: Great American Insurance Group Tower, 301 E. Fourth St., Cincinnati, OH 45202. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "greenmountainclub.org",
+   "evidenceUrl": "https://greenmountainclub.org/hike/thru-hiking/long-trail-end-to-ender-certification/",
+   "hqCountry": "US",
+   "notes": "First-party site lists HQ/mailing address: Green Mountain Club, 4711 Waterbury-Stowe Road, Waterbury Center, VT 05677. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "greynoise.io",
+   "evidenceUrl": "https://www.greynoise.io/privacy",
+   "hqCountry": "US",
+   "notes": "First-party privacy policy lists HQ: 1015 15th St NW, Ste 600, Washington, DC 20005; careers page states headquartered in the Washington DC area. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "guardianlife.com",
+   "evidenceUrl": "http://www.guardianlife.com/corporate-governance",
+   "hqCountry": "US",
+   "notes": "First-party page states corporate headquarters at 10 Hudson Yards, New York, NY 10001. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "gvsu.edu",
+   "evidenceUrl": "https://cms5.gvsu.edu/maps/getting-here-2",
+   "hqCountry": "US",
+   "notes": "First-party page lists Grand Valley State University main campus: 1 Campus Drive, Allendale, MI 49401-9403. Note: Kirkhof College of Nursing is part of GVSU; board is GVSU's own. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "habitat.org",
+   "evidenceUrl": "https://www.habitat.org/contact",
+   "hqCountry": "US",
+   "notes": "First-party contact page lists Operational headquarters: 322 West Lamar Street, Americus, GA 31709-3543. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "haemonetics.com",
+   "evidenceUrl": "https://www.haemonetics.com/contact-support",
+   "hqCountry": "US",
+   "notes": "First-party contact page lists Boston Global Headquarters: Haemonetics Corporation, 125 Summer Street, Boston, MA 02110. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "hayadams.com",
+   "evidenceUrl": "https://www.hayadams.com/faqs/",
+   "hqCountry": "US",
+   "notes": "First-party FAQ page lists HQ: 800 16th Street NW, Washington, DC 20006; its careers page lists the hotel's own jobs. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "heartaerospace.com",
+   "evidenceUrl": "https://heartaerospace.com/newsroom/klm-joins-heart-aerospaces-industry-advisory-board/",
+   "hqCountry": "US",
+   "notes": "First-party newsroom page lists Address: 1830 West 205th Street, Torrance, CA 90501, United States; separate first-party release confirms corporate HQ relocated to Los Angeles, California. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "hebrewseniorlife.org",
+   "evidenceUrl": "https://www.hebrewseniorlife.org/locations/hebrew-rehabilitation-center/patients-and-visitors",
+   "hqCountry": "US",
+   "notes": "First-party page lists Hebrew Rehabilitation Center-Boston (flagship campus): 1200 Centre Street, Boston, MA 02131. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "hendricks.org",
+   "evidenceUrl": "https://www.hendricks.org/Default.aspx?id=38&sid=1&CWFriendlyUrl=true",
+   "hqCountry": "US",
+   "notes": "First-party maps page lists Hendricks Regional Health: 1000 East Main Street, Danville, IN 46122. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "hfsc.org",
+   "evidenceUrl": "https://hfsc.org/multidisciplinary-care-team-expanding-at-hospital-for-special-cares-autism-center/",
+   "hqCountry": "US",
+   "notes": "First-party page lists Hospital for Special Care: 2150 Corbin Avenue, New Britain, CT 06053. Note: hfsc.org is Hospital for Special Care, NOT Houston Forensic Science Center as the batch label suggested; board tenant hfsc matches the domain owner. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "highpointnc.gov",
+   "evidenceUrl": "https://www.highpointnc.gov/DocumentCenter/View/20680/ITB-21-111722-Sodium-Hypochlorite-PS-FINAL?bidId",
+   "hqCountry": "US",
+   "notes": "First-party city document states City of High Point principal place of business: 211 South Hamilton Street, High Point, NC 27260. Note: High Point Museum is a City department; board is the City's. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "hilbgroup.com",
+   "evidenceUrl": "https://www.hilbgroup.com/about-us/",
+   "hqCountry": "US",
+   "notes": "First-party about page lists Hilb Group: 6802 Paragon Place, Suite 200, Richmond, VA 23230. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "hippo.com",
+   "evidenceUrl": "https://www.hippo.com/blog/hippo-names-keith-simard-vice-president-property-claims",
+   "hqCountry": "US",
+   "notes": "First-party press release states HQ: Palo Alto, CA (no street address published on first-party pages). Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "hollandhospital.org",
+   "evidenceUrl": "https://www.hollandhospital.org/patients-visitors/visitor-guide",
+   "hqCountry": "US",
+   "notes": "First-party page lists Holland Hospital: 602 Michigan Avenue, Holland, MI 49423. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "homedepot.com",
+   "evidenceUrl": "https://ir.homedepot.com/~/media/Files/H/HomeDepot-IR/reports-and-presentations/quarterly-earnings/2024/q4-2024-10-k.pdf",
+   "hqCountry": "US",
+   "notes": "First-party 10-K (ir.homedepot.com) states Store Support Center (corporate headquarters): 2455 Paces Ferry Road, Atlanta, GA 30339. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "honorhealth.com",
+   "evidenceUrl": "https://www.honorhealth.com/sites/default/files/documents/community/honorhealth-scottsdale-volunteer-handbook.pdf",
+   "hqCountry": "US",
+   "notes": "First-party handbook states Corporate Office: 8125 North Hayden Road, Scottsdale, AZ 85258. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "houstonmethodist.org",
+   "evidenceUrl": "https://www.houstonmethodist.org/eu_patient_fair_processing_privacy_notice/",
+   "hqCountry": "US",
+   "notes": "First-party page lists Houston Methodist, The Methodist Hospital: 6565 Fannin Street, Houston, TX 77030. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "howard.edu",
+   "evidenceUrl": "https://howard.edu/contact",
+   "hqCountry": "US",
+   "notes": "First-party contact page lists Howard University: 2400 Sixth Street NW, Washington, DC 20059. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "hrl.com",
+   "evidenceUrl": "https://www.hrl.com/terms",
+   "hqCountry": "US",
+   "notes": "First-party Terms of Use lists: HRL Laboratories, LLC, 3011 Malibu Canyon Road, M/S RL85, Malibu, CA 90265. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "hshs.org",
+   "evidenceUrl": "http://www.hshs.org/terms",
+   "hqCountry": "US",
+   "notes": "First-party terms page lists Hospital Sisters Health System: 4936 Laverna Road, Springfield, IL 62794. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "hss.edu",
+   "evidenceUrl": "https://www.hss.edu/patient-care/patients-visitors/contact",
+   "hqCountry": "US",
+   "notes": "First-party contact page lists Hospital for Special Surgery mailing address: 535 East 70th Street, New York, NY 10021. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "huntsman.com",
+   "evidenceUrl": "https://www.huntsman.com/investors/financials/sec-filings/content/0001437749-26-004524/0001437749-26-004524.pdf",
+   "hqCountry": "US",
+   "notes": "First-party 10-K (huntsman.com) lists principal executive offices: 10003 Woodloch Forest Drive, The Woodlands, TX 77380. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "hy-vee.com",
+   "evidenceUrl": "https://www.hy-vee.com/corporate/news-events/news-press-releases/hyvee-hosting-expanded-business-summit-in-central-iowa-this-fall/",
+   "hqCountry": "US",
+   "notes": "First-party press release lists HQ: 5820 Westown Parkway, West Des Moines, IA 50266. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "ideas42.org",
+   "evidenceUrl": "https://www.ideas42.org/privacy-policy",
+   "hqCountry": "US",
+   "notes": "First-party site lists HQ: 805 15th Street Northwest, Washington, DC 20005, United States. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "idinsight.org",
+   "evidenceUrl": "https://www.idinsight.org/give/donor-privacy-policy/",
+   "hqCountry": "US",
+   "notes": "First-party Donor Privacy Policy states principal office: One Mifflin Place, Suite 400, Cambridge, MA 02138. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "iesabroad.org",
+   "evidenceUrl": "https://www.iesabroad.org/contact",
+   "hqCountry": "US",
+   "notes": "First-party contact page lists HQ: 33 West Monroe Street, Suite 2300, Chicago, IL 60603-5405. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "insurity.com",
+   "evidenceUrl": "https://insurity.com/press-release/insurity-partners-mpx-improve-mail-print-and-digital-fulfillment-across-pc-insurance",
+   "hqCountry": "US",
+   "notes": "First-party press release lists HQ: 120 Huyshope Avenue, Suite 300, Hartford, CT 06106. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "intel.com",
+   "evidenceUrl": "https://www.intel.com/content/dam/www/central-libraries/us/en/documents/2026-11/foundrytechnologyandmanufacturing-iso270012022certificate-2026.pdf",
+   "hqCountry": "US",
+   "notes": "First-party document labels USA Headquarters: 2200 Mission College Blvd, Santa Clara, CA 95054. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "intelligence.org",
+   "evidenceUrl": "https://intelligence.org/wp-content/uploads/2024/10/990-2021.pdf",
+   "hqCountry": "US",
+   "notes": "First-party-hosted Form 990 lists: Machine Intelligence Research Institute, Inc., 2150 Shattuck Ave, Suite 1250, Berkeley, CA 94704. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "intermountainhealthcare.org",
+   "evidenceUrl": "https://www.intermountainhealth.org/about/contact",
+   "hqCountry": "US",
+   "notes": "First-party contact page lists corporate office: 36 S State St, Salt Lake City, UT 84111; first-party About page states Intermountain is based/headquartered in Salt Lake City, UT. Note: evidence is on intermountainhealth.org, the current canonical domain; listed domain intermountainhealthcare.org is the legacy name. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "invesco.com",
+   "evidenceUrl": "https://www.invesco.com/content/dam/invesco/corporate/en/pdfs/regulatory/2012-Proxy.pdf",
+   "hqCountry": "US",
+   "notes": "First-party filing lists Global Headquarters: 1555 Peachtree Street, N.E., Atlanta, GA 30309. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "ioaging.org",
+   "evidenceUrl": "https://www.ioaging.org/leadership/",
+   "hqCountry": "US",
+   "notes": "First-party leadership page lists Main Office: 3575 Geary Boulevard, San Francisco, CA 94118. Note: listed as Main Office, not explicitly labelled HQ. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "ivytech.edu",
+   "evidenceUrl": "https://www.ivytech.edu/locations/indianapolis/contact-us/?department=Advising",
+   "hqCountry": "US",
+   "notes": "First-party contact page lists Indianapolis campus/system-office address: 50 W Fall Creek Parkway N Dr, Indianapolis, IN 46208. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "jacksongov.org",
+   "evidenceUrl": "https://www.jacksongov.org/Government/County-Legislature",
+   "hqCountry": "US",
+   "notes": "First-party county page lists HQ: 415 E 12th Street, Kansas City, MO 64106 (Jackson County Courthouse). Note: batch file's company label 'Missouri Town 1855' is a mislabel; the domain org is Jackson County, MO, and the Workday tenant jacksongov matches. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "jax.org",
+   "evidenceUrl": "https://www.jax.org/news-and-insights/2015/july/jax-researchers-and-collaborators-identify-recurrent-fusion-genes",
+   "hqCountry": "US",
+   "notes": "First-party news page lists HQ: 600 Main Street, Bar Harbor, ME 04609 (based in Bar Harbor; HQ campus in Maine). Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "jeffco.us",
+   "evidenceUrl": "https://www.Jeffco.Us/2574/Life-in-Jeffco",
+   "hqCountry": "US",
+   "notes": "First-party county page lists County Headquarters: 100 Jefferson County Parkway, Golden, CO 80419. Note: batch file's company label 'Hiwan Homestead Museum' is a mislabel; the domain org is Jefferson County, CO, and the Workday tenant jefferson matches. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "jff.org",
+   "evidenceUrl": "https://www.jff.org/why-xr-and-small-business-are-a-winning-combination/",
+   "hqCountry": "US",
+   "notes": "First-party site lists Boston office: 50 Milk Street, 17th fl, Boston, MA 02109. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "jointcommission.org",
+   "evidenceUrl": "https://www.jointcommission.org/who-we-are/joint-commission-international/",
+   "hqCountry": "US",
+   "notes": "First-party page lists HQ: One Renaissance Boulevard, Suite 401, Oakbrook Terrace, IL 60181 (Joint Commission International headquarters; same address as Joint Commission HQ). Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "kansashealthsystem.com",
+   "evidenceUrl": "https://www.kansashealthsystem.com/?p=108521",
+   "hqCountry": "US",
+   "notes": "First-party page lists main hospital address: 4000 Cambridge Street, Kansas City, KS 66160. Note: not explicitly labelled HQ. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "kauffman.org",
+   "evidenceUrl": "https://www.kauffman.org/our-campus/conference-center/",
+   "hqCountry": "US",
+   "notes": "First-party campus page lists HQ: 4801 Rockhill Road, Kansas City, MO 64110. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "koppers.com",
+   "evidenceUrl": "https://investors.koppers.com/static-files/491be708-9de1-4702-8716-ff1a115a3528",
+   "hqCountry": "US",
+   "notes": "First-party SEC filing lists principal executive offices: 436 Seventh Avenue, Pittsburgh, PA 15219; koppers.com press releases also state corporate HQ in Pittsburgh, PA (city-only). Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "ksbe.edu",
+   "evidenceUrl": "https://www.ksbe.edu/about-us/trustees-and-executives/executive-leadership-team",
+   "hqCountry": "US",
+   "notes": "First-party leadership page lists HQ: 567 South King Street, Honolulu, HI 96813. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "kyndryl.com",
+   "evidenceUrl": "https://www.kyndryl.com/content/dam/kyndrylprogram/doc/en/2026/fiscal-un-sdg-update.pdf",
+   "hqCountry": "US",
+   "notes": "First-party document lists Company Headquarters: One Vanderbilt Avenue, 15th Floor, New York, NY 10017. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "laalliance.org",
+   "evidenceUrl": "https://laalliance.org/wp-content/uploads/2025/07/2025_0710-Meeting-Agenda.pdf",
+   "hqCountry": "US",
+   "notes": "First-party document lists Alliance Home Office: 1149 South Hill Street, Suite 950, Los Angeles, CA 90015. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "latticesemi.com",
+   "evidenceUrl": "https://www.latticesemi.com/About",
+   "hqCountry": "US",
+   "notes": "First-party About page lists Corporate Headquarters: 5555 NE Moore Ct, Hillsboro, OR 97124. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "law.ubalt.edu",
+   "evidenceUrl": "https://www.ubalt.edu/law/about/index.cfm",
+   "hqCountry": "US",
+   "notes": "First-party law school page lists HQ: 1401 N Charles Street, Baltimore, MD 21201. Note: evidence is on ubalt.edu, the parent domain of the law.ubalt.edu subdomain; the Workday site UBaltCareers is UBalt-specific. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "legalservicesnyc.org",
+   "evidenceUrl": "https://www.legalservicesnyc.org/privacy-policy/text-message-program/",
+   "hqCountry": "US",
+   "notes": "First-party privacy policy lists HQ: 40 Worth Street, Suite 606, New York, NY 10013. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "lendmarkfinancial.com",
+   "evidenceUrl": "https://www.lendmarkfinancial.com/news/lendmark-financial-services-purchases-receivables-portfolio-from-north-carolina-based-consumer-loan-company-century-finance-inc",
+   "hqCountry": "US",
+   "notes": "First-party press release states Lendmark is headquartered in Lawrenceville, GA (city-only HQ statement); full address 1735 N Brown Road, Suite 300, Lawrenceville, GA 30043 appears on the first-party site contact/article page. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "lesschwab.com",
+   "evidenceUrl": "https://www.lesschwab.com/htcsweepstake",
+   "hqCountry": "US",
+   "notes": "First-party page lists sponsor/corporate address: 20900 Cooley Road, Bend, OR 97701. Note: not explicitly labelled HQ. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "liberty.edu",
+   "evidenceUrl": "https://www.liberty.edu/about/",
+   "hqCountry": "US",
+   "notes": "First-party About page lists HQ: 1971 University Boulevard, Lynchburg, VA 24515. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "lisc.org",
+   "evidenceUrl": "https://www.lisc.org/about-us/contact/",
+   "hqCountry": "US",
+   "notes": "First-party contact page lists LISC National Headquarters: 28 Liberty Street, Floor 34, New York, NY 10005. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "lsuneworleans.edu",
+   "evidenceUrl": "https://WWW.UNO.EDU/procurement/guidelines",
+   "hqCountry": "US",
+   "notes": "First-party page lists HQ: 2000 Lakeshore Drive, New Orleans, LA 70148. Note: evidence is on uno.edu, UNO's main domain, with lsuneworleans.edu as its alias; the Workday site UniversityOfNewOrleans is UNO-specific. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "lucasmuseum.org",
+   "evidenceUrl": "https://lucasmuseum.org/hours-and-location",
+   "hqCountry": "US",
+   "notes": "First-party Hours and Location page lists HQ: One Lucas Plaza, Los Angeles, CA 90037. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "lvhn.org",
+   "evidenceUrl": "https://www.lvhn.org/locations/lehigh-valley-health-network-mack-boulevard",
+   "hqCountry": "US",
+   "notes": "First-party location page lists HQ: 2100 Mack Blvd, Allentown, PA 18103. Note: LVHN is now part of Jefferson Health, but the Workday tenant lvhn matches the domain org. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "maricopa.gov",
+   "evidenceUrl": "http://www.maricopa.gov/m/newsflash/Home/Detail/3844",
+   "hqCountry": "US",
+   "notes": "First-party county page lists HQ: 301 West Jefferson Street, Phoenix, AZ 85003. Note: the listed department is Maricopa County Dept of Public Health; the Workday board MC_External is the county's own board and the domain is the county government. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "marybird.org",
+   "evidenceUrl": "http://marybird.org/press-release/press-release-baton-rouge/radiation-oncology-professionals-from-around-the-world-to-gather-at-mary-bird-perkins-cancer-center/",
+   "hqCountry": "US",
+   "notes": "First-party press release calls the organisation's headquarters on Essen Lane: 4950 Essen Lane, Baton Rouge, LA 70809; the Workday site MBPCC is org-specific on the OneOncology tenant. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "maryfreebed.com",
+   "evidenceUrl": "https://www.maryfreebed.com/preparing-for-life-after-a-stroke/",
+   "hqCountry": "US",
+   "notes": "First-party page footer lists HQ: 235 Wealthy Street SE, Grand Rapids, MI 49503. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "massgeneralbrigham.org",
+   "evidenceUrl": "https://www.massgeneralbrigham.org/en/about/giving",
+   "hqCountry": "US",
+   "notes": "First-party page lists corporate address: 399 Revolution Drive, Suite 1330, Somerville, MA 02145 (also listed across multiple first-party pages, e.g. supplier/vendor and billing pages at the same building). Note: not explicitly labelled HQ on the evidence page. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "med.unr.edu",
+   "evidenceUrl": "https://med.unr.edu/med/pdfs/privacy/Student-Outreach-Clinic-Notice-of-Privacy-3-28-2025.pdf",
+   "hqCountry": "US",
+   "notes": "First-party document lists Privacy Officer address: 1664 N Virginia Street, Reno, NV 89557; the Workday site UNR-external is UNR-specific on the NSHE tenant. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "menv.com",
+   "evidenceUrl": "https://menv.com/wp-content/uploads/2026/04/External-Non-Discrimination-Policy.pdf",
+   "hqCountry": "US",
+   "notes": "First-party policy states HQ building at: 259 Najoles Road, Millersville, MD 21108; the Workday tenant mes matches the domain org. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "merck.com",
+   "evidenceUrl": "https://www.merck.com/wp-content/uploads/sites/124/2026/04/2026-Merck-Proxy-Statement.pdf",
+   "hqCountry": "US",
+   "notes": "First-party proxy statement lists principal executive offices: 126 East Lincoln Avenue, Rahway, NJ 07065; the Workday tenant msd is Merck Sharp & Dohme, Merck's own. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "mercy.net",
+   "evidenceUrl": "https://www.mercy.net/content/dam/mercy/en/images/mercy-npp.pdf",
+   "hqCountry": "US",
+   "notes": "First-party privacy notice lists Mercy management (HQ) address: 14528 South Outer Forty Rd, Ste 100, Chesterfield, MO 63017. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "mercyhealthsystem.org",
+   "evidenceUrl": "https://www.mercyhealthsystem.org/education-programs/school-of-radiography/",
+   "hqCountry": "US",
+   "notes": "First-party page lists Mercyhealth Javon Bea Hospital-Rockton: 2400 N. Rockton Ave., Rockford, IL 61103. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "metr.org",
+   "evidenceUrl": "https://metr.org/METR_ai_action_plan_comment.pdf",
+   "hqCountry": "US",
+   "notes": "First-party comment letter lists HQ: Model Evaluation and Threat Research, 440 N Barranca Ave #3345, Covina, CA 91723 (org also states it is based in Berkeley, CA). Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "miamioh.edu",
+   "evidenceUrl": "https://miamioh.edu/visit-miami/",
+   "hqCountry": "US",
+   "notes": "First-party visit page lists Miami University, Oxford Ohio: 501 E. High Street, Oxford, OH 45056. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "moishehouse.org",
+   "evidenceUrl": "https://memglobal.org/wp-content/uploads/2026/09/2025-Moishe-House-990-PD-Copy.pdf",
+   "hqCountry": "US",
+   "notes": "First-party-hosted Form 990 shows legal name Moishe House DBA MEM Global, address 441 Saxony Road, Barn 2, Encinitas, CA 92024; memglobal.org is the same legal entity under its DBA, not a different organization. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "monument.health",
+   "evidenceUrl": "https://monument.health/home/notice-of-non-discrimination/",
+   "hqCountry": "US",
+   "notes": "First-party notice of non-discrimination lists Monument Health address: 353 Fairmont Boulevard, Rapid City, SD 57701. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "moore.org",
+   "evidenceUrl": "https://www.moore.org/privacy-policy",
+   "hqCountry": "US",
+   "notes": "First-party privacy policy lists HQ: 1661 Page Mill Road, Palo Alto, CA 94304. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "motorolasolutions.com",
+   "evidenceUrl": "https://www.motorolasolutions.com/newsroom/press-releases/mayor-emanuel-and-motorola-solutions-open-new-global-headquarters.html",
+   "hqCountry": "US",
+   "notes": "First-party press release announces global headquarters at 500 West Monroe Street, Chicago, IL 60661. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "moveon.org",
+   "evidenceUrl": "https://front.moveon.org/petitions__terms/",
+   "hqCountry": "US",
+   "notes": "First-party Terms of Use states: MoveOn.org Civic Action is located at PO Box 9038, Berkeley, CA 94709. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "msd.com",
+   "evidenceUrl": "https://www.msd.com/contact-us/",
+   "hqCountry": "US",
+   "notes": "First-party contact page lists MSD corporate headquarters: 126 East Lincoln Avenue, P.O. Box 2000, Rahway, NJ 07065, USA. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "msh.org",
+   "evidenceUrl": "https://msh.org/privacy-policy/",
+   "hqCountry": "US",
+   "notes": "First-party privacy policy lists Management Sciences for Health address: 1201 Wilson Boulevard, 9th Floor, Arlington, VA 22209. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "mskcc.org",
+   "evidenceUrl": "https://www.mskcc.org/departments/division-solid-tumor-oncology/early-drug-development-service-phase-clinical-trials/locations",
+   "hqCountry": "US",
+   "notes": "First-party page states Memorial Sloan Kettering is headquartered at 1275 York Avenue, New York, NY 10065. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "msmc.com",
+   "evidenceUrl": "https://www.msmc.com/location/",
+   "hqCountry": "US",
+   "notes": "First-party locations page lists Mount Sinai Medical Center main campus: 4300 Alton Road, Miami Beach, FL 33140. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "muhlenberg.edu",
+   "evidenceUrl": "https://www.muhlenberg.edu/",
+   "hqCountry": "US",
+   "notes": "First-party site (muhlenberg.edu) lists campus HQ: 2400 Chew Street, Allentown, PA 18104. Verified 2026-11-17.",
+   "verifiedAt": "2026-11-17"
+  },
+  {
+   "domain": "muschealth.org",
+   "evidenceUrl": "https://muschealth.org/medical-services/radiology",
+   "hqCountry": "US",
+   "notes": "First-party page lists MUSC Health University Medical Center: 171 Ashley Avenue, Charleston, SC 29425. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "mwe.com",
+   "evidenceUrl": "https://www.mwe.com/wp-content/uploads/2022/09/2018-Digital-Health-Year-in-Review-Focus-on-Care-Coordination-and-Reimbursement.pdf",
+   "hqCountry": "US",
+   "notes": "First-party publication lists McDermott Will & Emery Chicago office: 444 West Lake Street, Chicago, IL 60606. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "nationalgeographic.org",
+   "evidenceUrl": "https://support.nationalgeographic.org/s/article/Washington-DC-Headquarters-General-Information",
+   "hqCountry": "US",
+   "notes": "First-party support article lists Washington D.C. headquarters: 1145 17th Street NW, Washington, DC 20036. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "nationwidechildrens.org",
+   "evidenceUrl": "https://www.nationwidechildrens.org/about-us",
+   "hqCountry": "US",
+   "notes": "First-party About page lists Nationwide Children's Hospital: 700 Childrens Drive, Columbus, OH 43205. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "navigators.org",
+   "evidenceUrl": "https://www.navigators.org/give/mms-terms_and_conditions/",
+   "hqCountry": "US",
+   "notes": "First-party terms page lists The Navigators address: 3820 N 30th St, Colorado Springs, CO 80904. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "netgear.com",
+   "evidenceUrl": "https://www.downloads.netgear.com/files/DoC/204-11312-04_CE_A6100_EN-EP-FR-IT-GR-SP_20SEP22.pdf",
+   "hqCountry": "US",
+   "notes": "First-party Declaration of Conformity on company download subdomain lists HQ: U.S. Head Office, NETGEAR Incorporated, 350 East Plumeria Drive, San Jose, CA 95134. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "newarka.edu",
+   "evidenceUrl": "https://www.newarka.edu/who-we-are/equity-inclusion-and-belonging",
+   "hqCountry": "US",
+   "notes": "First-party site lists: Newark Academy, 91 South Orange Avenue, Livingston, NJ 07039. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "newvisions.org",
+   "evidenceUrl": "https://www.newvisions.org/privacy-policy",
+   "hqCountry": "US",
+   "notes": "First-party privacy policy lists HQ: 205 E. 42nd Street, 4th FL, New York, NY 10017. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "nike.com",
+   "evidenceUrl": "https://agreementservice.svs.nike.com/rest/agreement/termsOfSale/en/IL/com.nike.unite/redirect/true",
+   "hqCountry": "US",
+   "notes": "First-party Terms of Sale state Nike headquarters and principal place of business: One Bowerman Drive, Beaverton, OR 97005, USA. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "nmhs.net",
+   "evidenceUrl": "https://www.nmhs.net/medical-services/orthopedics-and-sports-medicine/specialties-and-services/joint-replacement/joint-replacement-preparation",
+   "hqCountry": "US",
+   "notes": "First-party page lists North Mississippi Medical Center-Tupelo (HQ campus): 830 South Gloster Street, Tupelo, MS 38801. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "northwest.bank",
+   "evidenceUrl": "https://www.northwest.bank/siteassets/pdfs/northwest-bank-cashback-visa-signature-disclosure-12-01-2025.pdf",
+   "hqCountry": "US",
+   "notes": "First-party disclosure lists Northwest Bank: 100 Liberty Street, P.O. Box 1793, Warren, PA 16365. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "ntta.org",
+   "evidenceUrl": "https://www.ntta.org/sites/default/files/2026-03/02.05.26%20Board.pdf",
+   "hqCountry": "US",
+   "notes": "First-party board minutes list NTTA administrative offices: 5900 West Plano Parkway, Plano, TX 75093. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "nwtc.edu",
+   "evidenceUrl": "https://www.nwtc.edu/news/2026/02/nwtc-appoints-new-deans-to-lead-stem-and-advanced",
+   "hqCountry": "US",
+   "notes": "First-party news page lists NWTC Green Bay campus: 2740 West Mason Street, Green Bay, WI 54303. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "obama.org",
+   "evidenceUrl": "https://www.obama.org/press-releases/the-obama-presidential-center-expands-its-historic-public-art-program/",
+   "hqCountry": "US",
+   "notes": "First-party press release (dateline Chicago, IL) lists Obama Foundation contact address: 6001 S. Stony Island Ave., Chicago, IL (no ZIP stated on page). Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "ochsner.org",
+   "evidenceUrl": "https://www.ochsner.org/locations/ochsner-medical-center%20/",
+   "hqCountry": "US",
+   "notes": "First-party location page lists Ochsner Medical Center - New Orleans: 1514 Jefferson Highway, Jefferson, LA 70121. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "oclc.org",
+   "evidenceUrl": "https://www.oclc.org/en/contacts.html",
+   "hqCountry": "US",
+   "notes": "First-party contacts page lists OCLC Headquarters: 6565 Kilgour Place, Dublin, OH 43017, USA. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "ohiohealth.com",
+   "evidenceUrl": "https://www.ohiohealth.com/mobile-app-prelogin/app-privacy-policy",
+   "hqCountry": "US",
+   "notes": "First-party app privacy policy lists OhioHealth Corporation: 3430 OhioHealth Parkway, Columbus, OH 43202. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "olympicmedical.org",
+   "evidenceUrl": "https://www.olympicmedical.org/careers/physician-recruitment/",
+   "hqCountry": "US",
+   "notes": "First-party careers page lists HQ: 939 Caroline St, Port Angeles, WA 98362. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "onepercentfortheplanet.org",
+   "evidenceUrl": "https://www.onepercentfortheplanet.org/leave-a-legacy-for-the-planet",
+   "hqCountry": "US",
+   "notes": "First-party page lists mailing address: 50 Lakeside Avenue, PMB 74, Burlington, VT 05401, United States; careers page confirms HQ in Burlington, VT. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "oregon.gov",
+   "evidenceUrl": "https://www.oregon.gov/das/Pages/contact.aspx",
+   "hqCountry": "US",
+   "notes": "First-party Oregon DAS contact page lists DAS Headquarters: Executive Building, 155 Cottage Street NE, Salem, OR 97301. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "origin.bank",
+   "evidenceUrl": "https://www.origin.bank/news/origin-bancorp-inc-completes-merger-subsidiary-banks/",
+   "hqCountry": "US",
+   "notes": "First-party news page states headquartered in Ruston, Louisiana and lists HQ: 500 South Service Road East, Ruston, LA 71270. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "otis.com",
+   "evidenceUrl": "https://www.otis.com/en/us/contact-us",
+   "hqCountry": "US",
+   "notes": "First-party contact page lists Otis World Headquarters: 1 Carrier Place, Farmington, CT 06032. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "overlakehospital.org",
+   "evidenceUrl": "https://www.overlakehospital.org/locations/overlake-medical-center",
+   "hqCountry": "US",
+   "notes": "First-party locations page lists main campus: 1035 116th Ave NE, Bellevue, WA 98004. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "palomarhealth.org",
+   "evidenceUrl": "http://palomarhealth.org/wp-content/uploads/2023/10/BOD-Regular-Session-10.9.2023-FINAL.pdf",
+   "hqCountry": "US",
+   "notes": "First-party board document states Palomar Health Administrative Office: 2125 Citracado Parkway, Suite 300, Escondido, CA 92029. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "park.edu",
+   "evidenceUrl": "https://www.park.edu/consumer-information/",
+   "hqCountry": "US",
+   "notes": "First-party page lists flagship campus: 8700 NW River Park Drive, Parkville, MO 64152. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "patch.io",
+   "evidenceUrl": "https://www.patch.io/terms",
+   "hqCountry": "US",
+   "notes": "First-party terms page lists HQ: 250 Oak Street, San Francisco, CA 94102; privacy page states headquartered in the United States. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "pbs.org",
+   "evidenceUrl": "https://www.pbs.org/",
+   "hqCountry": "US",
+   "notes": "First-party listing for Public Broadcasting Service: 1225 S Clark St, Arlington, VA (current HQ; 2100 Crystal Drive was the former HQ). Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "pcci.edu",
+   "evidenceUrl": "https://www.pcci.edu/visit-us/campus-tours/",
+   "hqCountry": "US",
+   "notes": "First-party campus tours page lists: 250 Brent Lane, Pensacola, FL 32503. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "pcom.edu",
+   "evidenceUrl": "http://www.pcom.edu/campuses/philadelphia-campus/maps-and-directions-philadelphia.html",
+   "hqCountry": "US",
+   "notes": "First-party maps page lists PCOM: 4170 City Avenue, Philadelphia, PA 19131. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "peets.com",
+   "evidenceUrl": "https://www.peets.com/pages/holiday-giveaway-terms-conditions",
+   "hqCountry": "US",
+   "notes": "First-party page lists Peet's Coffee, Inc.: 1400 Park Avenue, Emeryville, CA 94608. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "pentagroup.co",
+   "evidenceUrl": "https://pentagroup.com/",
+   "hqCountry": "US",
+   "notes": "First-party site (pentagroup.com) lists Penta Group: 1666 K St NW, Suite 500, Washington, DC, US; first-party press releases state Penta is headquartered in Washington, D.C. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "pfizer.com",
+   "evidenceUrl": "https://www.pfizer.com/contact",
+   "hqCountry": "US",
+   "notes": "First-party contact page lists world headquarters: 66 Hudson Boulevard East, New York, NY 10001-2192, USA. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "philadelphiaeagles.com",
+   "evidenceUrl": "https://www.philadelphiaeagles.com/footer/contact-us/",
+   "hqCountry": "US",
+   "notes": "First-party contact page lists HQ: Philadelphia Eagles, Jefferson Health Training Complex, 1 Eagles Way, Philadelphia, PA 19145. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "phinia.com",
+   "evidenceUrl": "https://www.phinia.com/data-protection-compliance/website-and-social-media-privacy-notice",
+   "hqCountry": "US",
+   "notes": "First-party privacy notice lists PHINIA Inc.: 3000 University Drive, Auburn Hills, MI 48326, United States of America; press releases confirm headquartered in Auburn Hills, Michigan, USA. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "phoebehealth.com",
+   "evidenceUrl": "https://careers.phoebehealth.com/search/jobdetails/registered-nurse-emergency-room-3p---3a/d45c9699-c6fc-4e5a-9488-e777826c14a1",
+   "hqCountry": "US",
+   "notes": "First-party careers page lists Phoebe Putney Memorial Hospital: 417 W 3rd Ave, Albany, GA 31701. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "phs.org",
+   "evidenceUrl": "https://onbaseext.phs.org/PEL/DisplayDocument?ContentID=OB_000000042677",
+   "hqCountry": "US",
+   "notes": "First-party document lists Presbyterian Rev. Hugh Cooper Administrative Center: 9521 San Mateo Blvd. NE, Albuquerque, NM 87113. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "pinerest.org",
+   "evidenceUrl": "https://www.pinerest.org/psychiatric-urgent-care/",
+   "hqCountry": "US",
+   "notes": "First-party page lists main campus: 300 68th Street SE, Grand Rapids, MI 49548. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "pingry.org",
+   "evidenceUrl": "https://www.pingry.org/contact1",
+   "hqCountry": "US",
+   "notes": "First-party contact page lists HQ: 131 Martinsville Road, Basking Ridge, NJ 07920. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "pixar.com",
+   "evidenceUrl": "https://renderman.pixar.com/eula",
+   "hqCountry": "US",
+   "notes": "First-party (Pixar subdomain) EULA lists Pixar Animation Studios: 1200 Park Avenue, Emeryville, CA 94608. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "pkhotelsandresorts.com",
+   "evidenceUrl": "https://www.pkhotelsandresorts.com/~/media/Files/P/Park-Hotels/reports-and-presentations/q2-2026-8-k-combined.pdf",
+   "hqCountry": "US",
+   "notes": "First-party SEC filing lists address of principal executive offices: 1775 Tysons Blvd., 7th Floor, Tysons, VA 22102. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "progresschamber.org",
+   "evidenceUrl": "https://progresschamber.org/wp-content/uploads/2025/02/Chamber-of-Progress-comments-to-CADE-on-digital-ecosystems.pdf",
+   "hqCountry": "US",
+   "notes": "First-party document footer lists: 1390 Chain Bridge Rd. #A108, McLean, VA 22101. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "projectkittyhawk.com",
+   "evidenceUrl": "https://projectkittyhawk.com/careers/",
+   "hqCountry": "US",
+   "notes": "First-party careers page states HQ: Chapel Hill, NC (no street address published on first-party pages). Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "propublica.org",
+   "evidenceUrl": "https://www.propublica.org/",
+   "hqCountry": "US",
+   "notes": "First-party homepage lists address: 155 Avenue of the Americas, 13th Floor, New York, NY 10013, US. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "proteininnovation.org",
+   "evidenceUrl": "https://proteininnovation.org/yeast-display-course/",
+   "hqCountry": "US",
+   "notes": "First-party course page lists HQ: 4 Blackfan Circle, Room 921, Boston, MA 02115. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "rapidsos.com",
+   "evidenceUrl": "https://rapidsos.com/wp-content/uploads/2025/09/RapidSOS-B2B-MSA_4.15.25-1.pdf",
+   "hqCountry": "US",
+   "notes": "First-party Master Services Agreement states RapidSOS, Inc., a Delaware corporation with a principal place of business at 3 Park Avenue, 22nd Floor, New York, NY 10016. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "rebeccaschool.org",
+   "evidenceUrl": "https://www.rebeccaschool.org/admission/",
+   "hqCountry": "US",
+   "notes": "First-party admissions page lists HQ: 35 E 21st Street, New York, NY 10010. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "redhat.com",
+   "evidenceUrl": "https://www.redhat.com/en/about/office-locations",
+   "hqCountry": "US",
+   "notes": "First-party office locations page lists corporate headquarters: 100 East Davie Street, Raleigh, NC 27601, United States. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "regionalfinance.com",
+   "evidenceUrl": "https://regionalfinance.com/support/frequently-asked-questions",
+   "hqCountry": "US",
+   "notes": "First-party FAQ page lists Headquarters, Regional Management Corp.: 979 Batesville Road, Suite B, Greer, SC 29651. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "rfta.com",
+   "evidenceUrl": "https://www.rfta.com/non-discrimination/title-vi-2/",
+   "hqCountry": "US",
+   "notes": "First-party page lists Roaring Fork Transportation Authority office: 2307 Wulfsohn Road, Glenwood Springs, CO 81601. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "ridefox.com",
+   "evidenceUrl": "https://ridefox.com/pages/text-messaging-terms-conditions",
+   "hqCountry": "US",
+   "notes": "First-party terms page lists Fox Factory, Inc. principal executive office: 2055 Sugarloaf Circle, Suite 300, Duluth, GA 30097. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "rit.edu",
+   "evidenceUrl": "https://www.rit.edu/contact",
+   "hqCountry": "US",
+   "notes": "First-party contact page lists Rochester Institute of Technology: One Lomb Memorial Drive, Rochester, NY 14623. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "riversideonline.com",
+   "evidenceUrl": "https://www.riversideonline.com/patients-and-visitors/patient-rights/patient-liability-assistance",
+   "hqCountry": "US",
+   "notes": "First-party policy page lists Riverside Health System: 701 Town Center Drive, Suite 1000, Newport News, VA 23606. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "rmi.org",
+   "evidenceUrl": "https://rmi.org/wp-content/uploads/2018/10/RMI-Innovation-Center-Overview-2017.pdf",
+   "hqCountry": "US",
+   "notes": "First-party document states RMI Innovation Center is Headquarters of Rocky Mountain Institute: 22830 Two Rivers Road, Basalt, CO 81621. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "roomtoread.org",
+   "evidenceUrl": "https://www.roomtoread.org/contact-us/",
+   "hqCountry": "US",
+   "notes": "First-party contact page lists San Francisco office: 600 California Street, 11th Floor, San Francisco, CA 94108, United States of America; site states this is its principal place of business. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "roseman.edu",
+   "evidenceUrl": "https://www.roseman.edu/about/our-mission-and-history/",
+   "hqCountry": "US",
+   "notes": "First-party history page lists Henderson campus: 11 Sunset Way, Henderson, NV 89014. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "rumcsi.org",
+   "evidenceUrl": "https://rumcsi.org/careers/graduate-medical-education/residency-programs/radiology/",
+   "hqCountry": "US",
+   "notes": "First-party page states main campus at 355 Bard Avenue, Staten Island, NY 10310. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "russellinvestments.com",
+   "evidenceUrl": "https://russellinvestments.com/content/ri/mi/en-gb/about-us/contact-us.html",
+   "hqCountry": "US",
+   "notes": "First-party contact page lists Seattle (Headquarters): 401 Union Street, 18th Floor, Seattle, WA 98101. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "saintfrancis.com",
+   "evidenceUrl": "https://www.saintfrancis.com/location/saint-francis-hospital",
+   "hqCountry": "US",
+   "notes": "First-party hospital page lists Saint Francis Hospital: 6161 South Yale Avenue, Tulsa, OK 74136; Saint Francis Health System is based in Tulsa, OK. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "saintlukeskc.org",
+   "evidenceUrl": "https://www.saintlukeskc.org/locations/saint-lukes-hospital-kansas-city",
+   "hqCountry": "US",
+   "notes": "First-party locations page lists Saint Luke's Hospital of Kansas City: 4401 Wornall Road, Kansas City, MO 64111. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "sanfordhealth.org",
+   "evidenceUrl": "https://news.sanfordhealth.org/research/sanford-center-opens/",
+   "hqCountry": "US",
+   "notes": "First-party news article states Sanford Health corporate headquarters in Sioux Falls, SD (city-only; no street address on first-party page). Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "saracademy.org",
+   "evidenceUrl": "https://saracademy.org/support/",
+   "hqCountry": "US",
+   "notes": "First-party support page lists HQ: 655 West 254th Street, Riverdale, NY 10471. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "scholastic.com",
+   "evidenceUrl": "https://www.scholastic.com/newsroom/all-news/press-release/scholastic-reports-fiscal-2025-third-quarter-results.html",
+   "hqCountry": "US",
+   "notes": "First-party press release states Scholastic owns its headquarters building at 555 / 557 Broadway in Soho, New York City; privacy policy lists Scholastic Inc., 557 Broadway, New York, NY 10012. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "scripps.com",
+   "evidenceUrl": "https://scripps.com/contact/",
+   "hqCountry": "US",
+   "notes": "First-party contact page lists Scripps Corporate Headquarters: Scripps Center, 312 Walnut St., Suite 2800, Cincinnati, OH 45202. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "scsp.ai",
+   "evidenceUrl": "https://www.scsp.ai/terms-of-use/",
+   "hqCountry": "US",
+   "notes": "First-party Terms of Use gives mailing address: 241 18th St S, 1200, Arlington, VA 22202; its careers page lists SCSP's own roles. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "sentara.com",
+   "evidenceUrl": "https://www.sentara.com/",
+   "hqCountry": "US",
+   "notes": "First-party homepage lists Sentara Health address: 6015 Poplar Hall Dr, Norfolk, VA 23502. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "sfaf.org",
+   "evidenceUrl": "https://www.sfaf.org/privacy-policy/",
+   "hqCountry": "US",
+   "notes": "First-party privacy policy states SFAF is based in the United States and lists contact: 940 Howard Street, San Francisco, CA 94103. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "sfmoma.org",
+   "evidenceUrl": "https://www.sfmoma.org/about/contact-us/",
+   "hqCountry": "US",
+   "notes": "First-party contact page lists: SFMOMA, 151 Third Street, San Francisco, CA 94103. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "sharp.com",
+   "evidenceUrl": "https://careers.sharp.com/hiring-process",
+   "hqCountry": "US",
+   "notes": "First-party careers page lists HQ: 8695 Spectrum Center Blvd., San Diego, CA 92123. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "shepherd.org",
+   "evidenceUrl": "https://news.shepherd.org/shepherd-center-wins-statewide-patient-safety-awards/",
+   "hqCountry": "US",
+   "notes": "First-party news page lists HQ: Shepherd Center, 2020 Peachtree Road NW, Atlanta, GA 30309-1465. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "shop.hasbro.com",
+   "evidenceUrl": "https://docs.hasbro.com/en-ca/legal/privacy",
+   "hqCountry": "US",
+   "notes": "First-party Hasbro privacy page lists HQ: 1027 Newport Avenue, Pawtucket, RI 02861. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "shoreunitedbank.com",
+   "evidenceUrl": "https://www.shoreunitedbank.com/personal/banking/checking-accounts",
+   "hqCountry": "US",
+   "notes": "First-party page lists HQ: 18 East Dover Street, Easton, MD 21601. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "shrinerschildrens.org",
+   "evidenceUrl": "https://www.shrinerschildrens.org/en/patient-information/international-patients",
+   "hqCountry": "US",
+   "notes": "First-party patient information page lists Corporate Headquarters: 2900 N. Rocky Point Dr., Tampa, FL 33607. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "siegelendowment.org",
+   "evidenceUrl": "http://siegelendowment.org/",
+   "hqCountry": "US",
+   "notes": "First-party site lists Siegel Family Endowment: 100 6th Ave (100 Avenue of the Americas), 16th Floor, New York, NY 10013, US. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "sih.net",
+   "evidenceUrl": "https://www.sih.net/-/media/files/patients-and-visitors/financial-resources/healthcareassistance/2026/healthcare-assistance-application-packet.pdf",
+   "hqCountry": "US",
+   "notes": "First-party financial assistance document lists System Office: 1239 East Main Street, Carbondale, IL 62901. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "silverhillhospital.org",
+   "evidenceUrl": "https://SilverhillHospital.org/getting-to-silver-hill-hospital/",
+   "hqCountry": "US",
+   "notes": "First-party directions page lists HQ: 208 Valley Road, New Canaan, CT 06840. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "simmonsbank.com",
+   "evidenceUrl": "https://newsroom.simmonsbank.com/Simmons-First-National-Corporation-Announces-Agreement-to-Acquire-The-Landrum-Company-July-31,-2019",
+   "hqCountry": "US",
+   "notes": "First-party newsroom release lists HQ: 501 Main Street, Pine Bluff, AR 71601. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "slhn.org",
+   "evidenceUrl": "https://www.slhn.org/locations/stlukes-university-hospital-bethlehem",
+   "hqCountry": "US",
+   "notes": "First-party locations page lists HQ: 801 Ostrum Street, Bethlehem, PA 18015. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "smithfieldfoods.com",
+   "evidenceUrl": "https://investors.smithfieldfoods.com/sec-filings/sec-filings/content/0000091388-26-000014/smf-20251228.htm",
+   "hqCountry": "US",
+   "notes": "First-party SEC filing (10-K) lists principal executive offices: 200 Commerce Street, Smithfield, VA 23430. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "socal.easterseals.com",
+   "evidenceUrl": "https://socal.easterseals.com/take-action/donate-now",
+   "hqCountry": "US",
+   "notes": "First-party donate page lists mailing address: 1063 McGaw Ave., Suite 100, Irvine, CA 92614. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "socialfinance.org",
+   "evidenceUrl": "https://socialfinance.org/wp-content/uploads/2023/01/SIBs-Early-Years-Press-Release-Final.pdf",
+   "hqCountry": "US",
+   "notes": "First-party press release lists HQ: 10 Milk Street, Suite 1010, Boston, MA 02108 (2016 document; most recent first-party street address found). Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "soka.edu",
+   "evidenceUrl": "https://tour.soka.edu/accessibility",
+   "hqCountry": "US",
+   "notes": "First-party accessibility page lists HQ: 1 University Drive, Aliso Viejo, CA 92656. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "sourcesofstrength.org",
+   "evidenceUrl": "https://sourcesofstrength.org/wp-content/uploads/securepdfs/2025/09/Campaign_418.pdf",
+   "hqCountry": "US",
+   "notes": "First-party document lists HQ: 8960 W Hampden Ave, Lakewood, CO 80227; company states its headquarters is in Denver, Colorado. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "specialized.com",
+   "evidenceUrl": "https://www.specialized.com/no/en/faq",
+   "hqCountry": "US",
+   "notes": "First-party FAQ page lists international HQ: 15130 Concord Circle, Morgan Hill, CA 95037, USA. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "sphera.com",
+   "evidenceUrl": "https://sphera.com/wp-content/uploads/2024/05/ESG-Report-2022.pdf",
+   "hqCountry": "US",
+   "notes": "First-party ESG report lists HQ: 130 East Randolph Street, Suite 2900, Chicago, IL 60601, USA. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "stanleyblackanddecker.com",
+   "evidenceUrl": "https://www.stanleyblackanddecker.com/privacy-policy/cookie-notice",
+   "hqCountry": "US",
+   "notes": "First-party cookie notice lists HQ: 1000 Stanley Drive, New Britain, CT 06053. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "stellar.org",
+   "evidenceUrl": "https://stellar.org/",
+   "hqCountry": "US",
+   "notes": "First-party site lists Stellar Development Foundation: 475 Brannan St, San Francisco, CA, US. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "stoel.com",
+   "evidenceUrl": "https://www.stoel.com/insights/pressreleases/stoel-rives-completes-portland-office-relocation",
+   "hqCountry": "US",
+   "notes": "First-party press release lists Portland office: 760 SW Ninth Ave., Suite 3000, Portland, OR 97205-2584. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "strayer.edu",
+   "evidenceUrl": "https://coursecatalog.strayer.edu/sites/default/files/SUCatalog2025-20267.13.26Rev.pdf",
+   "hqCountry": "US",
+   "notes": "First-party catalog lists Principal Office of the University: 901 15th Street, N.W., Suite 200, Washington, D.C. 20005. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "sunrisegroup.org",
+   "evidenceUrl": "https://sunrisegroup.org/locations/florida/",
+   "hqCountry": "US",
+   "notes": "First-party locations page lists National Headquarters: 9040 Sunset Drive, Miami, FL 33173. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "sunriseseniorliving.com",
+   "evidenceUrl": "https://www.sunriseseniorliving.com/about/hipaa-policy",
+   "hqCountry": "US",
+   "notes": "First-party HIPAA policy page lists HQ: 7902 Westpark Drive, McLean, VA 22102. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "svbsecurities.com",
+   "evidenceUrl": "https://leerink.com/important-disclosures/",
+   "hqCountry": "US",
+   "notes": "First-party disclosures page lists firm address: 53 State Street, 40th Floor, Boston, MA 02109. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "tbkbank.com",
+   "evidenceUrl": "https://www.tbkbank.com/dallas/",
+   "hqCountry": "US",
+   "notes": "First-party Dallas page lists HQ: 6060 Sherry Lane, Dallas, TX 75225. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "teachforamerica.org",
+   "evidenceUrl": "http://www.teachforamerica.org/employee-matching-gifts",
+   "hqCountry": "US",
+   "notes": "First-party matching gifts page lists HQ: 25 Broadway, 12th Floor, New York, NY 10004. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "themlc.com",
+   "evidenceUrl": "https://www.themlc.com/audits-member",
+   "hqCountry": "US",
+   "notes": "First-party Member Audits page lists mailing address: The MLC, 333 11th Avenue South, Suite 200, Nashville, TN 37203. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "thorn.org",
+   "evidenceUrl": "https://www.thorn.org/support/more-ways-to-give/",
+   "hqCountry": "US",
+   "notes": "First-party giving page lists HQ: 222 Pacific Coast Highway, 10th Floor, El Segundo, CA 90245. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "tmhcc.com",
+   "evidenceUrl": "https://www.tmhcc.com/en/office-directory",
+   "hqCountry": "US",
+   "notes": "First-party office directory lists Corporate Headquarters: 13403 Northwest Freeway, Houston, TX 77040. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "travelers.com",
+   "evidenceUrl": "https://travelers.com/contact-us",
+   "hqCountry": "US",
+   "notes": "First-party contact page lists HQ: One Tower Square, Hartford, CT 06183. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "trugreen.com",
+   "evidenceUrl": "https://www.trugreen.com/monthlypay-terms-conditions",
+   "hqCountry": "US",
+   "notes": "First-party terms page lists corporate address: 1790 Kirby Parkway, Memphis, TN 38138. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "trumancenter.org",
+   "evidenceUrl": "https://www.trumancenter.org/support/supporting-truman",
+   "hqCountry": "US",
+   "notes": "First-party page lists mailing address: Truman Center for National Policy, 600 14th Street, NW, c/o Convene, 5th Floor, Washington, DC 20005. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "trustage.com",
+   "evidenceUrl": "https://www.trustage.com/legal/terms-conditions",
+   "hqCountry": "US",
+   "notes": "First-party terms of use lists Corporate Headquarters: 5910 Mineral Point Road, Madison, WI 53705. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "uaudio.com",
+   "evidenceUrl": "https://media.uaudio.com/support/eula/USER_PRIVACY_STATEMENT_LO_112123.pdf",
+   "hqCountry": "US",
+   "notes": "First-party privacy statement on company media subdomain lists HQ: Universal Audio, Inc., 4585 Scotts Valley Drive, Scotts Valley, CA 95066. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "uaustin.org",
+   "evidenceUrl": "https://uaustin.org/page-setting/basic/",
+   "hqCountry": "US",
+   "notes": "First-party legal page states principal place of business in Austin, TX, address 522 Congress Ave, Suite 300, Austin, TX 78701. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "ucumberlands.edu",
+   "evidenceUrl": "https://www.ucumberlands.edu/news/university-cumberlands-honors-veterans-and-military-service-members-veterans-day-ceremony",
+   "hqCountry": "US",
+   "notes": "First-party news page lists HQ: 6178 College Station Drive, Williamsburg, KY 40769, United States. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "ulse.org",
+   "evidenceUrl": "https://ulse.org/news/news-ul-research-institutes-ul-standards-engagement-relocate-evanston-illinois/",
+   "hqCountry": "US",
+   "notes": "First-party news page lists HQ: 1603 Orrington Ave #2000, Evanston, IL 60201. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "umassglobal.edu",
+   "evidenceUrl": "https://www.umassglobal.edu/about",
+   "hqCountry": "US",
+   "notes": "First-party about page lists HQ: 65 Enterprise, Suite 150, Aliso Viejo, CA 92656. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "umc.edu",
+   "evidenceUrl": "https://UMC.EDU/graduateschool/Degree-Programs/MS/Biomedical-Sciences/Application-Process.html",
+   "hqCountry": "US",
+   "notes": "First-party page lists HQ: 2500 North State Street, Jackson, MS 39216. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "ummhealth.org",
+   "evidenceUrl": "https://www.ummhealth.org/giving/ways-to-give/community-fundraising",
+   "hqCountry": "US",
+   "notes": "First-party page lists HQ: 365 Plantation Street, Worcester, MA 01605. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "uni.edu",
+   "evidenceUrl": "http://www.uni.edu/",
+   "hqCountry": "US",
+   "notes": "First-party homepage lists HQ: 1227 W 27th St, Cedar Falls, IA 50614. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "unisys.com",
+   "evidenceUrl": "https://www.unisys.com/siteassets/investor-relations/earnings-files/2023/2023_proxy_statement.pdf",
+   "hqCountry": "US",
+   "notes": "First-party proxy statement lists principal executive office: 801 Lakeview Drive, Suite 100, Blue Bell, PA 19422. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "universityhealthkc.org",
+   "evidenceUrl": "https://www.universityhealthkc.org/",
+   "hqCountry": "US",
+   "notes": "First-party homepage lists HQ: 2301 Holmes St, Kansas City, MO 64108. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "unum.com",
+   "evidenceUrl": "https://investors.unum.com/files/doc_financials/2011/ar/2011-proxy.pdf",
+   "hqCountry": "US",
+   "notes": "First-party proxy statement lists HQ: 1 Fountain Square, Chattanooga, TN 37402. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "urban.org",
+   "evidenceUrl": "https://www.urban.org/about/contact-us",
+   "hqCountry": "US",
+   "notes": "First-party contact page lists HQ: 500 L'Enfant Plaza SW, Washington, DC 20024. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "us.jll.com",
+   "evidenceUrl": "https://www.jll.com/en-de/legal-notice",
+   "hqCountry": "US",
+   "notes": "First-party legal notice lists HQ: 200 East Randolph Drive, Chicago, IL 60601. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "usacs.com",
+   "evidenceUrl": "https://www.usacs.com/resources/news/us-acute-care-solutions-reduces-opioid-prescriptions-through-emergency-department-feedback-program",
+   "hqCountry": "US",
+   "notes": "First-party news page lists HQ: 4535 Dressler Road NW, Canton, OH 44718. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "usbank.com",
+   "evidenceUrl": "https://www.usbank.com/about-us-bank/company-blog/article-library/us-bank-extends-lease-on-downtown-minneapolis-headquarters.html",
+   "hqCountry": "US",
+   "notes": "First-party article lists HQ: 800 Nicollet Mall, Minneapolis, MN 55402. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "ut.edu",
+   "evidenceUrl": "https://www.ut.edu/campus-life/career-services/contact-career-services",
+   "hqCountry": "US",
+   "notes": "First-party contact page lists HQ: 401 W. Kennedy Blvd, Tampa, FL 33606. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "valhalla.org",
+   "evidenceUrl": "https://valhalla.org/wp-content/uploads/2021/11/2020-Valhalla-Foundation-Form-990-PF.pdf",
+   "hqCountry": "US",
+   "notes": "First-party Form 990-PF hosted on its own site lists HQ: 175 Fox Hollow Road, Woodside, CA 94062; its careers page lists Valhalla's own roles and its Woodside, CA office. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "valleychildrens.org",
+   "evidenceUrl": "https://www.valleychildrens.org/your-visit/patient-care-and-safety/patient-rights-and-privacy",
+   "hqCountry": "US",
+   "notes": "First-party privacy page lists HQ: 9300 Valley Children's Place, Madera, CA 93636. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "valleyhealth.com",
+   "evidenceUrl": "https://www.valleyhealth.com/sites/default/files/Patient%20%26%20Visitors/Registration/Adm_103_Notice_of_Privacy_Rev_August2023.pdf",
+   "hqCountry": "US",
+   "notes": "First-party notice lists HQ: 223 North Van Dien Avenue, Ridgewood, NJ 07450. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "vanderbilthealth.com",
+   "evidenceUrl": "https://www.vanderbilthealth.com/",
+   "hqCountry": "US",
+   "notes": "First-party homepage footer lists HQ: 1211 Medical Center Drive, Nashville, TN 37232. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "velcro.com",
+   "evidenceUrl": "https://www.velcro.com/news-and-blog/2025/04/velcro-companies-innovation-and-manufacturing-footprint-in-the-u-s/",
+   "hqCountry": "US",
+   "notes": "First-party article states global HQ is on the Sundial Avenue campus in Manchester, NH (city-only; no street number stated in first-party text). Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "verily.com",
+   "evidenceUrl": "https://verily.com/job-applicant-privacy",
+   "hqCountry": "US",
+   "notes": "First-party privacy policy lists HQ mailing address: 2999 Olympus Blvd, Ste 1000, Dallas, TX 75019. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "vermontstate.edu",
+   "evidenceUrl": "https://vermontstate.edu/news/vermont-state-university-honors-2026-student-engineering-leaders/",
+   "hqCountry": "US",
+   "notes": "First-party news page lists HQ: 124 Admin Drive, PO Box 500, Randolph Center, VT 05061. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "vfc.com",
+   "evidenceUrl": "https://www.vfc.com/contact",
+   "hqCountry": "US",
+   "notes": "First-party contact page lists World Headquarters: 1551 Wewatta St, Denver, CO 80202. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "viejas.com",
+   "evidenceUrl": "https://viejas.com/",
+   "hqCountry": "US",
+   "notes": "First-party homepage lists HQ: 5000 Willows Rd, Alpine, CA 91901. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "virtua.org",
+   "evidenceUrl": "https://www.virtua.org/contact-us",
+   "hqCountry": "US",
+   "notes": "First-party contact page lists Corporate Office Main Mailing Address: Virtua Health, 303 Lippincott Drive, Fourth Floor, Marlton, NJ 08053. Domain virtua.org is Virtua Health's own domain and the board (tenant virtua) is Virtua Health's own board. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "voxmedia.com",
+   "evidenceUrl": "http://voxmedia.com/",
+   "hqCountry": "US",
+   "notes": "First-party site lists Vox Media: 1701 Rhode Island Ave NW, Washington, DC, US. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "vumc.org",
+   "evidenceUrl": "https://www.vumc.org/main/home",
+   "hqCountry": "US",
+   "notes": "First-party homepage footer lists HQ: 1211 Medical Center Drive, Nashville, TN 37232. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "watchduty.org",
+   "evidenceUrl": "https://www.watchduty.org/legal/eula",
+   "hqCountry": "US",
+   "notes": "First-party Terms of Service lists HQ: Sherwood Forestry Service, Inc., 422 Larkfield Center #423, Santa Rosa, CA 95403. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "watchguard.com",
+   "evidenceUrl": "https://www.watchguard.com/wgrd-about/contact",
+   "hqCountry": "US",
+   "notes": "First-party contact page lists United States office: 255 S. King Street, Suite 1100, Seattle, WA 98104; docs state WatchGuard is headquartered in Seattle, WA. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "welfarefootprint.org",
+   "evidenceUrl": "https://welfarefootprint.org/documents/wfi-form-990-ez-2025-amended-public.pdf",
+   "hqCountry": "US",
+   "notes": "First-party Form 990-EZ lists HQ: 5840 Red Bug Lake Rd 2094 E, Winter Springs, FL 32708. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "western.edu",
+   "evidenceUrl": "https://western.edu/admissions/visit-western/",
+   "hqCountry": "US",
+   "notes": "First-party visit page lists HQ: 1 Western Way, Gunnison, CO 81231. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "wgbh.org",
+   "evidenceUrl": "https://www.wgbh.org/",
+   "hqCountry": "US",
+   "notes": "First-party homepage lists HQ: 1 Guest St, Boston, MA 02135. The publicmedia Workday tenant's WGBH_Careers site carries GBH jobs only (contact human_resources@wgbh.org), so the board is GBH's own. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "wgu.edu",
+   "evidenceUrl": "https://www.wgu.edu/contact.html",
+   "hqCountry": "US",
+   "notes": "First-party contact page lists WGU Headquarters: 4001 S 700 East, #700, Salt Lake City, UT 84107. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "whmc.org",
+   "evidenceUrl": "https://www.whmc.org/",
+   "hqCountry": "US",
+   "notes": "First-party homepage lists HQ: 1200 W. Fairview St, Colfax, WA 99111. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "whoi.edu",
+   "evidenceUrl": "http://www.whoi.edu/who-we-are/contact-us/",
+   "hqCountry": "US",
+   "notes": "First-party contact page lists mailing address: 266 Woods Hole Road, Woods Hole, MA 02543-1050. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "willamette.edu",
+   "evidenceUrl": "https://willamette.edu/academics/mba/ms-accounting-finance/",
+   "hqCountry": "US",
+   "notes": "First-party program page lists HQ: 900 State Street, Salem, OR 97301. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "wit.edu",
+   "evidenceUrl": "https://wit.edu/about/contact-us",
+   "hqCountry": "US",
+   "notes": "First-party contact page lists mailing address: 550 Huntington Ave, Boston, MA 02115. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "wsfsbank.com",
+   "evidenceUrl": "https://www.wsfsbank.com/about/our-company/corporate-overview/",
+   "hqCountry": "US",
+   "notes": "First-party corporate overview lists WSFS Bank Headquarters: 500 Delaware Avenue, Wilmington, DE 19801. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "wth.org",
+   "evidenceUrl": "https://www.wth.org/locations/jackson-madison-co-general/",
+   "hqCountry": "US",
+   "notes": "First-party location page lists HQ: 620 Skyline Dr, Jackson, TN 38301. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "www3.mtb.com",
+   "evidenceUrl": "https://newsroom.mtb.com/2019-03-28-M-T-Bank-Announces-Remodel-of-Corporate-Headquarters-Banking-Hall",
+   "hqCountry": "US",
+   "notes": "First-party newsroom press release lists HQ: One M&T Plaza, Buffalo, NY 14203. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "yai.org",
+   "evidenceUrl": "https://www.yai.org/news-stories/around-yai/new-chapter-yai-headquarters-open-business",
+   "hqCountry": "US",
+   "notes": "First-party news article lists HQ: 220 East 42nd Street, New York, NY 10017. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "zipcar.com",
+   "evidenceUrl": "https://www.zipcar.com/press/news/zipcar-headquarters-relocation",
+   "hqCountry": "US",
+   "notes": "First-party press release lists HQ: 35 Thomson Place, Boston, MA 02210. Verified 2026-11-18.",
+   "verifiedAt": "2026-11-18"
+  }
+ ],
+ "version": 1
+}
