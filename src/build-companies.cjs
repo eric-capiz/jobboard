@@ -171,7 +171,7 @@ function main() {
       careersUrl: r.evidenceUrl || `https://${domain}/careers`,
       atsType: r.ats || 'unresolved',
       atsSlug: r.slug || r.tenant || null,
-      atsHost: r.tenant || null,
+      atsHost: r.host || r.tenant || null,
       atsSite: r.site || null,
       atsEvidenceUrl: r.evidenceUrl || null,
       hqCountry,

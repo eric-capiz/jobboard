@@ -53,10 +53,13 @@ function parseRetryAfter(value) {
 // Honors Retry-After (seconds, capped at 30s); otherwise exponential
 // backoff capped at 8s. Returns { ok: true, status, json } or
 // { ok: false, status, error, retryable }.
+// opts.method / opts.body: for POST endpoints (Workday). GET by default;
+// a body is only sent when method is POST (a GET body is invalid).
 async function fetchJsonWithRetry(fetchFn, url, opts = {}) {
   const maxRetries = opts.maxRetries ?? 3;
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const limiter = opts.limiter;
+  const method = (opts.method || 'GET').toUpperCase();
   let attempt = 0;
   // eslint-disable-next-line no-constant-condition
   while (true) {
@@ -67,9 +70,12 @@ async function fetchJsonWithRetry(fetchFn, url, opts = {}) {
       const timer = setTimeout(() => controller.abort(), timeoutMs);
       try {
         res = await fetchFn(url, {
+          method,
+          ...(method === 'POST' && opts.body != null ? { body: opts.body } : {}),
           headers: {
             Accept: 'application/json',
             'User-Agent': 'JobBoard-Ingest/1.0 (+https://jobboard-rt89.onrender.com)',
+            ...(method === 'POST' ? { 'Content-Type': 'application/json' } : {}),
             ...(opts.headers || {}),
           },
           signal: controller.signal,

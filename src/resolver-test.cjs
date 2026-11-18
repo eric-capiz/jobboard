@@ -56,6 +56,13 @@ const cases = [
     expect: { ats: 'workday', slug: 'hooli/hoolicareers', crawlable: true },
   },
   {
+    name: 'workday host captured from wd number (not wd5 default)',
+    domain: 'acme.com',
+    html: '<a href="https://acme.wd1.myworkdayjobs.com/en-US/ACME-Careers">Careers</a>',
+    url: 'https://acme.com/careers',
+    expect: { ats: 'workday', slug: 'acme/ACME-Careers', crawlable: true },
+  },
+  {
     name: 'smartrecruiters',
     domain: 'stark.com',
     html: '<iframe src="https://careers.smartrecruiters.com/StarkIndustries"></iframe>',

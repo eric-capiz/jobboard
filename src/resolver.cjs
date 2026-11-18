@@ -55,11 +55,14 @@ const ATS_PATTERNS = [
     tokens: ['myworkdayjobs.com'],
     slugFrom: (html, url) => {
       // {tenant}.wd{N}.myworkdayjobs.com/{locale}/{site} — the site is the
-      // LAST path segment; the locale (en-US) is not the site.
-      const m = url.match(/([a-z0-9-]+)\.wd\d+\.myworkdayjobs\.com\/(?:[a-z]{2}-[A-Z]{2}\/)?([a-z0-9_-]+)/i)
-        || html.match(/([a-z0-9-]+)\.wd\d+\.myworkdayjobs\.com\/(?:[a-z]{2}-[A-Z]{2}\/)?([a-z0-9_-]+)/i);
+      // LAST path segment; the locale (en-US) is not the site. The wd
+      // number varies per tenant (wd1/wd2/wd5...) and the API host needs
+      // it, so capture it — never default to wd5.
+      const m = url.match(/([a-z0-9-]+)\.(wd\d+)\.myworkdayjobs\.com\/(?:[a-z]{2}-[A-Z]{2}\/)?([a-z0-9_-]+)/i)
+        || html.match(/([a-z0-9-]+)\.(wd\d+)\.myworkdayjobs\.com\/(?:[a-z]{2}-[A-Z]{2}\/)?([a-z0-9_-]+)/i);
       if (!m) return null;
-      return { tenant: m[1].toLowerCase(), site: m[2] };
+      const tenant = m[1].toLowerCase();
+      return { tenant, site: m[3], host: `${tenant}.${m[2].toLowerCase()}.myworkdayjobs.com` };
     },
   },
   {
@@ -129,6 +132,7 @@ function resolveAts(domain, html, finalUrl) {
       result.tenant = slug.tenant;
       result.site = slug.site;
       result.slug = `${slug.tenant}/${slug.site}`;
+      if (slug.host) result.host = slug.host;
     }
     // A detected ATS family with no extractable slug is still a resolution
     // (it tells the pilot where the volume is), but it is NOT crawlable

@@ -15,11 +15,13 @@ const { createCircuitBreaker, createRateLimiter } = require('./fetch-util.cjs');
 const { fetchGreenhouseJobs } = require('./greenhouse.cjs');
 const { fetchLeverJobs } = require('./lever.cjs');
 const { fetchAshbyJobs } = require('./ashby.cjs');
+const { fetchWorkdayJobs } = require('./workday.cjs');
 
 const FETCHERS = {
   greenhouse: fetchGreenhouseJobs,
   lever: fetchLeverJobs,
   ashby: fetchAshbyJobs,
+  workday: fetchWorkdayJobs,
 };
 
 // ATS API host per fetcher family. The rate limiter is keyed by HOST, not
@@ -112,11 +114,15 @@ async function ingestCompany(db, company, fetchFn, opts = {}) {
   upsertCompany(db, company);
 
   // Shared per-host limiter (see ATS_HOSTS above). opts.limiter still
-  // overrides for tests. EU Lever uses its own host.
-  const host = atsType === 'lever' && company.euLever ? 'api.eu.lever.co' : (ATS_HOSTS[atsType] || `${atsType}.example.invalid`);
+  // overrides for tests. EU Lever uses its own host. Workday's host is
+  // per-tenant (company.atsHost, e.g. acme.wd5.myworkdayjobs.com) — the
+  // wd number comes from the resolver, never a wd5 default.
+  const host = atsType === 'lever' && company.euLever ? 'api.eu.lever.co'
+    : atsType === 'workday' ? (company.atsHost || null)
+    : (ATS_HOSTS[atsType] || `${atsType}.example.invalid`);
   const limiter = opts.limiter || limiterForHost(host, opts.maxRps || 3);
   const breaker = opts.breaker || createCircuitBreaker();
-  const fetchOpts = { limiter, maxRetries: opts.maxRetries, eu: !!company.euLever };
+  const fetchOpts = { limiter, maxRetries: opts.maxRetries, eu: !!company.euLever, host };
   let result;
   try {
     result = await breaker.call(() => fetcher(company.atsSlug, fetchFn, fetchOpts));
