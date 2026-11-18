@@ -37,7 +37,7 @@
  * ROUTES
  *   /api/state, /api/companies, /api/companies/import,
  *   /api/companies/migrate, /api/find-companies, /api/find-jobs,
- *   /api/test-company  → the matching api/*.ts default handler.
+ *   /api/test-company, /api/jobs  → the matching api/*.ts default handler.
  *   /healthz            → {"ok":true} (Cloud Run health check).
  *   everything else     → dist/ static file, SPA fallback to
  *                          dist/index.html for GET/HEAD.
@@ -91,6 +91,7 @@ import findCompaniesHandler from '../../api/find-companies.ts';
 import findJobsHandler from '../../api/find-jobs.ts';
 import testCompanyHandler from '../../api/test-company.ts';
 import checkLinkHandler from '../../api/check-link.ts';
+import jobsHandler from '../../api/jobs.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -109,6 +110,7 @@ const ROUTES = new Map([
   ['/api/find-jobs', findJobsHandler],
   ['/api/test-company', testCompanyHandler],
   ['/api/check-link', checkLinkHandler],
+  ['/api/jobs', jobsHandler],
 ]);
 
 /* ------------------------------------------------------------------ */
