@@ -51,7 +51,13 @@ function structuralHash(companyId, title, location) {
     .digest('hex');
 }
 
-function openDb(file) {  const db = new DatabaseSync(file);
+function openDb(file) {
+  // The Actions shard runners check out a repo with no data/shards/ dir;
+  // SQLite will not create parent directories, so create them here.
+  // (Ingest pilot run #1: every shard crashed with "unable to open
+  // database file" because data/shards/ did not exist yet.)
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const db = new DatabaseSync(file);
   db.exec('PRAGMA journal_mode = WAL;');
   db.exec(SCHEMA);
   // Migration for DBs built before round 5 (column added then). Throws
