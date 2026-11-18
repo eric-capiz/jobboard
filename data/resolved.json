@@ -3027,7 +3027,7 @@
       "domain": "acumen.org",
       "ats": "greenhouse",
       "evidenceUrl": "https://acumen.org/jobs/",
-      "slug": "embed",
+      "slug": "acumen",
       "crawlable": true,
       "error": null
     },
@@ -3483,7 +3483,7 @@
       "company": "Abilene Christian University College of Arts and Sciences",
       "domain": "acu.edu",
       "ats": "workday",
-      "evidenceUrl": "https://acu.edu/about/careers",
+      "evidenceUrl": "https://acu.wd108.myworkdayjobs.com/ACUCareers/",
       "tenant": "acu",
       "site": "ACUCareers",
       "slug": "acu/ACUCareers",
@@ -3842,7 +3842,7 @@
       "domain": "adcouncil.org",
       "ats": "greenhouse",
       "evidenceUrl": "https://www.adcouncil.org/about-us/join-our-team/careers",
-      "slug": "embed",
+      "slug": "adcouncil",
       "crawlable": true,
       "error": null
     },
