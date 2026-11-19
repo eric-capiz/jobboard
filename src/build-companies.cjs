@@ -9,7 +9,13 @@
 //     { results: [...] } | [...] | { shard, results, summary } (one shard file)
 //     Each result: { company, domain, ats, slug, tenant, site, crawlable,
 //     evidenceUrl, error }. ats: greenhouse|lever|ashby|workday|
-//     smartrecruiters|icims|taleo|other|unresolved.
+//     smartrecruiters|icims|taleo|recruitee|personio|jobscore|oracle|
+//     bamboohr|jazzhr|breezy|adp-myjobs|neogov|schooljobs|pageup|
+//     adp-workforcenow|peoplematter|paylocity|ukg|fountain|hireology|
+//     successfactors|phenom|eightfold|jobvite|workable|teamtailor|
+//     rippling|other|unresolved. (Generic: any ats string flows through;
+//     fetchers exist only for greenhouse|lever|ashby|workday|
+//     smartrecruiters|recruitee|personio — see ingest.cjs FETCHERS.)
 //   us-allowlist.json — { version, companies: [{ domain, hqCountry,
 //     evidenceUrl, verifiedAt }] }. Hand-maintained, first-party evidence
 //     only (About/investor page HQ statement, SEC EDGAR for public cos).

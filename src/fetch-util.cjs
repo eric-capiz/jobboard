@@ -141,4 +141,57 @@ function createCircuitBreaker({ failureThreshold = 3, cooldownMs = 10 * 60 * 100
   };
 }
 
-module.exports = { stripHtml, createRateLimiter, fetchJsonWithRetry, createCircuitBreaker, sleep, parseRetryAfter, DEFAULT_RETRY_AFTER_MS };
+// fetchText with retries — same retry/backoff contract as
+// fetchJsonWithRetry, but returns the raw text (for XML feeds like
+// Personio). Returns { ok: true, status, text } or
+// { ok: false, status, error, retryable }.
+async function fetchTextWithRetry(fetchFn, url, opts = {}) {
+  const maxRetries = opts.maxRetries ?? 3;
+  const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const limiter = opts.limiter;
+  let attempt = 0;
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    if (limiter) await limiter.wait();
+    let res;
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        res = await fetchFn(url, {
+          headers: {
+            Accept: 'application/xml, text/xml, */*',
+            'User-Agent': 'JobBoard-Ingest/1.0 (+https://jobboard-rt89.onrender.com)',
+            ...(opts.headers || {}),
+          },
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timer);
+      }
+    } catch (err) {
+      if (attempt >= maxRetries) return { ok: false, status: 0, error: `network: ${err.message}`, retryable: true };
+      await sleep(Math.min(1000 * 2 ** attempt, 8000));
+      attempt++;
+      continue;
+    }
+    if (res.ok) {
+      const text = await res.text();
+      if (text.length > MAX_BODY_BYTES) return { ok: false, status: res.status, error: 'response_too_large', retryable: false };
+      return { ok: true, status: res.status, text };
+    }
+    const retryable = res.status === 429 || res.status === 403 || res.status >= 500;
+    if (!retryable || attempt >= maxRetries) {
+      return { ok: false, status: res.status, error: `http_${res.status}`, retryable };
+    }
+    const retryAfter = res.headers && typeof res.headers.get === 'function'
+      ? res.headers.get('retry-after') : null;
+    const delayMs = retryAfter != null
+      ? parseRetryAfter(retryAfter)
+      : Math.min(1000 * 2 ** attempt, 8000);
+    await sleep(delayMs);
+    attempt++;
+  }
+}
+
+module.exports = { stripHtml, createRateLimiter, fetchJsonWithRetry, fetchTextWithRetry, createCircuitBreaker, sleep, parseRetryAfter, DEFAULT_RETRY_AFTER_MS };
