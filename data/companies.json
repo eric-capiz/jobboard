@@ -94,12 +94,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://phf.tbe.taleo.net/phf03/ats/careers/v2/jobSearch?org=NBF1199&cws=41",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.1199seiubenefits.org/wp-content/uploads/2025/08/TUF-Training-Benefits-Overview.pdf",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "11thavenuehostel.com",
@@ -11773,12 +11773,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://adamscenter.org/career/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "http://www.adamscenter.org/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "adamscountyanimals.org",
@@ -12334,12 +12334,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.adelphi.edu/hr/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.adelphi.edu/about/locations/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "adelsoncampus.org",
@@ -12708,12 +12708,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.adl.org/about/careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.adl.org/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "adlercenter.org",
@@ -20239,12 +20239,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.airmethods.com/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.airmethods.com/about-us",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "airnet.com",
@@ -23962,12 +23962,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://aliante.boydgaming.com/explore/careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://aliante.boydgaming.com/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "alianzacv.org",
@@ -40452,12 +40452,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.arhcareers.org/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.arh.org/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "arhealthconnector.org",
@@ -44498,12 +44498,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.as.pitt.edu//careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.as.pitt.edu/contact",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "as.ttu.edu",
@@ -48340,12 +48340,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.astate.edu/jobs/?redirect=true",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "http://www.astate.edu/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "astc.org",
@@ -48952,12 +48952,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.asun.edu/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.asun.edu/a-to-z.php",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "asuprepdigital.org",
@@ -53780,12 +53780,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.avenues.org/careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.avenues.org/ny",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "avera.org",
@@ -58064,12 +58064,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://bankwithstifel.com/about-us/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://bankwithstifel.com/wp-content/uploads/2026/10/Stifel-Bank-Treasury-User-Guide_CA.pdf",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "bannerbank.com",
@@ -58404,12 +58404,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.bannerlife.com/about-us/careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.bannerlife.com/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "bantamclub.com",
@@ -58523,12 +58523,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://careers.baptisthealth.net/us/en",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "http://baptisthealth.net/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "baptisthealthal.com",
@@ -59186,12 +59186,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.barnesjewish.org/careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.barnesjewish.org/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "barnesjewishwestcounty.org",
@@ -64694,12 +64694,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.benaroyaresearch.org/careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "http://www.benaroyaresearch.org/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "benbough.org",
@@ -73245,12 +73245,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.blythedale.org/careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "http://www.blythedale.org/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "blythesolarpower.com",
@@ -79790,12 +79790,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.bridgespan.org/careers-at-bridgespan",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "http://www.bridgespan.org/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "bridgestoprosperity.org",
@@ -81507,12 +81507,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.brookings.edu/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "http://www.brookings.edu/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "brookings.edu",
@@ -81524,12 +81524,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.brookings.edu/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "http://www.brookings.edu/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "brookline.k12.ma.us",
@@ -82561,12 +82561,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.bruker.com/en/careers.html",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.bruker.com/en.html",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "brunerfoundation.org",
@@ -86760,12 +86760,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://bvhealthsystem.org/careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://bvhealthsystem.org/about-bvhs/connecting-our-community-to-exceptional-health-care",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "bvhpr.org",
@@ -86964,12 +86964,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.bwsc.org/about/careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "http://www.bwsc.org/residential-customers/faqs",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "bwscampus.com",
@@ -88018,12 +88018,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://jobs.cadence-education.com/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.cadence-education.com/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "cadence.com",
@@ -95056,12 +95056,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.care.org/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.care.org/about-us/contact-us/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "careasone.com",
@@ -99000,12 +99000,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://jobs.chsli.org/careers-home",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.catholichealthli.org/sites/default/files/2026-07/MH%20School%20of%20Radiology%20Application_Class%20of%202029.pdf",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "catholichistorywpa.org",
@@ -102077,12 +102077,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://ccsww.org/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://ccsww.org/services/workforce-development/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "cct.org",
@@ -105018,12 +105018,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://centinelamed.com/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://centinelamed.com/wp-content/uploads/2022/12/CHMC_FactSheet_2022-Feb.pdf",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "centinelamed.com",
@@ -105035,11 +105035,11 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://centinelamed.com/careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://centinelamed.com/wp-content/uploads/2022/12/CHMC_FactSheet_2022-Feb.pdf",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
     "tier": "C"
   },
   {
@@ -105443,12 +105443,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://centrastatejobs.com/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "http://www.centrastate.com/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "centrastatefoundation.org",
@@ -106463,12 +106463,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.cffc.com/about-c-f-bank/careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "http://www.cffc.com/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "cffcm.com",
@@ -110611,12 +110611,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://ches.bank/about-us/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://ches.bank/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "chescocf.org",
@@ -113671,12 +113671,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.chiquita.com/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "http://www.chiquita.com/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "chiromed.org",
@@ -115490,12 +115490,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://jobs.chsli.org/careers-home",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.catholichealthli.org/gsuh-st-charles-campus",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "chstm.org",
@@ -122392,12 +122392,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.clintonhealthaccess.org/join-our-team/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.clintonhealthaccess.org/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "clintonschool.uasys.edu",
@@ -123446,12 +123446,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.cmhc.org/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.cmhc.org/cmmc/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "cmhcinc.org",
@@ -124007,12 +124007,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://careers.cnb.com/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.cnb.com/content/dam/cnb/brands/city-national-bank/documents/cra/2024/occ-cra-performance-evaluation-2019-2021-final.pdf",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "cnb1901.com",
@@ -131419,12 +131419,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.condadovanderbilt.com/careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.condadovanderbilt.com/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "conduent.com",
@@ -132507,12 +132507,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.conservation.org/conservation-international-jobs",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.conservation.org/contact",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "conservationactionresearch.net",
@@ -133238,12 +133238,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://cookcountyhealth.org/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://cookcountyhealth.org/wp-content/uploads/11th-Semi-Annual-EPO-Report_18Feb20.pdf",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "cookcountyhealth.org",
@@ -133255,12 +133255,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://cookcountyhealth.org/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://cookcountyhealth.org/wp-content/uploads/11th-Semi-Annual-EPO-Report_18Feb20.pdf",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "cookcountyhhs.org",
@@ -133289,12 +133289,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://cookcountypublichealth.org/jobs/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "http://www.cookcountypublichealth.org/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "cookecountylibrary.org",
@@ -133510,12 +133510,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://coopergreen.org/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://coopergreen.org/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "cooperhealth.org",
@@ -138865,12 +138865,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://crestwoodmedcenter.com/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://crestwoodmedcenter.com/message-from-dr-pam-hudson-ceo-crestwood-medical-center-remains-steadfast-in-service-to-north-alabama/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "creynolds.org",
@@ -143489,12 +143489,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.cu.edu/cu-careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.cu.edu/cu-careers",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "cuahsi.org",
@@ -145529,12 +145529,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://cvmc.com/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://cvmc.com/careers/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "cvmc.org",
@@ -146600,12 +146600,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.daddario.com/pages/careers-job-listings",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.daddario.com/pages/careers-job-listings",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "dads.state.tx.us",
@@ -146957,12 +146957,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://careers-daktronics.icims.com/jobs/intro?hashed=-435709790",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://careers-daktronics.icims.com/jobs/intro?hashed=-435709790",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "dalbergcatalyst.org",
@@ -147195,12 +147195,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.dallasisd.org/careers/career-center",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.dallasisd.org/careers/career-center",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "dallasisd.org",
@@ -147212,12 +147212,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.dallasisd.org/careers/career-center",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.dallasisd.org/careers/career-center",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "dallasivc.org",
@@ -149813,12 +149813,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://dcgoodwill.org/careers/careers-at-dc-goodwill/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://dcgoodwill.org/careers/careers-at-dc-goodwill/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "dch.georgia.gov",
@@ -153349,12 +153349,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://dental.tufts.edu/about/careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://dental.tufts.edu/about/careers",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "dentalaia.org",
@@ -154114,12 +154114,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://deq.mt.gov/careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://deq.mt.gov/careers",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "deq.nc.gov",
@@ -160812,12 +160812,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://dli.mt.gov/careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://dli.mt.gov/careers",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "dli.pa.gov",
@@ -167799,12 +167799,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://dvmc.com/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://dvmc.com/careers/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "dvnha.org",
@@ -168547,12 +168547,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.eagle-crest.com/careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.eagle-crest.com/careers",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "eagle3.stark.k12.oh.us",
@@ -170383,12 +170383,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://about.ebsco.com/careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://about.ebsco.com/careers",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "ebscoind.com",
@@ -178186,12 +178186,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://encinomed.org/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://encinomed.org/careers/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "encompasshealth.com",
@@ -182725,12 +182725,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://equitable.com/careers-at-equitable",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://equitable.com/careers-at-equitable",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "equitable.com",
@@ -182742,12 +182742,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://equitable.com/careers-at-equitable",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://equitable.com/careers-at-equitable",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "equityapartments.com",
@@ -195815,12 +195815,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.fitzgibbon.org/careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.fitzgibbon.org/careers",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "fitzmall.com",
@@ -205148,12 +205148,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://freedomhouse.org/careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://freedomhouse.org/careers",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "freedomisntfree.org",
@@ -206423,12 +206423,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://careers.friendshipschools.org/home",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://careers.friendshipschools.org/home",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "friendshomemuseum.org",
@@ -208565,12 +208565,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.fultonbank.com/careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.fultonbank.com/careers",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "fultoncountyga.gov",
@@ -216708,12 +216708,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://giftofhope.org/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://giftofhope.org/careers/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "giftoflife.org",
@@ -217320,12 +217320,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.girlscouts.org/en/footer/careers.html",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.girlscouts.org/en/footer/careers.html",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "girlsintech.org",
@@ -232059,12 +232059,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://jobs.hackensackmeridianhealth.org/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://jobs.hackensackmeridianhealth.org/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "hackensackumc.org",
@@ -239641,12 +239641,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://heart.jobs/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://heart.jobs/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "heartaerospace.com",
@@ -248600,12 +248600,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.hobartcorp.com/about-us-hobart/current-openings",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.hobartcorp.com/about-us-hobart/current-openings",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "hobnobcornerrestaurant.com",
@@ -252748,12 +252748,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.hotelroanoke.com/careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.hotelroanoke.com/careers",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "hotelsaintjoseph.com",
@@ -255468,12 +255468,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://hsu.edu/about/administration/finance-and-administration/human-resources/job-opportunities/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://hsu.edu/about/administration/finance-and-administration/human-resources/job-opportunities/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "hsutx.edu",
@@ -255978,12 +255978,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.hudsonregionalhospital.com/carepoint/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.hudsonregionalhospital.com/carepoint/careers/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "hudsonriver.org",
@@ -257423,12 +257423,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://careers.hhsys.org/?bcsi-ac-1890e3206a556864=2791AF9A000000024k%20yjCjZLUuKVFe8%2Fi2uXN3Ox51kHAAAAgAAADnFagCEAwAAAgAAAGk0FAA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%20gpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-cde40c890bd19f3d%3D2719301D00000002HsPJUykHtQ3KyOBfcfBkP8YJ06axOAAAAgAAAB8v1QCEAwAAHQEAABphFQA%3D%3Fbcsi-ac-cde40c890bd19f3d%3D2719301D00000002TxABWgl7eq%20hQML22rIetyufVWbfagAAAgAAAJmgkQGEAwAAHAAAAAxZPAA%3D%3Fbcsi-ac-cde40c890bd19f3d%3D2719301D00000002voqohdcopjzdU6XxuG16mTAk2k1LKQAAAgAAAIg7mwCEAwAA2AAAAAtdDQA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%2Bns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%2Bns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002GC1bUC%2FqDT8rTBbNjUtVtRY8%20IQAbgAAAgAAAMxenQGEAwAAXAAAAG6SOgA%3D%3Fbcsi-ac-1890e3206a556864%3D2791AF9A000000024k%20yjCjZLUuKVFe8%2Fi2uXN3Ox51kHAAAAgAAADnFagCEAwAAAgAAAGk0FAA%3D%3Fbcsi-ac-1890e3206a556864%3D2791AF9A000000024k%2ByjCjZLUuKVFe8%2Fi2uXN3Ox51kHAAAAgAAADnFagCEAwAAAgAAAGk0FAA%3D%3Fbcsi-ac-1890e3206a556864%3D2791AF9A00000002RP3KROa3gsLqZPcbEy9EcmR2rT08BAAAAgAAANvpDwCEAwAACQAAAAKDAgA%3D%3Fbcsi-ac-cde40c890bd19f3d%3D2719301D00000002TxABWgl7eq%2BhQML22rIetyufVWbfagAAAgAAAJmgkQGEAwAAHAAAAAxZPAA%3D%3Fbcsi-ac-cde40c890bd19f3d%3D2719301D00000002voqohdcopjzdU6XxuG16mTAk2k1LKQAAAgAAAIg7mwCEAwAA2AAAAAtdDQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%20gpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002v9sVUBwLXg%20pFHuDtmLIVtgn55K8YQAAAgAAAJBRbwGEAwAAVQAAAOPsLwA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%2Bns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-cde40c890bd19f3d%3D2719301D00000002voqohdcopjzdU6XxuG16mTAk2k1LKQAAAgAAAIg7mwCEAwAA2AAAAAtdDQA%3D%3Ffbclid%3DIwAR2wKyaW2jXv-HncN8QxQhPOAhRDoQOf1swenm",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://careers.hhsys.org/?bcsi-ac-1890e3206a556864=2791AF9A000000024k%20yjCjZLUuKVFe8%2Fi2uXN3Ox51kHAAAAgAAADnFagCEAwAAAgAAAGk0FAA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%20gpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-cde40c890bd19f3d%3D2719301D00000002HsPJUykHtQ3KyOBfcfBkP8YJ06axOAAAAgAAAB8v1QCEAwAAHQEAABphFQA%3D%3Fbcsi-ac-cde40c890bd19f3d%3D2719301D00000002TxABWgl7eq%20hQML22rIetyufVWbfagAAAgAAAJmgkQGEAwAAHAAAAAxZPAA%3D%3Fbcsi-ac-cde40c890bd19f3d%3D2719301D00000002voqohdcopjzdU6XxuG16mTAk2k1LKQAAAgAAAIg7mwCEAwAA2AAAAAtdDQA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%2Bns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%2Bns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002GC1bUC%2FqDT8rTBbNjUtVtRY8%20IQAbgAAAgAAAMxenQGEAwAAXAAAAG6SOgA%3D%3Fbcsi-ac-1890e3206a556864%3D2791AF9A000000024k%20yjCjZLUuKVFe8%2Fi2uXN3Ox51kHAAAAgAAADnFagCEAwAAAgAAAGk0FAA%3D%3Fbcsi-ac-1890e3206a556864%3D2791AF9A000000024k%2ByjCjZLUuKVFe8%2Fi2uXN3Ox51kHAAAAgAAADnFagCEAwAAAgAAAGk0FAA%3D%3Fbcsi-ac-1890e3206a556864%3D2791AF9A00000002RP3KROa3gsLqZPcbEy9EcmR2rT08BAAAAgAAANvpDwCEAwAACQAAAAKDAgA%3D%3Fbcsi-ac-cde40c890bd19f3d%3D2719301D00000002TxABWgl7eq%2BhQML22rIetyufVWbfagAAAgAAAJmgkQGEAwAAHAAAAAxZPAA%3D%3Fbcsi-ac-cde40c890bd19f3d%3D2719301D00000002voqohdcopjzdU6XxuG16mTAk2k1LKQAAAgAAAIg7mwCEAwAA2AAAAAtdDQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%20gpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002v9sVUBwLXg%20pFHuDtmLIVtgn55K8YQAAAgAAAJBRbwGEAwAAVQAAAOPsLwA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%2Bns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-cde40c890bd19f3d%3D2719301D00000002voqohdcopjzdU6XxuG16mTAk2k1LKQAAAgAAAIg7mwCEAwAA2AAAAAtdDQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-cde40c890bd19f3d%3D2719301D00000002voqohdcopjzdU6XxuG16mTAk2k1LKQAAAgAAAIg7mwCEAwAA2AAAAAtdDQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-cde40c890bd19f3d%3D2719301D00000002voqohdcopjzdU6XxuG16mTAk2k1LKQAAAgAAAIg7mwCEAwAA2AAAAAtdDQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-cde40c890bd19f3d%3D2719301D00000002voqohdcopjzdU6XxuG16mTAk2k1LKQAAAgAAAIg7mwCEAwAA2AAAAAtdDQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-cde40c890bd19f3d%3D2719301D00000002voqohdcopjzdU6XxuG16mTAk2k1LKQAAAgAAAIg7mwCEAwAA2AAAAAtdDQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-cde40c890bd19f3d%3D2719301D00000002voqohdcopjzdU6XxuG16mTAk2k1LKQAAAgAAAIg7mwCEAwAA2AAAAAtdDQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-cde40c890bd19f3d%3D2719301D00000002voqohdcopjzdU6XxuG16mTAk2k1LKQAAAgAAAIg7mwCEAwAA2AAAAAtdDQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAWp6%2F8fW%2F8e8gWbL4Q8X4kQ%3D%3D%3Ffbclid%3DIwAR2wKyaW2jXv-HncN8QxQhPOAhRDoQOf1swenm",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "hurleymc.com",
@@ -261010,12 +261010,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.icann.org/en/careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.icann.org/en/careers",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "icanresearch.org",
@@ -262523,12 +262523,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.idc.com/about/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.idc.com/about/careers/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "idea.org",
@@ -263968,12 +263968,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.ifixit.com/about-us/careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.ifixit.com/about-us/careers",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "iflgroup.com",
@@ -264189,12 +264189,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.ifpri.org/landing/work-with-us/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.ifpri.org/landing/work-with-us/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "ifpsd.org",
@@ -267861,12 +267861,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.imsa.edu/discover-imsa/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.imsa.edu/discover-imsa/careers/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "imscoglobal.org",
@@ -295690,12 +295690,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.kaiserpermanentejobs.org/?kp_shortcut_referrer=kp.org/careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.kaiserpermanentejobs.org/?kp_shortcut_referrer=kp.org/careers",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "kpbs.org",
@@ -298087,12 +298087,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.laconcharesort.com/careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.laconcharesort.com/our-hotel/amenities/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "lacordaire.net",
@@ -300144,12 +300144,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://landmarkmedical.org/about-us/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://landmarkmedical.org/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "landmarks.org",
@@ -300756,12 +300756,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://lapalmaintercommunityhospital.com/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://lapalmaintercommunityhospital.com/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "lapca.org",
@@ -305584,12 +305584,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.legacyhealth.org/careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.legacyhealth.org/services-and-resources.aspx",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "legacyhealth.org",
@@ -305601,12 +305601,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.legacyhealth.org/careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.legacyhealth.org/services-and-resources.aspx",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "legacyhealth.org",
@@ -305618,12 +305618,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.legacyhealth.org/careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.legacyhealth.org/services-and-resources.aspx",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "legacyhealth.org",
@@ -305635,12 +305635,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.legacyhealth.org/careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.legacyhealth.org/services-and-resources.aspx",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "legacyhealth.org",
@@ -305652,12 +305652,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.legacyhealth.org/careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.legacyhealth.org/services-and-resources.aspx",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "legacyheritage.org",
@@ -306638,12 +306638,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.lennox.com/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.lennox.com/contact-us",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "lenovo.com",
@@ -310004,12 +310004,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://stanford.referrals.selectminds.com/page/university-libraries-855",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://library.stanford.edu/libraries/branches-and-centers",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "library.stanford.edu",
@@ -310021,12 +310021,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://stanford.referrals.selectminds.com/page/university-libraries-855",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://library.stanford.edu/libraries/branches-and-centers",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "library.stjohnsem.edu",
@@ -317093,12 +317093,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://lowerbuckshosp.com/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://lowerbuckshosp.com/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "lowercolumbia.edu",
@@ -323672,12 +323672,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://careers.mainlinehealth.org/?utm_source=corporate_site&utm_medium=referral&utm_campaign=internal_navigation",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.mainlinehealth.org/about/policies/terms-of-use",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "mainlinehealth.org",
@@ -323689,12 +323689,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://careers.mainlinehealth.org/?utm_source=corporate_site&utm_medium=referral&utm_campaign=internal_navigation",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.mainlinehealth.org/about/policies/terms-of-use",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "mainlinehealth.org",
@@ -323706,12 +323706,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://careers.mainlinehealth.org/?utm_source=corporate_site&utm_medium=referral&utm_campaign=internal_navigation",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.mainlinehealth.org/about/policies/terms-of-use",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "mainlinehealth.org",
@@ -323723,12 +323723,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://careers.mainlinehealth.org/?utm_source=corporate_site&utm_medium=referral&utm_campaign=internal_navigation",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.mainlinehealth.org/about/policies/terms-of-use",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "mainlinehealth.org",
@@ -323740,12 +323740,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://careers.mainlinehealth.org/?utm_source=corporate_site&utm_medium=referral&utm_campaign=internal_navigation",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.mainlinehealth.org/about/policies/terms-of-use",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "mainstreet.cityofforsyth.net",
@@ -333617,12 +333617,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.mbc.org/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.mbc.org/saint-paul-donor-center/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "mbcc.org",
@@ -338734,12 +338734,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://careers.medstarhealth.org/careers-home",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.medstarhealth.org/contact-us",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "medstarhealth.org",
@@ -338751,12 +338751,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://careers.medstarhealth.org/careers-home",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.medstarhealth.org/contact-us",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "medstarmontgomery.org",
@@ -339516,12 +339516,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.kaiserpermanentejobs.org/?kp_shortcut_referrer=kp.org/careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://about.kaiserpermanente.org/content/dam/kp/mykp/documents/reports/community-health/oakland-is-2025_ada.pdf",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "members.tripod.com",
@@ -341335,12 +341335,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://mercymedcenter.com/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://mercymedcenter.com/patients-visitors/patient-rights-responsibilities/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "mercyone.org",
@@ -344038,12 +344038,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.mhskids.org/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.mhskids.org/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "mhswc.com",
@@ -350787,12 +350787,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.mlgw.com/about/jobopportunities",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.mlgw.com/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "mlkcommunityhospital.org",
@@ -350855,12 +350855,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://jobs.mlssoccer.com/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.mlssoccer.com/news/major-league-soccer-unveils-new-global-headquarters-at-2-penn-plaza-in-manhattan",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "mma.org",
@@ -354068,12 +354068,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://montclair-hospital.org/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://montclair-hospital.org/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "montclairprep.com",
@@ -355768,12 +355768,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://morristownhamblen.com/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.morristownhamblen.com/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "morrisville.edu",
@@ -359117,12 +359117,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://careers.msci.com/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.msci.com/downloads/documents/sustainability/sustainable-finance-consultation-responses/responses/response-iosco-esg-ratings-data-products-2021.pdf",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "msci.org",
@@ -359950,12 +359950,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.mstc.edu/about-us/careers-at-mid-state",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.mstc.edu/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "mstc.org",
@@ -368705,12 +368705,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://nascsp.org/jobs/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://nascsp.org/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "nascus.org",
@@ -368756,12 +368756,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://naseo.org/jobs",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://naseo.org/Data/Sites/1/media/tknaseo/naseo-2026-rfp-013-senior-advisor-state-and-local-espc.pdf",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "naseworldwide.org",
@@ -378208,12 +378208,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.neuropsychiatrichospitals.net/careers-with-us/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.neuropsychiatrichospitals.net/wp-content/uploads/2026/04/Notice-of-Privacy-Practices.pdf",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "neuropsychiatrichospitals.net",
@@ -378225,12 +378225,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.neuropsychiatrichospitals.net/careers-with-us/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.neuropsychiatrichospitals.net/wp-content/uploads/2026/04/Notice-of-Privacy-Practices.pdf",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "neuropsychiatrichospitals.net",
@@ -378242,12 +378242,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.neuropsychiatrichospitals.net/careers-with-us/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.neuropsychiatrichospitals.net/wp-content/uploads/2026/04/Notice-of-Privacy-Practices.pdf",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "neusechristian.com",
@@ -383257,12 +383257,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.nielsen.com/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://computermobilepanel.nielsen.com/ui/US/en/privacypolicyen.html",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "nielsen.com",
@@ -383274,12 +383274,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.nielsen.com/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://computermobilepanel.nielsen.com/ui/US/en/privacypolicyen.html",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "nielseniq.com",
@@ -384600,12 +384600,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.njeda.gov/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.njeda.gov/wp-content/uploads/2025/01/NJ-Founders-and-Funders-All-Stars-Event-and-Pilot-Grant-NOFAupdated.pdf",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "njeja.org",
@@ -389088,12 +389088,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://northvistahospital.com/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://northvistahospital.com/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "northwardcenter.org",
@@ -398863,12 +398863,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.o-i.com/about-o-i/careers/?referrer_uri=/careers&referrer_eol=1735603200",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.o-i.com/wp-content/uploads/2020/04/2019-10-K.pdf",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "oa.oakwood.edu",
@@ -403861,12 +403861,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.ohsu.edu/human-resources?utm_source=careers&utm_medium=radio&utm_campaign=OPB",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.ohsu.edu/school-of-medicine/graduate-studies/contact-us",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "ohsu.edu",
@@ -403878,12 +403878,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.ohsu.edu/human-resources?utm_source=careers&utm_medium=radio&utm_campaign=OPB",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.ohsu.edu/school-of-medicine/graduate-studies/contact-us",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "ohwetlands.org",
@@ -404660,12 +404660,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://careers.okheart.com/main",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.okheart.com/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "okhighered.org",
@@ -407380,12 +407380,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.oneblood.org/careers.html",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.oneblood.org/content/dam/oneblood/corporate/documents-/Official%20Rules%20-Florida%20Gators%20Prizes_November%202026.pdf",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "oneearth.org",
@@ -415183,12 +415183,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://careers.ozk.com/career-home/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.ozk.com/locations/ar/little-rock/18000-cantrell-rd",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "ozonamuseum.com",
@@ -416628,12 +416628,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.pactworld.org/careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "http://pactworld.org/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "pacyber.org",
@@ -419042,12 +419042,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://paradisevalleyhospital.com/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://paradisevalleyhospital.net/paradise-valley-hospital-earns-a-hospital-safety-grade-from-the-leapfrog-group/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "paradoxsports.org",
@@ -431333,12 +431333,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.pinkerton.com/careers/current-openings",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.pinkerton.com/press-room/historic-risk-management-agency-opens-downtown-corporate-headquarters",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "pinkpepperhollywood.com",
@@ -447993,12 +447993,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.rambus.com/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.rambus.com/wp-content/uploads/2025/01/2024-05-Rambus-Form-SD-Filed.pdf",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "rameyafb.net",
@@ -448673,12 +448673,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://rare.org/careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://rare.org/about-us/contact-us/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "rareadvocates.org",
@@ -452838,12 +452838,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.renasantbank.com/careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.renasantbank.com/locations/tupelo-main",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "renbrook.org",
@@ -457326,12 +457326,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.riverbed.com/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://riverbed.com/riverbed-wp-content/uploads/2023/02/riverbed-technology-llc-form-8937.pdf",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "rivercenter.org",
@@ -457734,12 +457734,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.riversideresearch.org/index.php?p=careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.riversideresearch.org/locations",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "riversideresort.com",
@@ -466489,12 +466489,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://saintfrancisevanston.org/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://saintfrancisevanston.org/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "saintgeorgeschools.org",
@@ -470722,12 +470722,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.sarh.org/careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.sarh.org/careers/about-san-antonio",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "sariverfound.org",
@@ -478797,12 +478797,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://scspa.com/contact-us/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://scspa.com/news/43219/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "scspacegrant.cofc.edu",
@@ -480820,12 +480820,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.seattleaquarium.org/about-us/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.seattleaquarium.org/visit/faq/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "seattleartmuseum.org",
@@ -484628,12 +484628,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.sfmta.com/sfmta-career-center",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.sfmta.com/sfmta-career-center",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "sfomuseum.org",
@@ -485988,12 +485988,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://shastaregional.com/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://shastaregional.com/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "shawarmahousesd.com",
@@ -486855,12 +486855,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://shermanoakshospital.org/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://shermanoakshospital.org/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "shermansautorepair.com",
@@ -488572,12 +488572,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.shure.com/en-US/careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.shure.com/en-MEA/legal/processing-of-personal-data",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "shuttersonthebeach.com",
@@ -490238,12 +490238,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://silvertoncasino.com/jobs-directory/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://silvertoncasino.com/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "silvertonhealth.org",
@@ -494556,12 +494556,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://careers.smh.com/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://careers.smh.com/careers/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "smhall.org",
@@ -495219,12 +495219,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.smu.edu/businessfinance/hr/workingatsmu",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.smu.edu/aboutsmu/contactsmu",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "smu.edu",
@@ -495236,12 +495236,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.smu.edu/businessfinance/hr/workingatsmu",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.smu.edu/aboutsmu/contactsmu",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "smuinballet.org",
@@ -495372,12 +495372,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.snapon.com/EN/Careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.snapon.com/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "snappletheater.com",
@@ -498891,12 +498891,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://southcoasthealthcareers.org/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.southcoast.org/contact-us/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "southcoast.org",
@@ -498908,12 +498908,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://southcoasthealthcareers.org/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.southcoast.org/contact-us/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "southcoastcollege.edu",
@@ -503243,12 +503243,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.sri.com/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.sri.com/contact/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "srinc.biz",
@@ -504297,12 +504297,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://st-james-hotel.com/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://st-james-hotel.com/about-us/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "st-johns.org",
@@ -508853,12 +508853,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.stifel.com/careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.stifel.com/careers",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "stillcreekranch.org",
@@ -509346,12 +509346,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://stjosephkc.com/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://stjosephkc.com/careers/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "stjosephmuseum.org",
@@ -510825,12 +510825,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.stonybrookmedicine.edu/careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.stonybrookmedicine.edu/careers",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "stonywoldherbertfund.com",
@@ -519631,12 +519631,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.taskforce.org/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.taskforce.org/new-task-force-headquarters-starts-taking-shape/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "tassc.org",
@@ -523745,12 +523745,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.texasbar.com/AM/Template.cfm?Section=State_Bar_Jobs",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://blog.texasbar.com/2023/06/articles/state-bar/state-bar-of-texas-board-of-directors-to-meet-june-21-22-in-austin/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "texasbroadcastmuseum.com",
@@ -523898,12 +523898,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.texashealth.org/careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.texashealth.org/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "texashealth.org",
@@ -523915,12 +523915,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.texashealth.org/careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.texashealth.org/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "texasheart.org",
@@ -524527,12 +524527,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.tgh.org/careers-at-tampa-general",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.tgh.org/careers-at-tampa-general",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "tgkvf.org",
@@ -537753,12 +537753,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://thinktogether.org/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://thinktogether.org/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "thinkwy.org",
@@ -537821,12 +537821,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.thirdway.org/careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.thirdway.org/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "thirteen.org",
@@ -540218,12 +540218,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://tlhoc.com/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://tlhoc.com/careers/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "tlltemple.foundation",
@@ -542547,12 +542547,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.towson.edu/hr/employment/?utm_source=redirect&utm_medium=print&utm_content=jobs",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "http://www.towson.edu/contact.html",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "toyotausamuseum.com",
@@ -546882,12 +546882,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://jobs.tufts.edu/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.tufts.edu/about/contact-us",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "tufts.edu",
@@ -546899,12 +546899,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://jobs.tufts.edu/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.tufts.edu/about/contact-us",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "tuftsmedicalcenter.org",
@@ -548735,12 +548735,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.uab.edu/humanresources/home/careers?utm_source=careers&utm_medium=friendly",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.residency.peds.uab.edu/home/contact",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "uab.edu",
@@ -548752,12 +548752,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.uab.edu/humanresources/home/careers?utm_source=careers&utm_medium=friendly",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.residency.peds.uab.edu/home/contact",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "uabmedicine.org",
@@ -554226,12 +554226,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.unitedhealthgroup.com/careers/en/work.html",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.unitedhealthgroup.com/careers/en/work.html",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "unitedindianhealthservices.org",
@@ -555586,12 +555586,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://uoflhealth.org/healthcare-careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://uoflhealth.org/healthcare-careers/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "uofmhealth.org",
@@ -561740,12 +561740,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://jobs.utsouthwestern.edu/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://utswmed.org/contact-us/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "utswmedicine.org",
@@ -561757,12 +561757,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://jobs.utsouthwestern.edu/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://utswmed.org/contact-us/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "utsystem.edu",
@@ -563406,12 +563406,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.valero.com/careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.valero.com/about/offices",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "valhalla.org",
@@ -569118,12 +569118,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.vitalstrategies.org/get-involved/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.vitalstrategies.org/global/new-york/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "vitalysthealth.org",
@@ -571651,12 +571651,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.wafdbank.com/about-us/banking-careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.wafdbank.com/about-us",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "wafwa.org",
@@ -575425,12 +575425,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.thesilverlining.com/careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.thesilverlining.com/careers",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "wbu.edu",
@@ -579403,12 +579403,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.westerndigital.com/careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.westerndigital.com/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "westernfieldornithologists.org",
@@ -580882,12 +580882,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://www.weyerhaeuser.com/careers/",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.weyerhaeuser.com/company/contact-us-locations/",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "wf.catholic.edu.au",
@@ -586815,12 +586815,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://wiregrass.edu/about/employment",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://www.wiregrass.edu/institutional-effectiveness/accreditation",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "wirelessinnovation.org",
@@ -592034,12 +592034,12 @@
     "atsHost": null,
     "atsSite": null,
     "atsEvidenceUrl": "https://berkley.com/about-us/careers",
-    "hqCountry": null,
-    "usVerified": false,
-    "usEvidenceUrl": null,
-    "usVerifiedAt": null,
-    "usExpiresAt": null,
-    "tier": "held"
+    "hqCountry": "US",
+    "usVerified": true,
+    "usEvidenceUrl": "https://berkley.com/about-us/careers",
+    "usVerifiedAt": "2026-11-18",
+    "usExpiresAt": "2027-05-17T00:00:00.000Z",
+    "tier": "B"
   },
   {
     "id": "wrccct.org",
