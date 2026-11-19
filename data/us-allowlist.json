@@ -1,4 +1,5 @@
 {
+ "version": 1,
  "companies": [
   {
    "domain": "988lifeline.org",
@@ -2722,7 +2723,1070 @@
    "hqCountry": "US",
    "notes": "First-party press release lists HQ: 35 Thomson Place, Boston, MA 02210. Verified 2026-11-18.",
    "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "1199seiubenefits.org",
+   "evidenceUrl": "https://www.1199seiubenefits.org/wp-content/uploads/2025/08/TUF-Training-Benefits-Overview.pdf",
+   "hqCountry": "US",
+   "notes": "Principal office / Funds HQ: 498 Seventh Avenue, New York, NY 10018 (per 1199seiubenefits.org Training Benefits Overview; Funds newsletter also calls 498 Seventh Ave its headquarters)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "adamscenter.org",
+   "evidenceUrl": "http://www.adamscenter.org/",
+   "hqCountry": "US",
+   "notes": "HQ: 46903 Sugarland Rd, Sterling, VA",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "adelphi.edu",
+   "evidenceUrl": "https://www.adelphi.edu/about/locations/",
+   "hqCountry": "US",
+   "notes": "HQ: One South Avenue, P.O. Box 701, Garden City, NY 11530-0701",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "adl.org",
+   "evidenceUrl": "https://www.adl.org/",
+   "hqCountry": "US",
+   "notes": "HQ: 605 Third Avenue, New York, NY 10158",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "airmethods.com",
+   "evidenceUrl": "https://www.airmethods.com/about-us",
+   "hqCountry": "US",
+   "notes": "HQ: 5500 S Quebec St, Greenwood Village, CO 80111",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "aliantegaming.com",
+   "evidenceUrl": "https://aliante.boydgaming.com/",
+   "hqCountry": "US",
+   "notes": "HQ: 7300 N Aliante Pkwy, North Las Vegas, NV 89084 (board is parent Boyd Gaming's property-specific subdomain; address is unambiguous US)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "arh.org",
+   "evidenceUrl": "https://www.arh.org/",
+   "hqCountry": "US",
+   "notes": "Principal office: 2260 Executive Dr, Lexington, KY 40505 (older sources cite historic Hazard, KY address; both KY/US)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "as.pitt.edu",
+   "evidenceUrl": "https://www.as.pitt.edu/contact",
+   "hqCountry": "US",
+   "notes": "HQ: 917 Cathedral of Learning, 4200 Fifth Avenue, Pittsburgh, PA 15260",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "astate.edu",
+   "evidenceUrl": "http://www.astate.edu/",
+   "hqCountry": "US",
+   "notes": "HQ: 2105 E Aggie Rd, Jonesboro, AR 72401",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "asun.edu",
+   "evidenceUrl": "https://www.asun.edu/a-to-z.php",
+   "hqCountry": "US",
+   "notes": "HQ: 7648 Victory Blvd, Newport, AR 72112",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "avenues.org",
+   "evidenceUrl": "https://www.avenues.org/ny",
+   "hqCountry": "US",
+   "notes": "HQ offices: 11 E 26th St, New York, NY 10010; flagship campus 259 10th Ave, New York, NY 10001",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "bankwithstifel.com",
+   "evidenceUrl": "https://bankwithstifel.com/wp-content/uploads/2026/10/Stifel-Bank-Treasury-User-Guide_CA.pdf",
+   "hqCountry": "US",
+   "notes": "HQ: 501 North Broadway, St. Louis, MO 63102 (per bank's own PDF)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "bannerlife.com",
+   "evidenceUrl": "https://www.bannerlife.com/",
+   "hqCountry": "US",
+   "notes": "HQ: 3275 Bennett Creek Ave, Frederick, MD 21704",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "baptisthealth.net",
+   "evidenceUrl": "http://baptisthealth.net/",
+   "hqCountry": "US",
+   "notes": "Corporate offices: 6855 Red Rd, Coral Gables, FL 33143",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "barnesjewish.org",
+   "evidenceUrl": "https://www.barnesjewish.org/",
+   "hqCountry": "US",
+   "notes": "HQ: One Barnes-Jewish Hospital Plaza, St. Louis, MO 63110",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "benaroyaresearch.org",
+   "evidenceUrl": "http://www.benaroyaresearch.org/",
+   "hqCountry": "US",
+   "notes": "HQ: 1201 Ninth Avenue, Seattle, WA 98101",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "blythedale.org",
+   "evidenceUrl": "http://www.blythedale.org/",
+   "hqCountry": "US",
+   "notes": "HQ: 95 Bradhurst Ave, Valhalla, NY 10595",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "bridgespan.org",
+   "evidenceUrl": "http://www.bridgespan.org/",
+   "hqCountry": "US",
+   "notes": "HQ: 2 Copley Place, Boston, MA 02116 (bridgespan.org also lists Boston office at 287 Columbus Ave; both Boston, MA)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "brookings.edu",
+   "evidenceUrl": "http://www.brookings.edu/",
+   "hqCountry": "US",
+   "notes": "HQ: 1775 Massachusetts Ave NW, Washington, DC 20036",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "bruker.com",
+   "evidenceUrl": "https://www.bruker.com/en.html",
+   "hqCountry": "US",
+   "notes": "HQ: 40 Manning Road, Billerica, MA 01821",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "bvhealthsystem.org",
+   "evidenceUrl": "https://bvhealthsystem.org/about-bvhs/connecting-our-community-to-exceptional-health-care",
+   "hqCountry": "US",
+   "notes": "HQ: 1900 South Main Street, Findlay, OH 45840",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "bwsc.org",
+   "evidenceUrl": "http://www.bwsc.org/residential-customers/faqs",
+   "hqCountry": "US",
+   "notes": "HQ: 980 Harrison Avenue, Boston, MA 02119 (bwsc.org FAQ calls it 'its headquarters')",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "cadence-education.com",
+   "evidenceUrl": "https://www.cadence-education.com/",
+   "hqCountry": "US",
+   "notes": "HQ: 8800 N Gainey Center Dr Ste 300, Scottsdale, AZ 85258",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "care.org",
+   "evidenceUrl": "https://www.care.org/about-us/contact-us/",
+   "hqCountry": "US",
+   "notes": "HQ: 151 Ellis Street NE, Atlanta, GA 30303 ('CARE USA headquarters are located at' per care.org contact page)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "catholichealthli.org",
+   "evidenceUrl": "https://www.catholichealthli.org/sites/default/files/2026-07/MH%20School%20of%20Radiology%20Application_Class%20of%202029.pdf",
+   "hqCountry": "US",
+   "notes": "Principal place of business: 992 N Village Ave, Rockville Centre, NY 11570 (system also lists corporate offices in Melville, NY; both NY)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "ccsww.org",
+   "evidenceUrl": "https://ccsww.org/services/workforce-development/",
+   "hqCountry": "US",
+   "notes": "HQ: 100 23rd Ave S, Seattle, WA 98144",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "centinelamed.com",
+   "evidenceUrl": "https://centinelamed.com/wp-content/uploads/2022/12/CHMC_FactSheet_2022-Feb.pdf",
+   "hqCountry": "US",
+   "notes": "HQ: 555 East Hardy Street, Inglewood, CA 90301 (hospital's own fact sheet; member of Prime Healthcare)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "centrastate.com",
+   "evidenceUrl": "http://www.centrastate.com/",
+   "hqCountry": "US",
+   "notes": "HQ: 901 West Main Street, Freehold, NJ 07728 (partner of Atlantic Health System)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "cffc.com",
+   "evidenceUrl": "http://www.cffc.com/",
+   "hqCountry": "US",
+   "notes": "Main office: 415 14th St, West Point, VA 23181 (per cffc.com listing and FDIC; parent C&F Financial Corp HQ is 3600 La Grange Pkwy, Toano, VA)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "chesbank.com",
+   "evidenceUrl": "https://ches.bank/",
+   "hqCountry": "US",
+   "notes": "Main office: 97 N Main St, Kilmarnock, VA 22482 (bank now operates as ches.bank)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "chiquita.com",
+   "evidenceUrl": "http://www.chiquita.com/",
+   "hqCountry": "US",
+   "notes": "HQ: 1855 Griffin Road, Suite C-436, Dania Beach, FL 33004 (FL Sunbiz 2026 filing: principal place of business)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "chsli.org",
+   "evidenceUrl": "https://www.catholichealthli.org/gsuh-st-charles-campus",
+   "hqCountry": "US",
+   "notes": "St. Charles campus (now Good Samaritan University Hospital St. Charles Campus): 200 Belle Terre Road, Port Jefferson, NY 11777; board jobs.chsli.org is on the domain owner's own domain; parent Catholic Health HQ is Melville, NY",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "clintonhealthaccess.org",
+   "evidenceUrl": "https://www.clintonhealthaccess.org/",
+   "hqCountry": "US",
+   "notes": "HQ: 383 Dorchester Ave Ste 400, Boston, MA 02127",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "cmhc.org",
+   "evidenceUrl": "https://www.cmhc.org/cmmc/",
+   "hqCountry": "US",
+   "notes": "HQ: 300 Main Street, Lewiston, ME 04240 (Central Maine Healthcare; acquired by Prime Healthcare Jan 2025)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "cnb.com",
+   "evidenceUrl": "https://www.cnb.com/content/dam/cnb/brands/city-national-bank/documents/cra/2024/occ-cra-performance-evaluation-2019-2021-final.pdf",
+   "hqCountry": "US",
+   "notes": "HQ: 555 South Flower Street, Los Angeles, CA 90071 (per cnb.com CRA evaluation: 'headquartered in Los Angeles, California')",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "condadovanderbilt.com",
+   "evidenceUrl": "https://www.condadovanderbilt.com/",
+   "hqCountry": "US",
+   "notes": "HQ: 1055 Ashford Avenue, San Juan, PR 00907 (U.S. territory; hotel's own site footer)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "conservation.org",
+   "evidenceUrl": "https://www.conservation.org/contact",
+   "hqCountry": "US",
+   "notes": "HQ: 2011 Crystal Drive, Suite 600, Arlington, VA 22202 (conservation.org contact page: 'Our headquarters')",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "cookcountyhealth.org",
+   "evidenceUrl": "https://cookcountyhealth.org/wp-content/uploads/11th-Semi-Annual-EPO-Report_18Feb20.pdf",
+   "hqCountry": "US",
+   "notes": "CEO/admin offices: 1950 W Polk St, 9th Floor, Chicago, IL 60612 (per cookcountyhealth.org report; board meetings held there; older 2016 doc cites 1900 W Polk St, same campus)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "cookcountypublichealth.org",
+   "evidenceUrl": "http://www.cookcountypublichealth.org/",
+   "hqCountry": "US",
+   "notes": "Administrative office: 7556 Jackson Boulevard, Forest Park, IL 60130 (per cookcountypublichealth.org press releases)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "coopergreen.org",
+   "evidenceUrl": "https://coopergreen.org/",
+   "hqCountry": "US",
+   "notes": "HQ: 1509 6th Avenue South, Birmingham, AL 35233 (per coopergreen.org footer; older sources cite 1515 6th Ave S, the former hospital building)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "crestwoodmedcenter.com",
+   "evidenceUrl": "https://crestwoodmedcenter.com/message-from-dr-pam-hudson-ceo-crestwood-medical-center-remains-steadfast-in-service-to-north-alabama/",
+   "hqCountry": "US",
+   "notes": "HQ: One Hospital Drive, Huntsville, AL 35801 (per crestwoodmedcenter.com CEO message; now part of Huntsville Hospital Health System)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "cu.edu",
+   "evidenceUrl": "https://www.cu.edu/cu-careers",
+   "hqCountry": "US",
+   "notes": "HQ: 1800 Grant St, Denver, CO 80203 (CU System Administration Office)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "cvmc.com",
+   "evidenceUrl": "https://cvmc.com/careers/",
+   "hqCountry": "US",
+   "notes": "HQ: 5451 Walnut Ave, Chino, CA 91710 (Chino Valley Medical Center)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "daddario.com",
+   "evidenceUrl": "https://www.daddario.com/pages/careers-job-listings",
+   "hqCountry": "US",
+   "notes": "HQ: 595 Smith St, Farmingdale, NY 11735 (D'Addario & Company, Inc.)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "daktronics.com",
+   "evidenceUrl": "https://careers-daktronics.icims.com/jobs/intro?hashed=-435709790",
+   "hqCountry": "US",
+   "notes": "HQ: 201 Daktronics Dr, Brookings, SD 57006",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "dallasisd.org",
+   "evidenceUrl": "https://www.dallasisd.org/careers/career-center",
+   "hqCountry": "US",
+   "notes": "HQ: 9400 N Central Expy, Dallas, TX 75231 (Dallas ISD Administration Building)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "dcgoodwill.org",
+   "evidenceUrl": "https://dcgoodwill.org/careers/careers-at-dc-goodwill/",
+   "hqCountry": "US",
+   "notes": "HQ: 1140 3rd St NE Ste 350, Washington, DC 20002 (Goodwill of Greater Washington)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "dental.tufts.edu",
+   "evidenceUrl": "https://dental.tufts.edu/about/careers",
+   "hqCountry": "US",
+   "notes": "HQ: 1 Kneeland St, Boston, MA 02111 (Tufts University School of Dental Medicine)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "deq.mt.gov",
+   "evidenceUrl": "https://deq.mt.gov/careers",
+   "hqCountry": "US",
+   "notes": "HQ: 1520 E 6th Ave, Helena, MT 59601 (Montana DEQ Headquarters)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "dli.mt.gov",
+   "evidenceUrl": "https://dli.mt.gov/careers",
+   "hqCountry": "US",
+   "notes": "HQ: 1315 Lockey Ave, Helena, MT (Montana Dept. of Labor & Industry, physical address)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "dvmc.com",
+   "evidenceUrl": "https://dvmc.com/careers/",
+   "hqCountry": "US",
+   "notes": "HQ: 16850 Bear Valley Rd, Victorville, CA 92395 (Desert Valley Hospital)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "eagle-crest.com",
+   "evidenceUrl": "https://www.eagle-crest.com/careers",
+   "hqCountry": "US",
+   "notes": "HQ: 1522 Cline Falls Rd, Redmond, OR 97756 (Eagle Crest Resort)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "ebsco.com",
+   "evidenceUrl": "https://about.ebsco.com/careers",
+   "hqCountry": "US",
+   "notes": "HQ: 10 Estes St, Ipswich, MA 01938 (EBSCO Information Services, labeled Headquarters)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "encinomed.org",
+   "evidenceUrl": "https://encinomed.org/careers/",
+   "hqCountry": "US",
+   "notes": "HQ: 16237 Ventura Blvd, Encino, CA 91436 (Encino Hospital Medical Center)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "equitable.com",
+   "evidenceUrl": "https://equitable.com/careers-at-equitable",
+   "hqCountry": "US",
+   "notes": "HQ: 1345 Avenue of the Americas, New York, NY 10105 (Equitable Financial Life Insurance Company home office)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "fitzgibbon.org",
+   "evidenceUrl": "https://www.fitzgibbon.org/careers",
+   "hqCountry": "US",
+   "notes": "HQ: 2305 S Highway 65, Marshall, MO 65340 (Fitzgibbon Hospital)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "freedomhouse.org",
+   "evidenceUrl": "https://freedomhouse.org/careers",
+   "hqCountry": "US",
+   "notes": "HQ: 1225 I St NW #1200, Washington, DC 20005 (Freedom House)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "friendshipschools.org",
+   "evidenceUrl": "https://careers.friendshipschools.org/home",
+   "hqCountry": "US",
+   "notes": "HQ: 1400 1st St NW Ste 300, Washington, DC 20001 (Friendship Public Charter School)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "fultonbank.com",
+   "evidenceUrl": "https://www.fultonbank.com/careers",
+   "hqCountry": "US",
+   "notes": "HQ: One Penn Square, Lancaster, PA 17604 (Fulton Financial Corporation, corporate secretary address; HQ city Lancaster confirmed on first-party site)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "giftofhope.org",
+   "evidenceUrl": "https://giftofhope.org/careers/",
+   "hqCountry": "US",
+   "notes": "HQ: 425 Spring Lake Dr, Itasca, IL 60143 (Gift of Hope, explicitly 'Headquartered in Itasca, Ill.')",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "girlscouts.org",
+   "evidenceUrl": "https://www.girlscouts.org/en/footer/careers.html",
+   "hqCountry": "US",
+   "notes": "HQ: 420 Fifth Ave, New York, NY 10018 (Girl Scouts of the USA, explicitly headquartered there)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "hackensackmeridianhealth.org",
+   "evidenceUrl": "https://jobs.hackensackmeridianhealth.org/",
+   "hqCountry": "US",
+   "notes": "HQ: 343 Thornall St, Edison, NJ 08837 (Hackensack Meridian Health corporate address; one ACO doc lists ZIP 08818 for same street address)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "heart.org",
+   "evidenceUrl": "https://heart.jobs/",
+   "hqCountry": "US",
+   "notes": "HQ: 7272 Greenville Ave, Dallas, TX 75231 (American Heart Association National Center)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "hobartcorp.com",
+   "evidenceUrl": "https://www.hobartcorp.com/about-us-hobart/current-openings",
+   "hqCountry": "US",
+   "notes": "HQ: 701 S Ridge Ave, Troy, OH 45374 (Hobart headquarters in Troy, Ohio)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "hotelroanoke.com",
+   "evidenceUrl": "https://www.hotelroanoke.com/careers",
+   "hqCountry": "US",
+   "notes": "HQ: 110 Shenandoah Ave NW, Roanoke, VA 24016 (Hotel Roanoke & Conference Center)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "hsu.edu",
+   "evidenceUrl": "https://hsu.edu/about/administration/finance-and-administration/human-resources/job-opportunities/",
+   "hqCountry": "US",
+   "notes": "HQ: 1100 Henderson St, Arkadelphia, AR 71999 (Henderson State University)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "hudsonregionalhospital.com",
+   "evidenceUrl": "https://www.hudsonregionalhospital.com/carepoint/careers/",
+   "hqCountry": "US",
+   "notes": "HQ: 55 Meadowlands Pkwy, Secaucus, NJ 07094 (Hudson Regional Health)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "huntsvillehospital.org",
+   "evidenceUrl": "https://careers.hhsys.org/?bcsi-ac-1890e3206a556864=2791AF9A000000024k%20yjCjZLUuKVFe8%2Fi2uXN3Ox51kHAAAAgAAADnFagCEAwAAAgAAAGk0FAA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%20gpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-cde40c890bd19f3d%3D2719301D00000002HsPJUykHtQ3KyOBfcfBkP8YJ06axOAAAAgAAAB8v1QCEAwAAHQEAABphFQA%3D%3Fbcsi-ac-cde40c890bd19f3d%3D2719301D00000002TxABWgl7eq%20hQML22rIetyufVWbfagAAAgAAAJmgkQGEAwAAHAAAAAxZPAA%3D%3Fbcsi-ac-cde40c890bd19f3d%3D2719301D00000002voqohdcopjzdU6XxuG16mTAk2k1LKQAAAgAAAIg7mwCEAwAA2AAAAAtdDQA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%2Bns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%2Bns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002GC1bUC%2FqDT8rTBbNjUtVtRY8%20IQAbgAAAgAAAMxenQGEAwAAXAAAAG6SOgA%3D%3Fbcsi-ac-1890e3206a556864%3D2791AF9A000000024k%20yjCjZLUuKVFe8%2Fi2uXN3Ox51kHAAAAgAAADnFagCEAwAAAgAAAGk0FAA%3D%3Fbcsi-ac-1890e3206a556864%3D2791AF9A000000024k%2ByjCjZLUuKVFe8%2Fi2uXN3Ox51kHAAAAgAAADnFagCEAwAAAgAAAGk0FAA%3D%3Fbcsi-ac-1890e3206a556864%3D2791AF9A00000002RP3KROa3gsLqZPcbEy9EcmR2rT08BAAAAgAAANvpDwCEAwAACQAAAAKDAgA%3D%3Fbcsi-ac-cde40c890bd19f3d%3D2719301D00000002TxABWgl7eq%2BhQML22rIetyufVWbfagAAAgAAAJmgkQGEAwAAHAAAAAxZPAA%3D%3Fbcsi-ac-cde40c890bd19f3d%3D2719301D00000002voqohdcopjzdU6XxuG16mTAk2k1LKQAAAgAAAIg7mwCEAwAA2AAAAAtdDQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%20gpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002v9sVUBwLXg%20pFHuDtmLIVtgn55K8YQAAAgAAAJBRbwGEAwAAVQAAAOPsLwA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%2Bns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-cde40c890bd19f3d%3D2719301D00000002voqohdcopjzdU6XxuG16mTAk2k1LKQAAAgAAAIg7mwCEAwAA2AAAAAtdDQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-cde40c890bd19f3d%3D2719301D00000002voqohdcopjzdU6XxuG16mTAk2k1LKQAAAgAAAIg7mwCEAwAA2AAAAAtdDQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-cde40c890bd19f3d%3D2719301D00000002voqohdcopjzdU6XxuG16mTAk2k1LKQAAAgAAAIg7mwCEAwAA2AAAAAtdDQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-cde40c890bd19f3d%3D2719301D00000002voqohdcopjzdU6XxuG16mTAk2k1LKQAAAgAAAIg7mwCEAwAA2AAAAAtdDQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-cde40c890bd19f3d%3D2719301D00000002voqohdcopjzdU6XxuG16mTAk2k1LKQAAAgAAAIg7mwCEAwAA2AAAAAtdDQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-cde40c890bd19f3d%3D2719301D00000002voqohdcopjzdU6XxuG16mTAk2k1LKQAAAgAAAIg7mwCEAwAA2AAAAAtdDQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-cde40c890bd19f3d%3D2719301D00000002voqohdcopjzdU6XxuG16mTAk2k1LKQAAAgAAAIg7mwCEAwAA2AAAAAtdDQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAwAAAC1IAgA%3D%3Fbcsi-ac-a70e1c0dc9ec8868%3D2719437500000002kcIh1zkoVRqZIbVGmu%20ns80Z5UQxIgAAAgAAAJ2UgACEAwAA6AAAAG5PCQA%3D%3Fbcsi-ac-b7339fc24b5f9f3b%3D28DD4EC700000002iJmerumIG7eK3SUg83%2BgpkGitIPvAQAAAgAAANVFBwCEAwAAAWp6%2F8fW%2F8e8gWbL4Q8X4kQ%3D%3D%3Ffbclid%3DIwAR2wKyaW2jXv-HncN8QxQhPOAhRDoQOf1swenm",
+   "hqCountry": "US",
+   "notes": "HQ: 101 Sivley Rd, Huntsville, AL 35801 (Huntsville Hospital, flagship campus)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "icann.org",
+   "evidenceUrl": "https://www.icann.org/en/careers",
+   "hqCountry": "US",
+   "notes": "HQ: 12025 Waterfront Dr Ste 300, Los Angeles, CA 90094-2536 (ICANN Headquarters, labeled on icann.org/locations)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "idc.com",
+   "evidenceUrl": "https://www.idc.com/about/careers/",
+   "hqCountry": "US",
+   "notes": "HQ: 140 Kendrick St Bldg B, Needham, MA 02494 (IDC Global Headquarters)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "ifixit.com",
+   "evidenceUrl": "https://www.ifixit.com/about-us/careers",
+   "hqCountry": "US",
+   "notes": "HQ: 1330 Monterey St, San Luis Obispo, CA 93401 (iFixit US address)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "ifpri.org",
+   "evidenceUrl": "https://www.ifpri.org/landing/work-with-us/",
+   "hqCountry": "US",
+   "notes": "HQ: 1201 Eye St NW, Washington, DC 20005 (IFPRI Headquarters)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "imsa.edu",
+   "evidenceUrl": "https://www.imsa.edu/discover-imsa/careers/",
+   "hqCountry": "US",
+   "notes": "HQ: 1500 Sullivan Rd, Aurora, IL 60506 (Illinois Mathematics and Science Academy, Main Campus)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "kp.org",
+   "evidenceUrl": "https://www.kaiserpermanentejobs.org/?kp_shortcut_referrer=kp.org/careers",
+   "hqCountry": "US",
+   "notes": "HQ: One Kaiser Plaza, Oakland, CA 94612 (Kaiser Foundation Health Plan / Kaiser Permanente Insurance Company)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "laconcharesort.com",
+   "evidenceUrl": "https://www.laconcharesort.com/our-hotel/amenities/",
+   "hqCountry": "US",
+   "notes": "HQ: 1077 Ashford Ave, San Juan, Puerto Rico 00907 (US territory)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "landmarkmedical.org",
+   "evidenceUrl": "https://landmarkmedical.org/",
+   "hqCountry": "US",
+   "notes": "HQ: 115 Cass Ave, Woonsocket, RI 02895",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "lapalmaintercommunityhospital.com",
+   "evidenceUrl": "https://lapalmaintercommunityhospital.com/",
+   "hqCountry": "US",
+   "notes": "HQ: 7901 Walker St, La Palma, CA 90623",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "legacyhealth.org",
+   "evidenceUrl": "https://www.legacyhealth.org/services-and-resources.aspx",
+   "hqCountry": "US",
+   "notes": "HQ: Legacy Health System Office, 1919 NW Lovejoy St, Portland, OR 97209",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "lennox.com",
+   "evidenceUrl": "https://www.lennox.com/contact-us",
+   "hqCountry": "US",
+   "notes": "HQ: 2140 Lake Park Blvd, Richardson, TX 75080",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "library.stanford.edu",
+   "evidenceUrl": "https://library.stanford.edu/libraries/branches-and-centers",
+   "hqCountry": "US",
+   "notes": "HQ: Green Library, 557 Escondido Mall, Stanford, CA 94305",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "lowerbuckshosp.com",
+   "evidenceUrl": "https://lowerbuckshosp.com/",
+   "hqCountry": "US",
+   "notes": "HQ: 501 Bath Rd, Bristol, PA 19007",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "mainlinehealth.org",
+   "evidenceUrl": "https://www.mainlinehealth.org/about/policies/terms-of-use",
+   "hqCountry": "US",
+   "notes": "HQ: 240 North Radnor Chester Rd, Radnor, PA 19087",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "mbc.org",
+   "evidenceUrl": "https://www.mbc.org/saint-paul-donor-center/",
+   "hqCountry": "US",
+   "notes": "HQ: 737 Pelham Blvd, St. Paul, MN 55114",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "medstarhealth.org",
+   "evidenceUrl": "https://www.medstarhealth.org/contact-us",
+   "hqCountry": "US",
+   "notes": "HQ: 10980 Grantchester Way, Columbia, MD 21044",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "members.kaiserpermanente.org",
+   "evidenceUrl": "https://about.kaiserpermanente.org/content/dam/kp/mykp/documents/reports/community-health/oakland-is-2025_ada.pdf",
+   "hqCountry": "US",
+   "notes": "HQ: One Kaiser Plaza, Oakland, CA 94612 (first-party Kaiser implementation-strategy PDF)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "mercymedcenter.com",
+   "evidenceUrl": "https://mercymedcenter.com/patients-visitors/patient-rights-responsibilities/",
+   "hqCountry": "US",
+   "notes": "HQ: 1325 N Highland Ave, Aurora, IL 60506",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "mhskids.org",
+   "evidenceUrl": "https://www.mhskids.org/",
+   "hqCountry": "US",
+   "notes": "HQ: 1201 Homestead Ln, Hershey, PA 17033",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "mlgw.com",
+   "evidenceUrl": "https://www.mlgw.com/",
+   "hqCountry": "US",
+   "notes": "HQ/main office: 245 S Main St, Memphis, TN 38103",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "mlssoccer.com",
+   "evidenceUrl": "https://www.mlssoccer.com/news/major-league-soccer-unveils-new-global-headquarters-at-2-penn-plaza-in-manhattan",
+   "hqCountry": "US",
+   "notes": "HQ: 2 Penn Plaza, New York, NY (new global HQ unveiled May 6, 2026; replaced 420 Fifth Ave; no ZIP shown for new address)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "montclair-hospital.org",
+   "evidenceUrl": "https://montclair-hospital.org/",
+   "hqCountry": "US",
+   "notes": "HQ: 5000 San Bernardino St, Montclair, CA 91763",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "morristownhamblen.com",
+   "evidenceUrl": "https://www.morristownhamblen.com/",
+   "hqCountry": "US",
+   "notes": "HQ: 908 W 4th N St, Morristown, TN 37814",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "msci.com",
+   "evidenceUrl": "https://www.msci.com/downloads/documents/sustainability/sustainable-finance-consultation-responses/responses/response-iosco-esg-ratings-data-products-2021.pdf",
+   "hqCountry": "US",
+   "notes": "HQ: 7 World Trade Center, 250 Greenwich St, 49th Floor, New York, NY 10007",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "mstc.edu",
+   "evidenceUrl": "https://www.mstc.edu/",
+   "hqCountry": "US",
+   "notes": "HQ: 500 32nd St N, Wisconsin Rapids, WI 54494",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "nascsp.org",
+   "evidenceUrl": "https://nascsp.org/",
+   "hqCountry": "US",
+   "notes": "HQ: 111 K St NE, Suite 300, Washington, DC 20002",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "naseo.org",
+   "evidenceUrl": "https://naseo.org/Data/Sites/1/media/tknaseo/naseo-2026-rfp-013-senior-advisor-state-and-local-espc.pdf",
+   "hqCountry": "US",
+   "notes": "HQ: 1812 North Moore St, Suite 1810, Arlington, VA 22209 (moved from 1300 N 17th St, Arlington)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "neuropsychiatrichospitals.net",
+   "evidenceUrl": "https://www.neuropsychiatrichospitals.net/wp-content/uploads/2026/04/Notice-of-Privacy-Practices.pdf",
+   "hqCountry": "US",
+   "notes": "HQ: 112 West Jefferson Blvd, Suite 600, South Bend, IN 46601 (first-party Notice of Privacy Practices PDF)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "nielsen.com",
+   "evidenceUrl": "https://computermobilepanel.nielsen.com/ui/US/en/privacypolicyen.html",
+   "hqCountry": "US",
+   "notes": "HQ: 675 Avenue of the Americas, New York, NY 10010",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "njeda.com",
+   "evidenceUrl": "https://www.njeda.gov/wp-content/uploads/2025/01/NJ-Founders-and-Funders-All-Stars-Event-and-Pilot-Grant-NOFAupdated.pdf",
+   "hqCountry": "US",
+   "notes": "HQ: 36 West State St, PO Box 990, Trenton, NJ 08625 (evidence on njeda.gov, same org)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "northvistahospital.com",
+   "evidenceUrl": "https://northvistahospital.com/",
+   "hqCountry": "US",
+   "notes": "HQ: 1409 E Lake Mead Blvd, North Las Vegas, NV 89030",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "o-i.com",
+   "evidenceUrl": "https://www.o-i.com/wp-content/uploads/2020/04/2019-10-K.pdf",
+   "hqCountry": "US",
+   "notes": "HQ: One Michael Owens Way, Perrysburg, OH 43551-2999 (first-party 10-K hosted on o-i.com)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "ohsu.edu",
+   "evidenceUrl": "https://www.ohsu.edu/school-of-medicine/graduate-studies/contact-us",
+   "hqCountry": "US",
+   "notes": "HQ: 3181 SW Sam Jackson Park Rd, Portland, OR 97239",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "okheart.com",
+   "evidenceUrl": "https://www.okheart.com/",
+   "hqCountry": "US",
+   "notes": "HQ/main campus: Oklahoma Heart Hospital North, 4050 W Memorial Rd, Oklahoma City, OK 73120 (first-party homepage footer)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "oneblood.org",
+   "evidenceUrl": "https://www.oneblood.org/content/dam/oneblood/corporate/documents-/Official%20Rules%20-Florida%20Gators%20Prizes_November%202026.pdf",
+   "hqCountry": "US",
+   "notes": "HQ/principal place of business: 8669 Commodity Circle, Orlando, FL 32819 (first-party sweepstakes rules PDF)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "ozk.com",
+   "evidenceUrl": "https://www.ozk.com/locations/ar/little-rock/18000-cantrell-rd",
+   "hqCountry": "US",
+   "notes": "HQ: 18000 Cantrell Rd, Little Rock, AR 72223",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "pactworld.org",
+   "evidenceUrl": "http://pactworld.org/",
+   "hqCountry": "US",
+   "notes": "HQ: 1140 3rd Street NE, Suite 400, Washington, DC 20002",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "paradisevalleyhospital.net",
+   "evidenceUrl": "https://paradisevalleyhospital.net/paradise-valley-hospital-earns-a-hospital-safety-grade-from-the-leapfrog-group/",
+   "hqCountry": "US",
+   "notes": "HQ: 2400 E 4th St, National City, CA 91950 (evidence on the hospital's own .net site; batch evidenceUrl was the .com TLD of the same org)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "pinkerton.com",
+   "evidenceUrl": "https://www.pinkerton.com/press-room/historic-risk-management-agency-opens-downtown-corporate-headquarters",
+   "hqCountry": "US",
+   "notes": "HQ: 101 N Main St, Suite 300, Ann Arbor, MI 48104 (global HQ moved from Parsippany, NJ in 2014, first-party press release)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "rambus.com",
+   "evidenceUrl": "https://www.rambus.com/wp-content/uploads/2025/01/2024-05-Rambus-Form-SD-Filed.pdf",
+   "hqCountry": "US",
+   "notes": "HQ: 4453 North First Street, Suite 100, San Jose, CA 95134 (first-party Form SD hosted on rambus.com)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "rare.org",
+   "evidenceUrl": "https://rare.org/about-us/contact-us/",
+   "hqCountry": "US",
+   "notes": "Global HQ: 1310 N Courthouse Rd, Suite 110, Arlington, VA 22201",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "renasantbank.com",
+   "evidenceUrl": "https://www.renasantbank.com/locations/tupelo-main",
+   "hqCountry": "US",
+   "notes": "HQ/main office: 209 Troy St, Tupelo, MS 38802 (SEC filings show ZIP 38804 for same street address)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "riverbed.com",
+   "evidenceUrl": "https://riverbed.com/riverbed-wp-content/uploads/2023/02/riverbed-technology-llc-form-8937.pdf",
+   "hqCountry": "US",
+   "notes": "HQ: 680 Folsom St, San Francisco, CA 94107 (first-party Form 8937 hosted on riverbed.com)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "riversideresearch.org",
+   "evidenceUrl": "https://www.riversideresearch.org/locations",
+   "hqCountry": "US",
+   "notes": "HQ: 12601 Fair Lakes Circle, Suite 400, Fairfax, VA 22033 (moved from Arlington, VA in 2024)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "saintfrancisevanston.org",
+   "evidenceUrl": "https://saintfrancisevanston.org/",
+   "hqCountry": "US",
+   "notes": "HQ: 355 Ridge Ave, Evanston, IL 60202",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "sarh.org",
+   "evidenceUrl": "https://www.sarh.org/careers/about-san-antonio",
+   "hqCountry": "US",
+   "notes": "HQ: 999 San Bernardino Rd, Upland, CA 91786",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "scspa.com",
+   "evidenceUrl": "https://scspa.com/news/43219/",
+   "hqCountry": "US",
+   "notes": "HQ: 200 Ports Authority Dr, Mount Pleasant, SC 29464 (moved from 176 Concord St, Charleston in Jan 2019; ZIP from third-party directions doc)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "seattleaquarium.org",
+   "evidenceUrl": "https://www.seattleaquarium.org/visit/faq/",
+   "hqCountry": "US",
+   "notes": "HQ: 1483 Alaskan Way, Pier 59, Seattle, WA 98101",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "sfmta.com",
+   "evidenceUrl": "https://www.sfmta.com/sfmta-career-center",
+   "hqCountry": "US",
+   "notes": "HQ: 1 South Van Ness Ave, 7th Floor, San Francisco, CA 94103",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "shastaregional.com",
+   "evidenceUrl": "https://shastaregional.com/",
+   "hqCountry": "US",
+   "notes": "HQ: 1100 Butte St, Redding, CA 96001",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "shermanoakshospital.org",
+   "evidenceUrl": "https://shermanoakshospital.org/",
+   "hqCountry": "US",
+   "notes": "HQ: 4929 Van Nuys Blvd, Sherman Oaks, CA 91403",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "shure.com",
+   "evidenceUrl": "https://www.shure.com/en-MEA/legal/processing-of-personal-data",
+   "hqCountry": "US",
+   "notes": "Principal office: 5800 W Touhy Ave, Niles, IL 60714",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "silvertoncasino.com",
+   "evidenceUrl": "https://silvertoncasino.com/",
+   "hqCountry": "US",
+   "notes": "HQ: 3333 Blue Diamond Rd, Las Vegas, NV 89139",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "smh.com",
+   "evidenceUrl": "https://careers.smh.com/careers/",
+   "hqCountry": "US",
+   "notes": "HQ: 1700 S Tamiami Trl, Sarasota, FL 34239",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "smu.edu",
+   "evidenceUrl": "https://www.smu.edu/aboutsmu/contactsmu",
+   "hqCountry": "US",
+   "notes": "HQ: 6425 Boaz Lane, Dallas, TX 75205",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "snapon.com",
+   "evidenceUrl": "https://www.snapon.com/",
+   "hqCountry": "US",
+   "notes": "HQ: 2801 80th St, Kenosha, WI 53143",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "southcoast.org",
+   "evidenceUrl": "https://www.southcoast.org/contact-us/",
+   "hqCountry": "US",
+   "notes": "HQ/mailing: 101 Page St, New Bedford, MA 02740 (Southcoast Health)",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "sri.com",
+   "evidenceUrl": "https://www.sri.com/contact/",
+   "hqCountry": "US",
+   "notes": "HQ: 333 Ravenswood Ave, Menlo Park, CA 94025",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "st-james-hotel.com",
+   "evidenceUrl": "https://st-james-hotel.com/about-us/",
+   "hqCountry": "US",
+   "notes": "HQ: 406 Main St, Red Wing, MN 55066",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "stifel.com",
+   "evidenceUrl": "https://www.stifel.com/careers",
+   "hqCountry": "US",
+   "notes": "HQ: 501 N Broadway (One Financial Plaza), St. Louis, MO 63102",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "stjosephkc.com",
+   "evidenceUrl": "https://stjosephkc.com/careers/",
+   "hqCountry": "US",
+   "notes": "HQ: 1000 Carondelet Dr, Kansas City, MO 64114",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "stonybrookmedicine.edu",
+   "evidenceUrl": "https://www.stonybrookmedicine.edu/careers",
+   "hqCountry": "US",
+   "notes": "HQ: 101 Nicolls Rd, Stony Brook, NY 11794",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "taskforce.org",
+   "evidenceUrl": "https://www.taskforce.org/new-task-force-headquarters-starts-taking-shape/",
+   "hqCountry": "US",
+   "notes": "HQ: 330 W Ponce de Leon Ave, Decatur, GA 30030",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "texasbar.com",
+   "evidenceUrl": "https://blog.texasbar.com/2023/06/articles/state-bar/state-bar-of-texas-board-of-directors-to-meet-june-21-22-in-austin/",
+   "hqCountry": "US",
+   "notes": "HQ: 1414 Colorado St, Austin, TX 78701",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "texashealth.org",
+   "evidenceUrl": "https://www.texashealth.org/",
+   "hqCountry": "US",
+   "notes": "Corporate HQ: 612 E Lamar Blvd, Arlington, TX 76011",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "tgh.org",
+   "evidenceUrl": "https://www.tgh.org/careers-at-tampa-general",
+   "hqCountry": "US",
+   "notes": "HQ: 1 Tampa General Cir, Tampa, FL 33606",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "thinktogether.org",
+   "evidenceUrl": "https://thinktogether.org/",
+   "hqCountry": "US",
+   "notes": "HQ: 2101 E 4th St Ste 200B, Santa Ana, CA 92705",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "thirdway.org",
+   "evidenceUrl": "https://www.thirdway.org/",
+   "hqCountry": "US",
+   "notes": "HQ: 1025 Connecticut Ave NW Ste 400, Washington, DC 20036",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "tlhoc.com",
+   "evidenceUrl": "https://tlhoc.com/careers/",
+   "hqCountry": "US",
+   "notes": "Main office: 3334 Capital Medical Blvd Ste 400, Tallahassee, FL 32308",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "towson.edu",
+   "evidenceUrl": "http://www.towson.edu/contact.html",
+   "hqCountry": "US",
+   "notes": "HQ: 8000 York Rd, Towson, MD 21252",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "tufts.edu",
+   "evidenceUrl": "https://www.tufts.edu/about/contact-us",
+   "hqCountry": "US",
+   "notes": "HQ: 419 Boston Ave, Medford, MA 02155",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "uab.edu",
+   "evidenceUrl": "https://www.residency.peds.uab.edu/home/contact",
+   "hqCountry": "US",
+   "notes": "HQ/mailing: 1720 2nd Ave S, Birmingham, AL 35294",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "unitedhealthgroup.com",
+   "evidenceUrl": "https://www.unitedhealthgroup.com/careers/en/work.html",
+   "hqCountry": "US",
+   "notes": "Principal executive offices: 9900 Bren Road East, Minnetonka, MN 55343",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "uoflhealth.org",
+   "evidenceUrl": "https://uoflhealth.org/healthcare-careers/",
+   "hqCountry": "US",
+   "notes": "HQ: 530 S Jackson St, Louisville, KY",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "utswmed.org",
+   "evidenceUrl": "https://utswmed.org/contact-us/",
+   "hqCountry": "US",
+   "notes": "HQ: 5323 Harry Hines Blvd, Dallas, TX 75390; board is UT Southwestern's own",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "utswmedicine.org",
+   "evidenceUrl": "https://utswmed.org/contact-us/",
+   "hqCountry": "US",
+   "notes": "HQ: 5323 Harry Hines Blvd, Dallas, TX 75390; board is UT Southwestern's own",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "valero.com",
+   "evidenceUrl": "https://www.valero.com/about/offices",
+   "hqCountry": "US",
+   "notes": "HQ: One Valero Way, San Antonio, TX 78249",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "vitalstrategies.org",
+   "evidenceUrl": "https://www.vitalstrategies.org/global/new-york/",
+   "hqCountry": "US",
+   "notes": "HQ: 100 Broadway, 4th Floor, New York, NY 10005",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "wafdbank.com",
+   "evidenceUrl": "https://www.wafdbank.com/about-us",
+   "hqCountry": "US",
+   "notes": "Corporate HQ: 425 Pike St, Seattle, WA 98101",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "wbmi.com",
+   "evidenceUrl": "https://www.thesilverlining.com/careers",
+   "hqCountry": "US",
+   "notes": "HQ/home office: 1900 S 18th Ave, West Bend, WI 53095",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "westerndigital.com",
+   "evidenceUrl": "https://www.westerndigital.com/",
+   "hqCountry": "US",
+   "notes": "HQ: 5601 Great Oaks Pkwy, San Jose, CA 95119",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "weyerhaeuser.com",
+   "evidenceUrl": "https://www.weyerhaeuser.com/company/contact-us-locations/",
+   "hqCountry": "US",
+   "notes": "Corporate HQ: 220 Occidental Ave S, Seattle, WA 98104",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "wiregrass.edu",
+   "evidenceUrl": "https://www.wiregrass.edu/institutional-effectiveness/accreditation",
+   "hqCountry": "US",
+   "notes": "HQ: 4089 Val Tech Rd, Valdosta, GA 31602",
+   "verifiedAt": "2026-11-18"
+  },
+  {
+   "domain": "wrberkley.com",
+   "evidenceUrl": "https://berkley.com/about-us/careers",
+   "hqCountry": "US",
+   "notes": "Principal executive offices: 475 Steamboat Rd, Greenwich, CT 06830",
+   "verifiedAt": "2026-11-18"
   }
- ],
- "version": 1
+ ]
 }
