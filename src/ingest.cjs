@@ -16,12 +16,18 @@ const { fetchGreenhouseJobs } = require('./greenhouse.cjs');
 const { fetchLeverJobs } = require('./lever.cjs');
 const { fetchAshbyJobs } = require('./ashby.cjs');
 const { fetchWorkdayJobs } = require('./workday.cjs');
+const { fetchSmartRecruitersJobs } = require('./smartrecruiters.cjs');
+const { fetchRecruiteeJobs } = require('./recruitee.cjs');
+const { fetchPersonioJobs } = require('./personio.cjs');
 
 const FETCHERS = {
   greenhouse: fetchGreenhouseJobs,
   lever: fetchLeverJobs,
   ashby: fetchAshbyJobs,
   workday: fetchWorkdayJobs,
+  smartrecruiters: fetchSmartRecruitersJobs,
+  recruitee: fetchRecruiteeJobs,
+  personio: fetchPersonioJobs,
 };
 
 // ATS API host per fetcher family. The rate limiter is keyed by HOST, not
@@ -37,6 +43,9 @@ const ATS_HOSTS = {
   greenhouse: 'boards-api.greenhouse.io',
   lever: 'api.lever.co',
   ashby: 'api.ashbyhq.com',
+  smartrecruiters: 'api.smartrecruiters.com',
+  recruitee: null, // per-tenant host: <slug>.recruitee.com (no shared host)
+  personio: null, // per-tenant host: <slug>.jobs.personio.de (no shared host)
 };
 const hostLimiters = new Map();
 function limiterForHost(host, maxRps = 3) {
