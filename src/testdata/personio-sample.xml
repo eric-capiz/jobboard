@@ -1,0 +1,125 @@
+<!--
+  personio-sample.xml — Personio public XML job feed sample.
+  Source boards: ifixit.jobs.personio.de and nussli.jobs.personio.de
+  Fetched live: 2026-11-19 ~00:11-00:12 UTC (browser.open text fetches).
+  Endpoint: GET https://<slug>.jobs.personio.de/xml?language=en (also .com host)
+  No auth. Single response holds the whole board; no pagination.
+
+  !!! RECONSTRUCTED, NOT VERBATIM BYTES !!!
+  The text fetcher used for live verification strips XML tags, so raw feed
+  bytes could not be captured with the allowed tools (browser.open only;
+  direct curl to employer hosts is forbidden by the task). What IS real here:
+  every field value and every word of description text below was fetched
+  live from the two boards on 2026-11-19. Element order/shape follows
+  Personio's own OpenAPI spec (personio-recruiting-api.yaml, schemas
+  XmlResponse / JobPosting / jobDescriptionItem) and a measured Oct-2026
+  write-up of live feeds (dev.to/adderleydata). A fetcher-test run against
+  the REAL feed must still be done before the fetcher is trusted.
+  Known reconstruction gaps:
+  - Description <value> content below is PLAIN TEXT as surfaced by the
+    fetcher. The real feed carries styled HTML inside CDATA
+    (e.g. <ul><li>...</li></ul> with inline font stacks); the fetcher's
+    stripHtml() (fetch-util.cjs) is what reduces it to text.
+  - ifixit position (job 3): the text fetcher surfaced only the tail
+    sections (Must-have / Nice-to-have) and stripped the <id>, so its id
+    is marked UNKNOWN and its earlier sections are missing. Do NOT treat
+    job 3 as a complete position; it is included to show the partial-
+    capture failure mode of text fetching.
+  - nussli job 2 (Bauleiter): ?language=en returns EMPTY <jobDescriptions>
+    because the job is written in German only (documented Personio
+    behaviour). Its German description text was not surfaced by the
+    fetcher. Included to pin the empty-description case the fetcher must
+    handle (skip or fall back to ?language=de, never emit a thin posting).
+-->
+<workzag-jobs>
+  <position>
+    <id>2343128</id>
+    <subcompany>Nüssli (Schweiz) AG</subcompany>
+    <office>Hüttwilen</office>
+    <department>Initiativbewerbung</department>
+    <recruitingCategory>Initiativbewerbung</recruitingCategory>
+    <name>Initiativbewerbung - Nüssli (Schweiz) AG</name>
+    <jobDescriptions>
+      <jobDescription>
+        <name>Your mission</name>
+        <value><![CDATA[Unser Herz schlägt für das Handwerk, unsere Augen leuchten bei technischen Herausforderungen. Wir sind das Powerhouse für Schreinerei, Holzbau und Metallbau. In unserer 5000 m² grossen Werkhalle realisieren wir nicht nur Projekte, sondern echte Wow-Momente – vom individuellen Möbelstück bis zum komplexen Grossprojekt.]]></value>
+      </jobDescription>
+      <jobDescription>
+        <name>Wo bringst du deine Leidenschaft ein?</name>
+        <value><![CDATA[Schreinerei &amp; Innenausbau – Hier entstehen Arbeits- und Wohnwelten mit Charakter. An modernsten Maschinen und an der Werkbank fertigst du Möbel und Inneneinrichtungen in höchster Präzision. Wenn du Holz liebst und den perfekten Abschluss suchst, ist das dein Revier. Holzbau &amp; Zimmerei – Ob nachhaltige Fassaden, Aufstockungen oder komplette Scheunen: Hier denkst du in grossen Dimensionen. Du verbindest traditionelle Zimmermannskunst mit innovativer Elementbauweise und sorgst dafür, dass unsere Bauten stabil und zukunftssicher stehen. Metallbau – Ohne Metall geht nichts. Du fertigst Treppen, Geländer und Tragkonstruktionen, die technisch anspruchsvoll und optisch einzigartig sind. Du liebst das Spiel mit Stahl und die Kombination verschiedener Materialien? Dann bist du hier richtig. Projektleitung, AVOR &amp; Verkauf – Du bist der Kopf hinter dem Werk. Von der Kalkulation über die Arbeitsvorbereitung bis zur Bauleitung hältst du die Fäden in der Hand. Du löst technische Puzzles, bevor sie entstehen, und sorgst dafür, dass Qualität, Termine und Kosten stimmen. Backoffice – Unser kleines, aber feines Team im Hintergrund. Du hältst den „Machern“ in der Produktion und Montage den Rücken frei und sorgst dafür, dass die Administration genauso reibungslos läuft wie unsere Maschinen.]]></value>
+      </jobDescription>
+      <jobDescription>
+        <name>Findest du dich hier wieder?</name>
+        <value><![CDATA[Wir suchen Menschen mit Ecken und Kanten, die anpacken wollen. Egal ob Meister:in, Fachkraft oder Organisationstalent: Wenn du stolz auf das bist, was du am Ende des Tages geschaffen hast, bewirb dich jetzt initiativ. The Bigger Picture – Internationalität: Wir sind schweizerisch verwurzelt, aber auf der ganzen Welt zuhause. Kultur: Flache Hierarchien, "Du"-Kultur und legendäre Mitarbeiterevents gehören bei uns dazu. Perspektive: Viele unserer Führungskräfte haben "on the job" angefangen und sich intern entwickelt.]]></value>
+      </jobDescription>
+      <jobDescription>
+        <name>What you bring</name>
+        <value><![CDATA[Für eine Initiativbewerbung gibt es bei uns keine Checkliste. Was zählt, ist deine Einstellung. Du passt zu uns, wenn du folgende DNA mitbringst: Macher-Mentalität: Du wartest nicht auf Anweisungen, sondern siehst und packst an – egal ob im Büro oder auf dem Projekt. Flexibilität: Unser Geschäft ist das Projektgeschäft. Du bewahrst einen kühlen Kopf, auch wenn sich Pläne kurzfristig ändern. Teamgeist: Wir bauen Grosses, aber nie allein. Du arbeitest gerne interdisziplinär und auf Augenhöhe, vom Lernenden bis zum Projektleiter. Leidenschaft: Dich begeistert es, am Ende des Tages (oder des Projekts) das Ergebnis deiner Arbeit physisch vor dir zu sehen.]]></value>
+      </jobDescription>
+      <jobDescription>
+        <name>Languages &amp; Communication</name>
+        <value><![CDATA[Global &amp; Lokal: Da unsere Projekte weltweit stattfinden, ist Englisch oft unsere Brücke zwischen den Standorten. Im Tagesgeschäft und im Team vor Ort kommunizieren wir natürlich in der jeweiligen Landessprache. Sprichst du weitere Fremdsprachen? Hervorragend! Gerade in unseren internationalen Business Lines (Event Structures &amp; Special Projects), die oft grenzüberschreitend arbeiten, ist das ein grosser Vorteil für die Koordination vor Ort.]]></value>
+      </jobDescription>
+      <jobDescription>
+        <name>Leadership &amp; Responsibility</name>
+        <value><![CDATA[Bei uns bedeutet „Führung“ nicht zwingend, dass du ein grosses Team hast – sondern dass du dein Thema beherrschst. Wir suchen Menschen, die Entscheidungen treffen wollen, statt sie zu delegieren. Für Fachkräfte &amp; Talente: Egal ob Junior oder Senior Expert: Du übernimmst schnell die volle Verantwortung für deine Arbeitspakete. Wir suchen Macher, die Probleme sehen und selbstständig lösen – Ownership ist bei uns keine Frage des Titels. Für erfahrene Manager: Du suchst eine Rolle mit Personalverantwortung? Da wir wachsen, brauchen wir immer wieder erfahrene „Kapitäne“ für unsere Business Lines (EVST/SPPR) oder im Service-Bereich (CENS). Wenn du Teams mit Empathie, Klarheit und einer "Hands-on"-Mentalität führen kannst, bist du hier richtig.]]></value>
+      </jobDescription>
+    </jobDescriptions>
+    <employmentType>permanent</employmentType>
+    <seniority>entry-level</seniority>
+    <schedule>full-or-part-time</schedule>
+    <keywords>Spontanbewerbung,Initiativbewerbung,Blindbewerbung</keywords>
+    <occupation>other</occupation>
+    <occupationCategory>other</occupationCategory>
+    <createdAt>2025-09-17T19:48:42+00:00</createdAt>
+  </position>
+  <position>
+    <id>2354907</id>
+    <subcompany>Ruba Objektbau AG</subcompany>
+    <office>Hüttwilen</office>
+    <additionalOffices>
+      <office>Winterthur</office>
+    </additionalOffices>
+    <department>Schreinerei Planung</department>
+    <recruitingCategory>Mitarbeiter/in</recruitingCategory>
+    <name>Bauleiter (m/w/d)</name>
+    <jobDescriptions>
+      <!-- EMPTY in ?language=en: this job is written in German only.
+           A position with no text in the requested language keeps its other
+           fields and comes back with an empty <jobDescriptions>. The
+           fetcher must NOT emit a thin posting for it; fetch ?language=de
+           or skip it. -->
+    </jobDescriptions>
+    <employmentType>permanent</employmentType>
+    <seniority>experienced</seniority>
+    <schedule>full-time</schedule>
+    <yearsOfExperience>2-5</yearsOfExperience>
+    <keywords>offerten,planerstellung,projektleitung,kundenkontakt,baustelle</keywords>
+    <occupation>site_superintendent</occupation>
+    <occupationCategory>building_construction_and_skilled_trades</occupationCategory>
+    <createdAt>2025-09-22T14:44:25+00:00</createdAt>
+  </position>
+  <position>
+    <!-- ifixit board (ifixit.jobs.personio.de), 1 open position as of 2026-11-19.
+         id NOT recoverable via text fetch (tags stripped); earlier description
+         sections not surfaced either. Title/office/schedule from the live
+         careers page; employmentType=temporary from "Befristet" on that page.
+         Sections below are the verbatim tail of the German feed text. -->
+    <id>UNKNOWN</id>
+    <subcompany>iFixit GmbH</subcompany>
+    <office>Stuttgart</office>
+    <name>Mitarbeiter/in Lager und Versand (m/w/d)</name>
+    <jobDescriptions>
+      <jobDescription>
+        <name>Must-have</name>
+        <value><![CDATA[Körperliche Belastbarkeit für die tägliche Lagerarbeit mit viel Stehen und Gehen sowie regelmäßigem Heben und Tragen von Lasten. Samstag und Montag sind feste Arbeitstage – dafür hast du an einem anderen Tag unter der Woche frei. Zuverlässigkeit und sorgfältige Arbeitsweise. Grundlegende Computerkenntnisse (Scanner, Warenwirtschaft, Google Sheets). Gute Deutschkenntnisse, grundlegende Englischkenntnisse.]]></value>
+      </jobDescription>
+      <jobDescription>
+        <name>Nice-to-have</name>
+        <value><![CDATA[Erfahrung in Lager, Versand oder Logistik. Interesse an Technik und/oder Reparatur. Erfahrung im Umgang mit Hubwagen oder anderen Flurförderzeugen. Quereinsteiger/innen mit der richtigen Einstellung sind ausdrücklich willkommen.]]></value>
+      </jobDescription>
+    </jobDescriptions>
+    <employmentType>temporary</employmentType>
+    <schedule>full-time</schedule>
+  </position>
+</workzag-jobs>
